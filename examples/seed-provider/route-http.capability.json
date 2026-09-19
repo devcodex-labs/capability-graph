@@ -1,0 +1,10 @@
+{
+  "capabilityId": "route.http",
+  "name": "HTTP routes",
+  "description": "Register an HTTP method and path with an application handler.",
+  "whenToUse": "Create or locate an HTTP endpoint such as POST /users.",
+  "distinction": "Describes the route type; concrete method/path registrations are runtime instances.",
+  "parents": ["route"],
+  "examples": ["Find the registered POST /users instance in the selected project and environment."],
+  "knowledge": [{ "kind": "document", "knowledgeId": "D-01", "locator": { "type": "relative-file", "path": "knowledge/route-http.md" } }]
+}

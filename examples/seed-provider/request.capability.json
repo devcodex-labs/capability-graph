@@ -1,0 +1,7 @@
+{
+  "capabilityId": "request",
+  "name": "Request handling",
+  "description": "Describe input handling at application request boundaries.",
+  "whenToUse": "Inspect request-oriented capabilities when changing accepted input.",
+  "distinction": "Does not execute a request or discover a running project automatically."
+}

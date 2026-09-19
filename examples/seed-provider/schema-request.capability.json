@@ -1,0 +1,11 @@
+{
+  "capabilityId": "schema.request",
+  "name": "Request schema",
+  "description": "Describe the accepted fields and constraints of a request payload.",
+  "whenToUse": "Select an input schema when a route needs explicit payload constraints.",
+  "distinction": "Describes request data, not route dispatch or a universal schema execution engine.",
+  "parents": ["request"],
+  "related": ["route.validation"],
+  "examples": ["Describe required user fields and test malformed payload handling in the host application."],
+  "knowledge": [{ "kind": "document", "knowledgeId": "D-03", "locator": { "type": "relative-file", "path": "knowledge/schema-request.md" } }]
+}

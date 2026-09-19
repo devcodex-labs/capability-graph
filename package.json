@@ -4,6 +4,28 @@
   "description": "Framework-agnostic capability graph engine for AI coding systems and developer tooling.",
   "license": "Apache-2.0",
   "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
+    "pretest": "npm run build && npm run test:types",
+    "test": "tsc -p tsconfig.test.json && node scripts/run-tests.mjs",
+    "test:types": "tsc -p tsconfig.consumer.json",
+    "pretest:package": "npm run build",
+    "test:package": "node scripts/test-package.mjs",
+    "preevaluate": "npm run build && tsc -p tsconfig.test.json",
+    "evaluate": "node scripts/evaluate-seed.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2",
+    "@types/node": "22.18.6"
+  },
   "private": false,
   "repository": {
     "type": "git",

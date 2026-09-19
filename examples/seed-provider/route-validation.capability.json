@@ -1,0 +1,12 @@
+{
+  "capabilityId": "route.validation",
+  "name": "Route input validation",
+  "description": "Validate route input before the business handler consumes it.",
+  "whenToUse": "Add or change validation on an existing HTTP endpoint.",
+  "distinction": "Specializes HTTP routing and refers to request schemas; it does not execute validation inside Core.",
+  "parents": ["route", "request"],
+  "specializes": ["route.http"],
+  "related": ["schema.request"],
+  "examples": ["Add required-field validation to POST /users while preserving its route identity."],
+  "knowledge": [{ "kind": "document", "knowledgeId": "D-02", "locator": { "type": "relative-file", "path": "knowledge/route-validation.md" } }]
+}
