@@ -79,6 +79,30 @@ test("DB rejects oversized, looping and falsely reported neighbor pages", async 
   await assert.rejects(databaseAuthorityStore(big, "seed"), code("CG_BUDGET_EXCEEDED"));
 });
 
+test("DB query pagination rejects cross-page duplicate catalog and neighbor rows", async () => {
+  const db = new FakeDatabase([
+    record("a", { parents: ["root"] }), record("b", { parents: ["root"] }),
+    record("c", { parents: ["root"] }), record("root"),
+  ]);
+  const view = await databaseAuthorityStore(db, "seed");
+  try {
+    db.scanCapabilities = async (request) => request.cursor === undefined
+      ? { items: [db.records[0]!, db.records[1]!], nextCursor: "catalog-2" }
+      : { items: [db.records[1]!, db.records[2]!] };
+    const catalog = await view.listCapabilities({ ...page, limit: 2 });
+    assert.ok(catalog.nextCursor);
+    await assert.rejects(view.listCapabilities({ ...page, limit: 2, cursor: catalog.nextCursor }), code("CG_ADAPTER_CONTRACT_INVALID"));
+
+    const endpoint = (capabilityId: string) => ({ providerId: "seed", capabilityId });
+    db.neighbors = async (_id, _kind, request) => request.cursor === undefined
+      ? { items: [endpoint("a"), endpoint("b")], nextCursor: "neighbors-2" }
+      : { items: [endpoint("b"), endpoint("c")] };
+    const neighbors = await view.neighbors("root", "children", { ...page, limit: 2 });
+    assert.ok(neighbors.nextCursor);
+    await assert.rejects(view.neighbors("root", "children", { ...page, limit: 2, cursor: neighbors.nextCursor }), code("CG_ADAPTER_CONTRACT_INVALID"));
+  } finally { await view.close(); }
+});
+
 test("memory reverse indexes are exact and do not add implicit related forward edges", async () => {
   const db = new FakeDatabase([record("a", { related: ["z"] }), record("z")]);
   const view = memoryGraphStore(await file(db));

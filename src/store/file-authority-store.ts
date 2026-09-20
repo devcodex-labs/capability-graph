@@ -1,6 +1,7 @@
-import { readFile, readdir, realpath } from "node:fs/promises";
+import { open, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { CapabilityGraphError } from "../errors.js";
+import { RECORD_MAX_BYTES } from "../validate/values.js";
 import type { UnvalidatedCapabilityRecord, UnvalidatedProviderRecord, UnvalidatedProviderSnapshot } from "./types.js";
 
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist", "dist-test", "coverage", ".cache", ".tmp"]);
@@ -16,8 +17,25 @@ export class FileAuthorityStore {
         if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
           throw new Error("Definition outside provider root");
         }
-        return JSON.parse(await readFile(resolved, "utf8")) as unknown;
-      } catch {
+        const handle = await open(resolved, "r");
+        try {
+          // Read one byte beyond the record budget so oversized definitions fail before JSON parsing or allocation growth.
+          const bytes = Buffer.allocUnsafe(RECORD_MAX_BYTES + 1);
+          let length = 0;
+          while (length < bytes.length) {
+            const result = await handle.read(bytes, length, bytes.length - length, length);
+            if (!result.bytesRead) break;
+            length += result.bytesRead;
+          }
+          if (length > RECORD_MAX_BYTES) {
+            throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", {
+              nextAction: "repair_source", details: { file, maxBytes: RECORD_MAX_BYTES },
+            });
+          }
+          return JSON.parse(bytes.subarray(0, length).toString("utf8")) as unknown;
+        } finally { await handle.close(); }
+      } catch (error) {
+        if (error instanceof CapabilityGraphError) throw error;
         throw new CapabilityGraphError("CG_LOAD_FAILED", { nextAction: "repair_source", details: { file } });
       }
     };

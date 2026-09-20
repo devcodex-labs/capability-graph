@@ -40,6 +40,20 @@ function extensions(config: OpenConfig): Extensions {
   return Object.freeze({ runtimeAdapters, readers: Object.freeze([...(config.readers ?? [])]), knowledgeRetriever: config.knowledgeRetriever, capabilityRetriever: config.capabilityRetriever });
 }
 
+function queryObject<T extends object>(query: T): T {
+  if (!query || typeof query !== "object") inputInvalid();
+  try {
+    if (![Object.prototype, null].includes(Object.getPrototypeOf(query))) inputInvalid();
+    for (const key of Reflect.ownKeys(query)) {
+      if (typeof key !== "string" || !Object.hasOwn(Object.getOwnPropertyDescriptor(query, key)!, "value")) inputInvalid();
+    }
+  } catch (error) {
+    if (error instanceof CapabilityGraphError) throw error;
+    inputInvalid();
+  }
+  return query;
+}
+
 /**
  * Protocol-independent discovery and knowledge access. Does not execute capabilities or start MCP servers.
  * Queries pin their source views; close the owning graph after all consumers have finished.
@@ -52,7 +66,7 @@ export class CapabilityGraph {
     return new CapabilityGraph(await CoreHost.open(config), configured);
   }
   /** Serialize refreshes and publish each provider independently; inspect per-provider failures in the result. */
-  reload(options?: { providerId?: string }) { return this.host.reload(options); }
+  reload(options: { providerId?: string } = {}) { return this.host.reload(queryObject(options)); }
   /**
    * Reject new work and release owned views after queued refreshes. Existing query pins may outlive this call.
    * A later close can report delayed cleanup failures; adapter-owned work is not cancelled.
@@ -62,47 +76,56 @@ export class CapabilityGraph {
   forProvider(providerId: string): BoundProviderGraph { this.host.assertAllowed(providerId); return new BoundProviderGraph(this.host, providerId, this.extensions); }
   /** List loaded providers in the narrowed scope; any listed unreadable source fails the query. */
   listProviders(query: ProviderListQuery = {}) {
+    queryObject(query);
     return this.host.query(query.requestProviderScope, query.requiredStaticRevision, async (ctx) => ({
       items: await Promise.all([...ctx.scope].sort().filter((id) => ctx.graph.getProvider(id)).map((id) => provider(ctx, id))), meta: ctx.meta }));
   }
   /** Read provider metadata plus revision/refresh provenance, never Specification body or version applicability decisions. */
   getProvider(providerId: string, query: { requiredStaticRevision?: string } = {}): Promise<ProviderResult> {
+    queryObject(query);
     this.host.assertAllowed(providerId);
     return this.host.query([providerId], query.requiredStaticRevision, async (ctx) => ({ ...await provider(ctx, providerId), meta: ctx.meta }));
   }
   /** Return a bounded flat discovery page; use nextCursor without changing scope, filters or revision. */
   listCatalog(query: CatalogQuery = {}) {
+    queryObject(query);
     return this.host.query(query.requestProviderScope, query.requiredStaticRevision, (ctx) => catalog(ctx, query, this.host.budgets));
   }
   /** Preserve input order and failures per slot; an unreadable explicitly requested revision fails the whole query. */
   getCapabilities(ids: readonly CapabilityRef[], query: CapabilityDetailQuery = {}) {
+    queryObject(query);
     const scope = query.requiredStaticRevision === undefined ? undefined : refScope(ids);
     return this.host.query(scope, query.requiredStaticRevision, (ctx) => details(ctx, ids, query, this.host.budgets));
   }
   /** Page direct/reverse edges by kind, within one provider. Related edges are not made symmetric. */
   getNeighbors(ref: CapabilityRef, query: NeighborQuery = {}) {
+    queryObject(query);
     const id = identity(ref);
     return this.host.query([id.providerId], query.requiredStaticRevision, (ctx) => neighbors(ctx, id, query, this.host.budgets));
   }
   /** Read associated Documents from a nonempty selection; Collections require explicit queryKnowledge instead. */
   readDocuments(query: ReadDocumentsQuery) {
+    queryObject(query);
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
       (ctx) => documents(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
   }
   /** Optional candidate recall, verified against authority with original ranks; never silently substitutes for catalog. */
   retrieveCapabilities(query: RetrieveCapabilitiesQuery) {
+    queryObject(query);
     return this.host.query(query.requestProviderScope, query.requiredStaticRevision,
       (ctx) => retrieveCapabilities(ctx, query, this.host.budgets, this.extensions.capabilityRetriever));
   }
   /** Search only selected knowledge and return traceable evidence snippets, not a generated answer. */
   queryKnowledge(query: QueryKnowledgeQuery) {
+    queryObject(query);
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
       (ctx) => queryKnowledge(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
   }
   /** Explicitly query one provider/project/environment; disabled, unavailable and observed-empty are distinct states. */
   queryRuntime(query: QueryRuntimeQuery) {
+    queryObject(query);
     validateRuntimeQuery(query);
     const scope = query.requestProviderScope ?? (query.instanceOf === undefined ? undefined : [identity(query.instanceOf).providerId]);
     return this.host.query(scope, query.requiredStaticRevision, (ctx) => queryRuntime(ctx, query, this.host.budgets, this.extensions.runtimeAdapters));
@@ -111,7 +134,8 @@ export class CapabilityGraph {
 
 /** Reject even JavaScript attempts to replace a bound provider's scope. */
 export function boundQuery<T extends object>(query: T): T {
-  if (!query || typeof query !== "object" || "requestProviderScope" in query) inputInvalid();
+  queryObject(query);
+  if ("requestProviderScope" in query) inputInvalid();
   return query;
 }
 

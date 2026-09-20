@@ -75,7 +75,7 @@ try {
 
 文件 `rootDir` 在 `open` 时解析为固定绝对根，后续工作目录变化不会重定位 `reload`。数据库 `knowledgeRootDir` 若为相对路径，在 Core 收到该只读视图时立即固定；current/previous 分别保留自己的根。知识 locator 仍是作者声明的相对路径，私有根不出现在公共结果或检索请求中。
 
-文件模式从根目录的 `provider.json` 和递归的 `*.capability.json` 收集定义；任何层级均跳过目录 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache`、`.tmp`，按精确名称匹配。正式定义不要放在这些目录内；其他嵌套目录继续支持，不要求迁移到固定 `capabilities/` 布局。
+文件模式从根目录的 `provider.json` 和递归的 `*.capability.json` 收集定义；任何层级均跳过目录 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache`、`.tmp`，按精确名称匹配。正式定义不要放在这些目录内；其他嵌套目录继续支持，不要求迁移到固定 `capabilities/` 布局。每个定义文件最多 262_144 UTF-8 字节，超限会在 JSON 解析前返回 `CG_BUDGET_EXCEEDED`。
 
 <a id="queries"></a>
 

@@ -160,6 +160,9 @@ export class CoreHost {
 
   /** Validate before publishing each provider; refresh failure records status without discarding current/previous. */
   reload(options: { providerId?: string } = {}): Promise<ReloadResult> {
+    if (!options || typeof options !== "object" || Array.isArray(options)) {
+      throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
+    }
     if (this.closed) return Promise.reject(new CapabilityGraphError("CG_NO_ACTIVE_VIEW", { nextAction: "refresh" }));
     if (options.providerId !== undefined) this.assertAllowed(options.providerId);
     const specs = options.providerId === undefined ? this.specs : this.specs.filter((spec) => spec.providerId === options.providerId);

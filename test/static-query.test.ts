@@ -41,6 +41,28 @@ test("public providers/catalog project only declared static fields, including se
   } finally { await graph.close(); }
 });
 
+test("public query entrypoints reject invalid query objects with stable input errors", async () => {
+  const graph = await CapabilityGraph.open(options({ seed: () => new FakeDatabase([record("a")]) }));
+  try {
+    for (const call of [
+      () => graph.reload(null as never),
+      () => graph.listProviders(null as never),
+      () => graph.getProvider("seed", null as never),
+      () => graph.listCatalog(null as never),
+      () => graph.getCapabilities([], null as never),
+      () => graph.getNeighbors(id("a"), null as never),
+      () => graph.readDocuments(null as never),
+      () => graph.retrieveCapabilities(null as never),
+      () => graph.queryKnowledge(null as never),
+      () => graph.queryRuntime(null as never),
+      () => graph.forProvider("seed").getProvider(null as never),
+    ]) assert.throws(call, code("CG_INPUT_INVALID"));
+    for (const query of [[], "invalid", 1, new Date(), Object.defineProperty({}, "limit", { get: () => 1 })]) {
+      assert.throws(() => graph.listCatalog(query as never), code("CG_INPUT_INVALID"));
+    }
+  } finally { await graph.close(); }
+});
+
 test("joint catalog keeps provider revisions separate; revision selectors require one provider", async () => {
   const graph = await CapabilityGraph.open(options({ seed: () => new FakeDatabase([record("a")]), other: () => new FakeDatabase([record("z")]) }));
   try {

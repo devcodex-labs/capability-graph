@@ -13,8 +13,37 @@ import type { DatabaseReadView, StorePage, StorePageRequest, ValidatedProviderVi
 const PAGE: StorePageRequest = { limit: 100, maxBytes: RECORD_MAX_BYTES };
 const digest = (value: unknown) => createHash("sha256").update(canonicalJson(value)).digest("hex");
 
+/** Core-owned wrapper keeps the last verified identity beside the adapter's opaque page cursor. */
+interface QueryContinuation {
+  readonly v: 1;
+  readonly stream: string;
+  readonly sourceCursor: string;
+  readonly after: string;
+}
+
 function contract(reason: string): never {
   throw new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source", details: { reason } });
+}
+
+function queryContinuation(value: string | undefined, stream: string): QueryContinuation | undefined {
+  if (value === undefined) return undefined;
+  let continuation: QueryContinuation;
+  try { continuation = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as QueryContinuation; }
+  catch { throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" }); }
+  if (!continuation || continuation.v !== 1 || continuation.stream !== stream ||
+      typeof continuation.sourceCursor !== "string" || !continuation.sourceCursor || !isId(continuation.after)) {
+    throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
+  }
+  return continuation;
+}
+
+function queryCursor(stream: string, sourceCursor: string, after: string): string {
+  return Buffer.from(JSON.stringify({ v: 1, stream, sourceCursor, after } satisfies QueryContinuation)).toString("base64url");
+}
+
+function sourcePageRequest(request: StorePageRequest, continuation: QueryContinuation | undefined): StorePageRequest {
+  return { limit: request.limit, maxBytes: request.maxBytes,
+    ...(continuation === undefined ? {} : { cursor: continuation.sourceCursor }) };
 }
 
 function pageShape<T>(page: StorePage<T>, request: StorePageRequest): StorePage<T> {
@@ -111,8 +140,11 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
       },
       listCapabilities: async (request) => {
         const bounded = { ...request, limit: Math.min(request.limit, 100), maxBytes: Math.min(request.maxBytes, RECORD_MAX_BYTES) };
-        const page = pageShape(await call(() => view.scanCapabilities(bounded)), bounded);
-        let previous: string | undefined;
+        const stream = "capabilities";
+        const continuation = queryContinuation(bounded.cursor, stream);
+        const sourceRequest = sourcePageRequest(bounded, continuation);
+        const page = pageShape(await call(() => view.scanCapabilities(sourceRequest)), sourceRequest);
+        let previous = continuation?.after;
         const items = [];
         for (const raw of page.items) {
           const record = await validateCapability(raw, root, false);
@@ -120,15 +152,20 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
           previous = record.capabilityId;
           items.push(staticCapability(provider.providerId, record, revision));
         }
-        return { items, ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }) };
+        return pageShape({ items, ...(page.nextCursor === undefined ? {} : {
+          nextCursor: queryCursor(stream, page.nextCursor, previous!),
+        }) }, bounded);
       },
       neighbors: async (id, kind, request) => {
         const bounded = { ...request, limit: Math.min(request.limit, 100), maxBytes: Math.min(request.maxBytes, RECORD_MAX_BYTES) };
-        const page = pageShape(await call(() => view.neighbors(id, kind, bounded)), bounded);
+        const stream = canonicalJson([id, kind]);
+        const continuation = queryContinuation(bounded.cursor, stream);
+        const sourceRequest = sourcePageRequest(bounded, continuation);
+        const page = pageShape(await call(() => view.neighbors(id, kind, sourceRequest)), sourceRequest);
         const source = await checked(id);
         const items: CanonicalCapabilityId[] = [];
         const inverse = { children: "parents", specializedBy: "specializes", relatedBy: "related" } as const;
-        let previous: string | undefined;
+        let previous = continuation?.after;
         for (const endpoint of page.items) {
           if (!endpoint || endpoint.providerId !== provider.providerId || !isId(endpoint.capabilityId) || !ids.has(endpoint.capabilityId) ||
               (previous !== undefined && endpoint.capabilityId <= previous)) contract("neighbor_identity_invalid");
@@ -138,7 +175,9 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
           } else if (!(await checked(endpoint.capabilityId))[inverse[kind]].includes(id)) contract("neighbor_reverse_mismatch");
           items.push(freeze({ providerId: endpoint.providerId, capabilityId: endpoint.capabilityId }));
         }
-        return { items, ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }) };
+        return pageShape({ items, ...(page.nextCursor === undefined ? {} : {
+          nextCursor: queryCursor(stream, page.nextCursor, previous!),
+        }) }, bounded);
       }, close };
   } catch (error) { await close().catch(() => {}); throw error; }
 }

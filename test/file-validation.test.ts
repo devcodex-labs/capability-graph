@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { FileAuthorityStore } from "../src/store/file-authority-store.js";
 import { validateSnapshot } from "../src/validate/index.js";
 import { validateCapability, validateProvider } from "../src/validate/schema.js";
+import { RECORD_MAX_BYTES } from "../src/validate/values.js";
 import { assertProviderRelative, resolveProviderRelative } from "../src/knowledge/path-guard.js";
 import type { UnvalidatedCapabilityRecord, UnvalidatedProviderSnapshot } from "../src/store/types.js";
 
@@ -58,6 +59,16 @@ test("PR3: missing and malformed JSON return load failure without absolute paths
     await writeFile(path.join(root, "provider.json"), JSON.stringify(provider));
     await writeFile(path.join(root, "bad.capability.json"), "{");
     await assert.rejects(new FileAuthorityStore().load(root), { code: "CG_LOAD_FAILED", details: { file: "bad.capability.json" } });
+  });
+});
+
+test("file authority rejects oversized definitions before JSON parsing", async () => {
+  for (const file of ["provider.json", "oversized.capability.json"]) await fixture(async (root) => {
+    if (file !== "provider.json") await writeFile(path.join(root, "provider.json"), JSON.stringify(provider));
+    await writeFile(path.join(root, file), "x".repeat(RECORD_MAX_BYTES + 1));
+    await assert.rejects(new FileAuthorityStore().load(root), {
+      code: "CG_BUDGET_EXCEEDED", details: { file, maxBytes: RECORD_MAX_BYTES },
+    });
   });
 });
 
