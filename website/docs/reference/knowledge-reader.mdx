@@ -1,11 +1,11 @@
 ---
-title: KnowledgeReader Reference
+title: KnowledgeReader 接口
 description: KnowledgeReader 匹配、读取预算、内容身份、来源与私有上下文边界参考。
 ---
 
-# KnowledgeReader
+# KnowledgeReader 接口
 
-<span className="cg-status">Available</span> <span className="cg-status">Contract-only</span>
+<span className="cg-status">可用</span> <span className="cg-status">仅合同</span>
 
 `canRead(ref)` 同步决定是否支持一个非本地来源。Core 选择第一个匹配的自定义 Reader；内置本地 Reader 优先处理 `relative-file`。
 

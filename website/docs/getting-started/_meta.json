@@ -1,7 +1,7 @@
 [
-  { "type": "file", "name": "installation", "label": "Installation" },
-  { "type": "file", "name": "first-provider", "label": "First Provider" },
-  { "type": "file", "name": "first-query", "label": "First Query" },
-  { "type": "file", "name": "provider-owned-api", "label": "Provider-owned API" },
-  { "type": "file", "name": "next-steps", "label": "Next Steps" }
+  { "type": "file", "name": "installation", "label": "安装" },
+  { "type": "file", "name": "first-provider", "label": "创建第一个 Provider" },
+  { "type": "file", "name": "first-query", "label": "执行第一次查询" },
+  { "type": "file", "name": "provider-owned-api", "label": "Provider 自有 API" },
+  { "type": "file", "name": "next-steps", "label": "后续步骤" }
 ]

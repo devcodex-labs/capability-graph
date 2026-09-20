@@ -81,12 +81,19 @@ await writeFile(
   'utf8'
 );
 
+const symbolKindLabels = {
+  class: '类',
+  function: '函数',
+  interface: '接口',
+  type: '类型',
+  value: '值'
+};
 const table = [
-  '## Generated public symbols',
+  '## 生成的公开符号',
   '',
-  '| Symbol | Kind |',
+  '| 符号 | 类型 |',
   '|---|---|',
-  ...symbols.map((symbol) => `| \`${symbol.name}\` | ${symbol.kind} |`),
+  ...symbols.map((symbol) => `| \`${symbol.name}\` | ${symbolKindLabels[symbol.kind] ?? symbol.kind} |`),
   ''
 ].join('\n');
 await writeFile(path.join(generatedRoot, 'snippets', 'public-api.mdx'), table, 'utf8');
@@ -95,7 +102,7 @@ const errorRows = (unionContracts.ErrorCode ?? []).map((code) => `| \`${code}\` 
 const actionRows = (unionContracts.NextAction ?? []).map((action) => `| \`${action}\` |`).join('\n');
 await writeFile(
   path.join(generatedRoot, 'snippets', 'errors.mdx'),
-  `## Complete ErrorCode union\n\n| ErrorCode |\n|---|\n${errorRows}\n\n## Complete NextAction union\n\n| NextAction |\n|---|\n${actionRows}\n`,
+  `## 完整 ErrorCode 联合类型\n\n| ErrorCode |\n|---|\n${errorRows}\n\n## 完整 NextAction 联合类型\n\n| NextAction |\n|---|\n${actionRows}\n`,
   'utf8'
 );
 

@@ -1,12 +1,12 @@
 [
-  { "type": "file", "name": "product-boundary", "label": "Product Boundary" },
-  { "type": "file", "name": "provider-and-specification", "label": "Provider and Specification" },
-  { "type": "file", "name": "capability-identity", "label": "Capability Identity" },
-  { "type": "file", "name": "capability-modeling", "label": "Capability Modeling" },
-  { "type": "file", "name": "relations", "label": "Relations" },
-  { "type": "file", "name": "knowledge", "label": "Knowledge" },
-  { "type": "file", "name": "runtime", "label": "Runtime" },
-  { "type": "file", "name": "provider-scope", "label": "Provider Scope" },
-  { "type": "file", "name": "revisions", "label": "Revisions" },
-  { "type": "file", "name": "result-completeness", "label": "Result Completeness" }
+  { "type": "file", "name": "product-boundary", "label": "产品边界" },
+  { "type": "file", "name": "provider-and-specification", "label": "Provider 与 Specification" },
+  { "type": "file", "name": "capability-identity", "label": "能力标识" },
+  { "type": "file", "name": "capability-modeling", "label": "能力建模" },
+  { "type": "file", "name": "relations", "label": "关系模型" },
+  { "type": "file", "name": "knowledge", "label": "知识模型" },
+  { "type": "file", "name": "runtime", "label": "运行时模型" },
+  { "type": "file", "name": "provider-scope", "label": "Provider 作用域" },
+  { "type": "file", "name": "revisions", "label": "修订模型" },
+  { "type": "file", "name": "result-completeness", "label": "结果完整性" }
 ]

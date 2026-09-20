@@ -11,6 +11,11 @@ const coverage = await readJson(path.join(websiteRoot, 'data', 'reference-covera
 const definitionCases = await readJson(path.join(websiteRoot, 'data', 'definition-cases.json'));
 const docsRoot = path.join(websiteRoot, 'docs');
 const allowedStatuses = new Set(['Available', 'Contract-only', 'Conceptual']);
+const statusLabels = new Map([
+  ['Available', '可用'],
+  ['Contract-only', '仅合同'],
+  ['Conceptual', '概念示例']
+]);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -31,7 +36,8 @@ for (const entry of coverage.entries) {
   assert(allowedStatuses.has(entry.status), `invalid status for ${entry.symbol}: ${entry.status}`);
   const pagePath = path.join(docsRoot, entry.page);
   const page = await readFile(pagePath, 'utf8');
-  assert(page.includes(`>${entry.status}<`), `${entry.page} must display ${entry.status} for ${entry.symbol}`);
+  const statusLabel = statusLabels.get(entry.status);
+  assert(page.includes(`>${statusLabel}<`), `${entry.page} must display ${statusLabel} for ${entry.symbol}`);
 }
 
 for (const name of ['ErrorCode', 'NextAction', 'KnowledgeKind', 'NeighborKind', 'RuntimeCompatibility']) {

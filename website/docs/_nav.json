@@ -1,9 +1,4 @@
 [
-  { "text": "Getting Started", "link": "/getting-started/", "activeMatch": "^/getting-started/" },
-  { "text": "Concepts", "link": "/concepts/", "activeMatch": "^/concepts/" },
-  { "text": "Guides", "link": "/guides/", "activeMatch": "^/guides/" },
-  { "text": "Integrations", "link": "/integrations/", "activeMatch": "^/integrations/" },
-  { "text": "Examples", "link": "/examples/", "activeMatch": "^/examples/" },
-  { "text": "Reference", "link": "/reference/", "activeMatch": "^/reference/" },
+  { "text": "v1", "link": "/", "activeMatch": "^/" },
   { "text": "GitHub", "link": "https://github.com/devcodex-labs/capability-graph" }
 ]

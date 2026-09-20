@@ -1,0 +1,10 @@
+[
+  { "type": "file", "name": "index", "label": "概览" },
+  { "type": "dir", "name": "getting-started", "label": "快速开始", "collapsible": false, "collapsed": false },
+  { "type": "dir", "name": "concepts", "label": "核心概念", "collapsible": false, "collapsed": false },
+  { "type": "dir", "name": "guides", "label": "使用指南", "collapsible": false, "collapsed": false },
+  { "type": "dir", "name": "integrations", "label": "集成", "collapsible": false, "collapsed": false },
+  { "type": "dir", "name": "examples", "label": "示例", "collapsible": false, "collapsed": false },
+  { "type": "dir", "name": "reference", "label": "API 参考", "collapsible": false, "collapsed": false },
+  { "type": "dir", "name": "troubleshooting", "label": "故障排查", "collapsible": false, "collapsed": false }
+]

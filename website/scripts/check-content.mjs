@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const websiteRoot = path.resolve(import.meta.dirname, '..');
@@ -12,18 +12,32 @@ const sections = [
   'reference',
   'troubleshooting'
 ];
+const sectionLabels = new Map([
+  ['getting-started', '快速开始'],
+  ['concepts', '核心概念'],
+  ['guides', '使用指南'],
+  ['integrations', '集成'],
+  ['examples', '示例'],
+  ['reference', 'API 参考'],
+  ['troubleshooting', '故障排查']
+]);
 const expectedNav = [
-  ['Getting Started', '/getting-started/'],
-  ['Concepts', '/concepts/'],
-  ['Guides', '/guides/'],
-  ['Integrations', '/integrations/'],
-  ['Examples', '/examples/'],
-  ['Reference', '/reference/'],
+  ['v1', '/'],
   ['GitHub', 'https://github.com/devcodex-labs/capability-graph']
+];
+const expectedRootSidebar = [
+  ['file', 'index', '概览'],
+  ...sections.map((name) => ['dir', name, sectionLabels.get(name)])
 ];
 
 function fail(message) {
   throw new Error(`content check failed: ${message}`);
+}
+
+function assertChineseNavigationLabel(value, location) {
+  if (typeof value !== 'string' || !/[\u3400-\u9fff]/u.test(value)) {
+    fail(`${location} must use a Chinese user-facing label`);
+  }
 }
 
 function frontmatter(source, file) {
@@ -43,12 +57,18 @@ if (JSON.stringify(nav.map(({ text, link }) => [text, link])) !== JSON.stringify
   fail('_nav.json does not match the frozen navbar contract');
 }
 
-try {
-  await stat(path.join(docsRoot, '_meta.json'));
-  fail('root _meta.json is forbidden');
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
+const rootSidebar = JSON.parse(await readFile(path.join(docsRoot, '_meta.json'), 'utf8'));
+const rootSidebarShape = rootSidebar.map(({ type, name, label }) => [type, name, label]);
+if (JSON.stringify(rootSidebarShape) !== JSON.stringify(expectedRootSidebar)) {
+  fail('root _meta.json does not expose the complete global sidebar');
 }
+for (const item of rootSidebar) assertChineseNavigationLabel(item.label, `root sidebar ${item.name}`);
+for (const item of rootSidebar.filter(({ type }) => type === 'dir')) {
+  if (item.collapsible !== false || item.collapsed !== false) {
+    fail(`global sidebar section ${item.name} must remain fully expanded`);
+  }
+}
+const expectedPageTitles = new Map();
 
 const home = await readFile(path.join(docsRoot, 'index.mdx'), 'utf8');
 for (const section of sections) {
@@ -63,7 +83,13 @@ for (const section of sections) {
   const sectionRoot = path.join(docsRoot, section);
   const meta = JSON.parse(await readFile(path.join(sectionRoot, '_meta.json'), 'utf8'));
   const overview = await readFile(path.join(sectionRoot, 'index.mdx'), 'utf8');
+  expectedPageTitles.set(`docs/${section}/index.mdx`, sectionLabels.get(section));
   const names = meta.filter((item) => item.type === 'file').map((item) => item.name);
+  for (const item of meta) {
+    assertChineseNavigationLabel(item.label, `${section}/_meta.json:${item.name}`);
+    if (item.tag !== undefined) assertChineseNavigationLabel(item.tag, `${section}/_meta.json:${item.name}:tag`);
+    expectedPageTitles.set(`docs/${section}/${item.name}.mdx`, item.label);
+  }
   if (new Set(names).size !== names.length) fail(`${section}/_meta.json has duplicate pages`);
 
   const diskPages = (await readdir(sectionRoot))
@@ -87,6 +113,15 @@ for (const file of publicPages) {
   const source = await readFile(file, 'utf8');
   const relative = path.relative(websiteRoot, file).replaceAll('\\', '/');
   const meta = frontmatter(source, relative);
+  const expectedTitle = expectedPageTitles.get(relative);
+  if (expectedTitle !== undefined) {
+    if (meta.title !== expectedTitle) fail(`${relative} title must match its Chinese navigation label`);
+    const heading = source.match(/^# (.+)$/m)?.[1];
+    if (heading !== expectedTitle) fail(`${relative} H1 must match its Chinese navigation label`);
+  }
+  for (const status of source.matchAll(/<span className="cg-status">([^<]+)<\/span>/g)) {
+    assertChineseNavigationLabel(status[1], `${relative} status badge`);
+  }
   if (titles.has(meta.title)) fail(`duplicate title in ${relative} and ${titles.get(meta.title)}`);
   if (descriptions.has(meta.description)) fail(`duplicate description in ${relative} and ${descriptions.get(meta.description)}`);
   titles.set(meta.title, relative);
@@ -112,6 +147,15 @@ if (!vext || vext.status !== 'Conceptual' || vext.source !== null || vext.verify
 const config = await readFile(path.join(websiteRoot, 'rspress.config.ts'), 'utf8');
 if (/themeConfig\s*:\s*{[\s\S]*?\b(?:nav|sidebar)\s*:/m.test(config)) {
   fail('rspress.config.ts contains a second nav/sidebar truth source');
+}
+
+const publicApiSnippet = await readFile(path.join(websiteRoot, 'generated', 'snippets', 'public-api.mdx'), 'utf8');
+if (!publicApiSnippet.startsWith('## 生成的公开符号\n\n| 符号 | 类型 |')) {
+  fail('generated public API navigation text must remain Chinese');
+}
+const errorSnippet = await readFile(path.join(websiteRoot, 'generated', 'snippets', 'errors.mdx'), 'utf8');
+if (!errorSnippet.includes('## 完整 ErrorCode 联合类型') || !errorSnippet.includes('## 完整 NextAction 联合类型')) {
+  fail('generated error reference headings must remain Chinese');
 }
 
 console.log(`content check passed: ${publicPages.length} pages, ${titles.size} unique titles`);

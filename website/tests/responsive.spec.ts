@@ -46,3 +46,17 @@ test('home process is vertical and ordered', async ({ page }) => {
     expect(Math.abs(positions[index].width - positions[0].width)).toBeLessThanOrEqual(1);
   }
 });
+
+test('wide desktop keeps the compact navigation controls visible', async ({ page }) => {
+  await page.setViewportSize({ width: 1720, height: 300 });
+  await page.goto('./');
+  await expect(page.locator('.rp-nav__title')).toContainText('Capability Graph');
+  await expect(page.locator('.rp-search-button')).toBeVisible();
+  await expect(page.locator('.rp-nav-menu--right > li > a')).toHaveText(['v1', 'GitHub']);
+  await expect(page.locator('.rp-nav__others > .rp-switch-appearance')).toBeVisible();
+  await expect(page.locator('.rp-nav-hamburger__md')).toBeHidden();
+  await page.screenshot({
+    path: 'output/playwright/screenshots/desktop-navbar.png',
+    clip: { x: 0, y: 0, width: 1720, height: 96 }
+  });
+});

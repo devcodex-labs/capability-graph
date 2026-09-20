@@ -55,13 +55,6 @@ export default defineConfig({
     ['meta', { property: 'og:site_name', content: 'Capability Graph' }]
   ],
   themeConfig: {
-    search: true,
-    socialLinks: [
-      {
-        icon: 'github',
-        mode: 'link',
-        content: 'https://github.com/devcodex-labs/capability-graph'
-      }
-    ]
+    search: true
   }
 });

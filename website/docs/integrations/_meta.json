@@ -1,9 +1,9 @@
 [
-  { "type": "file", "name": "node-api", "label": "Node.js API" },
-  { "type": "file", "name": "provider-owned-mcp", "label": "Provider-owned MCP" },
-  { "type": "file", "name": "runtime-adapter", "label": "RuntimeAdapter" },
-  { "type": "file", "name": "capability-retriever", "label": "CapabilityRetriever" },
-  { "type": "file", "name": "knowledge-retriever", "label": "KnowledgeRetriever" },
-  { "type": "file", "name": "knowledge-reader", "label": "KnowledgeReader" },
-  { "type": "file", "name": "database-authority-adapter", "label": "DatabaseAuthorityAdapter" }
+  { "type": "file", "name": "node-api", "label": "Node.js API 接入" },
+  { "type": "file", "name": "provider-owned-mcp", "label": "Provider 自有 MCP" },
+  { "type": "file", "name": "runtime-adapter", "label": "RuntimeAdapter 接入" },
+  { "type": "file", "name": "capability-retriever", "label": "CapabilityRetriever 接入" },
+  { "type": "file", "name": "knowledge-retriever", "label": "KnowledgeRetriever 接入" },
+  { "type": "file", "name": "knowledge-reader", "label": "KnowledgeReader 接入" },
+  { "type": "file", "name": "database-authority-adapter", "label": "DatabaseAuthorityAdapter 接入" }
 ]

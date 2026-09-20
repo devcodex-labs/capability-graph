@@ -1,10 +1,10 @@
 [
-  { "type": "file", "name": "model-a-provider", "label": "Model a Provider" },
-  { "type": "file", "name": "choose-capability-granularity", "label": "Choose Capability Granularity" },
-  { "type": "file", "name": "design-relations", "label": "Design Relations" },
-  { "type": "file", "name": "add-local-knowledge", "label": "Add Local Knowledge" },
-  { "type": "file", "name": "use-runtime", "label": "Use Runtime" },
-  { "type": "file", "name": "multiple-providers", "label": "Work with Multiple Providers" },
-  { "type": "file", "name": "lifecycle-and-reload", "label": "Manage Lifecycle and Reload" },
-  { "type": "file", "name": "errors-and-partial-results", "label": "Handle Errors and Partial Results" }
+  { "type": "file", "name": "model-a-provider", "label": "建模 Provider" },
+  { "type": "file", "name": "choose-capability-granularity", "label": "选择能力粒度" },
+  { "type": "file", "name": "design-relations", "label": "设计关系" },
+  { "type": "file", "name": "add-local-knowledge", "label": "添加本地知识" },
+  { "type": "file", "name": "use-runtime", "label": "使用运行时" },
+  { "type": "file", "name": "multiple-providers", "label": "使用多个 Provider" },
+  { "type": "file", "name": "lifecycle-and-reload", "label": "管理生命周期与重新加载" },
+  { "type": "file", "name": "errors-and-partial-results", "label": "处理错误与部分结果" }
 ]

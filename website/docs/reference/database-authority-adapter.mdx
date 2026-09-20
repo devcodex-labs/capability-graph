@@ -1,11 +1,11 @@
 ---
-title: DatabaseAuthorityAdapter Reference
+title: DatabaseAuthorityAdapter 接口
 description: Database read view 的稳定性、扫描、点读、关系、预算和关闭合同参考。
 ---
 
-# DatabaseAuthorityAdapter
+# DatabaseAuthorityAdapter 接口
 
-<span className="cg-status">Contract-only</span>
+<span className="cg-status">仅合同</span>
 
 `openView(providerId)` 返回一个 `DatabaseReadView`。view 暴露 Provider metadata、sourceRevision、可选知识根，以及 `getCapability()`、`scanCapabilities()`、`neighbors()` 和 `close()`。
 

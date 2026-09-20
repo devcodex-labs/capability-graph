@@ -17,23 +17,23 @@ Capability Graph 是 Provider 底层的能力发现模块。Provider 使用 Core
   <div><strong>Agent</strong><br />先看主能力，再按意图进入所需能力和子能力</div>
 </div>
 
-## Start here
+## 从这里开始
 
-- [Getting Started](./getting-started/)：从安装到第一个 Provider 和第一次查询。
-- [Concepts](./concepts/)：理解身份、关系、范围、修订、知识和 Runtime。
+- [快速开始](./getting-started/)：从安装到第一个 Provider 和第一次查询。
+- [核心概念](./concepts/)：理解身份、关系、范围、修订、知识和 Runtime。
 - [GitHub](https://github.com/devcodex-labs/capability-graph)：查看源码、测试和真实 Seed。
 
-## Documentation
+## 文档目录
 
-- [Getting Started](./getting-started/)
-- [Concepts](./concepts/)
-- [Guides](./guides/)
-- [Integrations](./integrations/)
-- [Examples](./examples/)
-- [Reference](./reference/)
-- [Troubleshooting](./troubleshooting/)
+- [快速开始](./getting-started/)
+- [核心概念](./concepts/)
+- [使用指南](./guides/)
+- [集成](./integrations/)
+- [示例](./examples/)
+- [API 参考](./reference/)
+- [故障排查](./troubleshooting/)
 
-## Minimal discovery
+## 最小能力发现
 
 ```ts
 import { CapabilityGraph } from '@devcodex-labs/capability-graph';
@@ -55,4 +55,4 @@ try {
 }
 ```
 
-下一步从 [First Provider](./getting-started/first-provider) 创建真实定义，再通过 [Provider-owned MCP](./integrations/provider-owned-mcp) 把主能力、意图收窄和子能力逐层暴露给 Agent。
+下一步从[创建第一个 Provider](./getting-started/first-provider)创建真实定义，再通过 [Provider 自有 MCP](./integrations/provider-owned-mcp)把主能力、意图收窄和子能力逐层暴露给 Agent。
