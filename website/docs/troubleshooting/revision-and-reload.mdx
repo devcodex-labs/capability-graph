@@ -1,0 +1,18 @@
+---
+title: Revision and Reload
+description: 诊断 CG_REVISION_MISMATCH、刷新失败、previous 视图和过期游标。
+---
+
+# Revision and Reload
+
+收到 `CG_REVISION_MISMATCH` 时：
+
+1. 重新调用 `listCatalog()` 或 `getProvider()` 获取当前 Static Revision。
+2. 丢弃绑定旧修订的游标和缓存详情。
+3. 用新修订重新执行本次发现流程。
+
+`refreshFailed: true` 不表示当前响应为空；它表示最近 reload 失败，但 `servedFrom` 指明的视图仍可读。查看 `reload()` 的逐 Provider 错误并修复来源。
+
+Core 只保留 current 和 previous。更旧修订无法恢复。指定修订查询要求有效范围恰好一个 Provider；多 Provider 配合单 revision 会被拒绝。
+
+不要在 reload 期间修改已打开数据库 read view 的记录；这会违反稳定快照合同。

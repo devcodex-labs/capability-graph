@@ -1,0 +1,23 @@
+[
+  { "type": "file", "name": "capability-graph", "label": "CapabilityGraph" },
+  { "type": "file", "name": "bound-provider-graph", "label": "BoundProviderGraph" },
+  { "type": "file", "name": "open-authority-reload", "label": "Open / Authority / Reload" },
+  { "type": "file", "name": "queries-and-results", "label": "Queries and Results" },
+  { "type": "file", "name": "knowledge", "label": "Knowledge" },
+  { "type": "file", "name": "runtime", "label": "Runtime" },
+  { "type": "file", "name": "identity", "label": "Identity" },
+  { "type": "file", "name": "result-meta", "label": "ResultMeta" },
+  { "type": "file", "name": "batch", "label": "Batch" },
+  { "type": "file", "name": "errors", "label": "ErrorCode and NextAction" },
+  { "type": "file", "name": "provider-definition", "label": "Provider Definition" },
+  { "type": "file", "name": "capability-definition", "label": "Capability Definition" },
+  { "type": "file", "name": "runtime-adapter", "label": "RuntimeAdapter" },
+  { "type": "file", "name": "capability-retriever", "label": "CapabilityRetriever" },
+  { "type": "file", "name": "knowledge-retriever", "label": "KnowledgeRetriever" },
+  { "type": "file", "name": "knowledge-reader", "label": "KnowledgeReader" },
+  { "type": "file", "name": "database-authority-adapter", "label": "DatabaseAuthorityAdapter" },
+  { "type": "file", "name": "provider-scope", "label": "Provider Scope" },
+  { "type": "file", "name": "revisions", "label": "Static and Runtime Revision" },
+  { "type": "file", "name": "pagination-and-cursor", "label": "Pagination and Cursor" },
+  { "type": "file", "name": "budget-and-completeness", "label": "Budget and Completeness" }
+]

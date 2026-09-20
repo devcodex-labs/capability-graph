@@ -1,0 +1,7 @@
+[
+  { "type": "file", "name": "installation", "label": "Installation" },
+  { "type": "file", "name": "first-provider", "label": "First Provider" },
+  { "type": "file", "name": "first-query", "label": "First Query" },
+  { "type": "file", "name": "provider-owned-api", "label": "Provider-owned API" },
+  { "type": "file", "name": "next-steps", "label": "Next Steps" }
+]

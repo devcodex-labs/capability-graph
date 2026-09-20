@@ -1,0 +1,24 @@
+---
+title: ResultMeta
+description: 解释完整性、来源修订、范围、视图、warning 和预算元数据。
+---
+
+# ResultMeta
+
+<span className="cg-status">Available</span>
+
+| 字段 | 语义 |
+|---|---|
+| `completeness` | `complete`、`truncated` 或 `partial` |
+| `compositeStaticRevision` | 本次实际 Provider 修订集合的组合身份 |
+| `staticRevision` | 单 Provider 查询的修订 |
+| `staticRevisionByProvider` | 多 Provider 查询的修订映射 |
+| `servedFrom` | `current` 或 `previous` |
+| `refreshFailed` | 最近刷新失败，但当前返回视图仍可读 |
+| `scope` | 本次有效 Provider 范围 |
+| `filter` | 实际应用的查询过滤 |
+| `view` | 本次使用的能力、Runtime 和知识内容身份 |
+| `warnings` | 有界非致命诊断 |
+| `budgets` | 实际相关的预算值 |
+
+`CurrentCapabilityView` 是查询证据，不是需持久化的合并实体，也不承诺跨来源事务。

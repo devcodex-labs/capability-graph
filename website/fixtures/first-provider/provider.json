@@ -1,0 +1,11 @@
+{
+  "providerId": "acme.http",
+  "name": "Acme HTTP",
+  "version": "0.1.0",
+  "specification": {
+    "specificationId": "acme.http.conventions",
+    "version": "1",
+    "appliesTo": { "software": "acme-http", "versionRange": ">=0.1.0 <1.0.0" },
+    "entryRef": { "type": "relative-file", "path": "PROVIDER.md" }
+  }
+}

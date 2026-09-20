@@ -1,0 +1,26 @@
+---
+title: Capability Identity
+description: 使用 Provider 与 Provider 内 Capability 的二元身份，避免跨来源歧义和错误复用。
+---
+
+# Capability Identity
+
+<span className="cg-status">Available</span>
+
+规范身份是：
+
+```ts
+{ providerId: 'seed.http', capabilityId: 'route.validation' }
+```
+
+可逆显示形式为 `seed.http::route.validation`。`::` 是正式分隔符；不能按点号猜 Provider 和 Capability 的边界。
+
+`capabilityId` 只在所属 Provider 内唯一。查询必须已经绑定 Provider，或传入完整二元身份。正式关系边只能连接同一 Provider 内的节点。
+
+## 演进规则
+
+身份表达概念连续性。如果能力语义发生不兼容替换，Provider 作者必须使用新 ID。Core 不会识别“保留旧 ID 但暗中变义”，也不会把旧候选、向量、缓存、Runtime `instanceOf` 或知识映射自动绑定到新身份。
+
+辅助函数 `formatQualifiedId()` 和 `parseQualifiedId()` 用于可逆显示，不要自行拼接或拆分。
+
+下一步阅读 [Capability Modeling](./capability-modeling)。

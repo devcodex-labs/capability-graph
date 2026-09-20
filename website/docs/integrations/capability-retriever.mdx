@@ -1,0 +1,32 @@
+---
+title: CapabilityRetriever
+description: 接入可选能力召回后端，同时由 Core 校验身份、范围、修订和原始排名。
+---
+
+# CapabilityRetriever
+
+<span className="cg-status">Contract-only</span>
+
+`CapabilityRetriever` 是可选候选召回合同。`0.1.0` 不附带向量或模型后端。
+
+```ts
+interface CapabilityRetriever {
+  readonly id: string;
+  retrieve(input: {
+    text: string;
+    providerIds: readonly string[];
+    staticRevisionByProvider: Readonly<Record<string, string>>;
+    limit: number;
+  }): Promise<{
+    candidates: readonly {
+      id: CanonicalCapabilityId;
+      score?: number;
+      sourceStaticRevision: string;
+    }[];
+  }>;
+}
+```
+
+Retriever 只能返回已有身份，不能创建新能力或图边。Core 会重新检查 Provider scope、身份存在性和来源修订；拒绝项留下排名间隙，合法候选不因其他失败重新排序。
+
+目录查询始终可用，Retriever 不会静默替换 Flat Catalog。未配置时调用召回返回 `CG_RETRIEVER_UNCONFIGURED`。

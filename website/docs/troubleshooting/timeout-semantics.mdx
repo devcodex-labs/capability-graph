@@ -1,0 +1,18 @@
+---
+title: Timeout Semantics
+description: 正确理解 CG_TIMEOUT、停止等待、Adapter 取消和迟到结果处理。
+---
+
+# Timeout Semantics
+
+`CG_TIMEOUT` 只表示 Core 在配置的等待时间后返回失败。它不证明 Adapter 的 I/O、Promise 或远程任务已经取消。
+
+V1 的 Adapter 合同没有统一 `AbortSignal`。实现方需要：
+
+- 在 Adapter 内设置自己的网络/数据库超时；
+- 消费迟到 resolve/reject，避免未处理拒绝；
+- 让重复请求具备幂等或明确去重语义；
+- 在 `close()` 或 Adapter 生命周期中回收资源；
+- 记录任务是否仍在运行，而不是把 `Promise.race` 写成取消。
+
+调用方重试前先判断底层操作是否可能仍产生副作用。Capability Graph 查询本身只读取，但 Provider-owned 接入层可能连接有状态后端。

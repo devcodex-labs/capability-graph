@@ -1,0 +1,40 @@
+---
+title: Node.js API
+description: 在 Node.js ESM 应用中打开、查询、刷新并关闭 Capability Graph。
+---
+
+# Node.js API
+
+<span className="cg-status">Available</span>
+
+主包提供 ESM 根入口和 TypeScript 声明：
+
+```ts
+import {
+  CapabilityGraph,
+  CapabilityGraphError,
+  type OpenConfig
+} from '@devcodex-labs/capability-graph';
+```
+
+典型生命周期：
+
+```ts
+const graph = await CapabilityGraph.open(config);
+try {
+  const providers = await graph.listProviders();
+  const catalog = await graph.listCatalog({ limit: 40 });
+  const bound = graph.forProvider(providers.items[0].providerId);
+  const detail = await bound.getCapabilities(['route']);
+  console.log({ catalog, detail });
+} catch (error) {
+  if (error instanceof CapabilityGraphError) {
+    console.error(error.code, error.nextAction);
+  }
+  throw error;
+} finally {
+  await graph.close();
+}
+```
+
+`forProvider()` 只绑定查询范围，不拥有来源句柄。完整签名见 [CapabilityGraph](../reference/capability-graph) 和 [BoundProviderGraph](../reference/bound-provider-graph)。

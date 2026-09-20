@@ -1,0 +1,62 @@
+{
+  "ErrorCode": [
+    "CG_CONFIG_INCOMPLETE",
+    "CG_DUAL_AUTHORITY",
+    "CG_SCOPE_DENIED",
+    "CG_IDENTITY_AMBIGUOUS",
+    "CG_IDENTITY_INVALID",
+    "CG_NOT_FOUND",
+    "CG_VALIDATION_FAILED",
+    "CG_RELATION_CROSS_PROVIDER",
+    "CG_RELATION_CYCLE",
+    "CG_LOAD_FAILED",
+    "CG_NO_ACTIVE_VIEW",
+    "CG_REVISION_MISMATCH",
+    "CG_INDEX_STALE",
+    "CG_INPUT_INVALID",
+    "CG_RUNTIME_CONTEXT_REQUIRED",
+    "CG_RUNTIME_DISABLED",
+    "CG_RUNTIME_UNAVAILABLE",
+    "CG_RUNTIME_RESULT_MISMATCH",
+    "CG_ADAPTER_CONTRACT_INVALID",
+    "CG_KNOWLEDGE_NOT_ASSOCIATED",
+    "CG_KNOWLEDGE_TYPE_UNSUPPORTED",
+    "CG_READER_UNCONFIGURED",
+    "CG_READER_UNAVAILABLE",
+    "CG_RETRIEVER_UNCONFIGURED",
+    "CG_RETRIEVER_UNAVAILABLE",
+    "CG_SOURCE_UNREADABLE",
+    "CG_PATH_TRAVERSAL",
+    "CG_BUDGET_EXCEEDED",
+    "CG_TIMEOUT",
+    "CG_PARTIAL_ITEM"
+  ],
+  "KnowledgeKind": [
+    "document",
+    "collection"
+  ],
+  "NeighborKind": [
+    "parents",
+    "children",
+    "specializes",
+    "specializedBy",
+    "related",
+    "relatedBy"
+  ],
+  "NextAction": [
+    "fix_input",
+    "narrow_scope",
+    "page_or_filter",
+    "configure_backend",
+    "repair_source",
+    "refresh",
+    "select_capabilities",
+    "use_retrieval",
+    "reduce_document"
+  ],
+  "RuntimeCompatibility": [
+    "compatible",
+    "unknown",
+    "refresh_required"
+  ]
+}

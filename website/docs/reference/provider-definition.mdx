@@ -1,0 +1,34 @@
+---
+title: Provider Definition
+description: provider.json 的字段、Specification metadata、默认行为和验证约束参考。
+---
+
+# Provider Definition
+
+<span className="cg-status">Available</span>
+
+| 字段 | 必填 | 说明 |
+|---|---:|---|
+| `providerId` | 是 | 稳定 Provider 身份，必须符合 ID 规则 |
+| `name` | 是 | 人类可读名称 |
+| `version` | 是 | Provider 定义版本，不属于能力身份 |
+| `specification` | 否 | Provider-owned Specification metadata |
+
+Specification 可含 `specificationId`、`version`、`appliesTo.software`、`versionRange`、`conditions` 和 `entryRef`。Core 只关联这些元数据，不读取正文来执行策略，也不判断当前项目版本。
+
+文件 Authority 的 `provider.json` 必须与配置中的 `providerId` 一致。每个有效启用 Provider 必须恰有一个 Authority。
+
+## 可执行验证用例
+
+| Case ID | 字段/场景 | 预期 |
+|---|---|---|
+| `DEF-PROVIDER-01` | 最小完整记录 | 打开成功 |
+| `DEF-PROVIDER-02` | 缺少 `providerId` | 拒绝 |
+| `DEF-PROVIDER-03` | 非法 `providerId` | 拒绝 |
+| `DEF-PROVIDER-04` | 空 `name` | 拒绝 |
+| `DEF-PROVIDER-05` | 空 `version` | 拒绝 |
+| `DEF-PROVIDER-06` | 不完整 `specification` | 拒绝 |
+| `DEF-PROVIDER-07` | 定义与配置的 Provider ID 不一致 | 拒绝 |
+| `DEF-PROVIDER-08` | 有效 Specification 与相对入口 | 打开成功 |
+
+这些用例由 Reference 校验器通过公开 `CapabilityGraph.open()` 执行，不依赖内部校验函数。

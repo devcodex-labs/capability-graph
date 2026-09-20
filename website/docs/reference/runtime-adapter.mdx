@@ -1,0 +1,20 @@
+---
+title: RuntimeAdapter Reference
+description: RuntimeAdapter 输入、输出、证据、预算、超时和生命周期合同参考。
+---
+
+# RuntimeAdapter
+
+<span className="cg-status">Available</span>
+
+一个 Provider 最多配置一个 Runtime Adapter。`query()` 输入项目、环境、可选实例过滤、当前静态修订、limit 和 cursor；输出实例、观察和可选续页游标。
+
+Core 验证：
+
+- Provider、项目和环境匹配请求；
+- `instanceOf` 是当前 Provider 的已有静态能力；
+- facts、association 和游标满足预算；
+- observation 的修订、兼容、availability 和 freshness 合法；
+- `requiredRuntimeRevision` 不被静默切换。
+
+Adapter 自己管理连接、取消、重试和清理。Core 的 5 秒默认超时只停止等待；迟到拒绝必须由 Adapter 消费，不能形成未处理 Promise rejection。

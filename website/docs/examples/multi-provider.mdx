@@ -1,0 +1,24 @@
+---
+title: Multi Provider
+description: 查看联合目录如何保留 Provider 身份、隔离修订和限制跨 Provider 图边。
+---
+
+# Multi Provider
+
+<span className="cg-status">Runnable</span>
+
+Multi Provider 场景同时打开多个 Authority，通过 `graph.listCatalog()` 建立联合候选，再用 `forProvider()` 进入具体图。
+
+根测试覆盖：
+
+- 相同 `capabilityId` 在不同 Provider 中保持不同二元身份；
+- 请求范围只能收窄；
+- 一个来源故障不会把其他 Provider 的未指定修订结果清空；
+- 正式关系不能跨 Provider；
+- 每个 Provider 的 Static Revision 独立。
+
+```sh
+npm test
+```
+
+跨 Provider 的业务组合属于 Agent 或上层工作流，不写入 V1 静态边。

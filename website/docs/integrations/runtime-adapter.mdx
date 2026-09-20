@@ -1,0 +1,31 @@
+---
+title: RuntimeAdapter
+description: 实现 Provider 专属 Runtime 数据源，并保持项目、环境、修订和资源所有权清晰。
+---
+
+# RuntimeAdapter
+
+<span className="cg-status">Contract available; HTTP reference Runnable</span>
+
+```ts
+interface RuntimeAdapter {
+  readonly id: string;
+  readonly providerId: string;
+  query(input: {
+    project: string;
+    environment: string;
+    instanceOf?: CanonicalCapabilityId;
+    instanceId?: string;
+    currentStaticRevision: string;
+    limit: number;
+    cursor?: string;
+  }): Promise<RuntimeAdapterResult>;
+  invalidate?(change: SourceChange): Promise<void>;
+}
+```
+
+Adapter 返回有界实例页和 `RuntimeObservation`。`source`、`observedAt`、`runtimeRevision`、`observedAgainstStaticRevision`、`compatibility`、`availability` 与 `freshness` 都是结果可信度的一部分。
+
+网络访问、刷新、取消和资源清理由 Adapter 负责。Core 的超时只限制等待，不会自动取消正在运行的 Adapter Promise；V1 也不会自动调用 `invalidate()`。
+
+实例必须包含 Provider、项目、环境、`instanceId` 和无歧义 `instanceOf`。Runtime-only association 不会写回静态图。

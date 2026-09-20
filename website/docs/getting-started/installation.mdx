@@ -1,0 +1,32 @@
+---
+title: Installation
+description: 安装 Capability Graph 0.1.0，并确认 Node.js、ESM 和包入口要求。
+---
+
+# Installation
+
+<span className="cg-status">Available in 0.1.0</span>
+
+## 前置条件
+
+- Node.js `20.19.0+`、`22.12.0+` 或更高兼容版本。
+- 使用 ESM。主包只提供根入口，不提供 `./mcp` 子路径。
+- Provider 定义文件位于你的项目或独立资源目录中。
+
+```sh
+npm install @devcodex-labs/capability-graph
+```
+
+安装后先确认根入口可解析：
+
+```ts
+import { CapabilityGraph } from '@devcodex-labs/capability-graph';
+
+console.log(typeof CapabilityGraph.open); // function
+```
+
+主包没有运行时依赖。MCP SDK 只存在于仓库的私有示例项目中；需要 MCP 时，应在 Provider 自己的接入层安装所需 SDK。
+
+## 下一步
+
+在 [First Provider](./first-provider) 中创建一个最小、可校验的 Provider。

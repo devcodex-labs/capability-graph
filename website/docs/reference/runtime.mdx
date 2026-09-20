@@ -1,0 +1,24 @@
+---
+title: Runtime Reference
+description: QueryRuntimeQuery、RuntimeInstance、RuntimeObservation 和 QueryRuntimePage 参考。
+---
+
+# Runtime Reference
+
+<span className="cg-status">Available</span>
+
+## QueryRuntimeQuery
+
+`project` 和 `environment` 必填；可按 `instanceOf`、`instanceId`、Provider scope、Static/Runtime Revision、cursor 和 limit 收窄。
+
+## RuntimeInstance
+
+包含 `instanceId`、`providerId`、`project`、`environment`、`instanceOf`、`facts` 和可选 Runtime-only associations。association 不构成静态关系或完整 Runtime Graph。
+
+## RuntimeObservation
+
+包含来源、观察时间、来源身份、Runtime Revision、依据的 Static Revision、兼容状态、availability、freshness 及可选覆盖说明。
+
+## QueryRuntimePage
+
+返回实例、观察、`ResultMeta` 和可选续页游标。`available + []` 可表示真实观察为空；`CG_RUNTIME_DISABLED` 或 `CG_RUNTIME_UNAVAILABLE` 是不同状态。

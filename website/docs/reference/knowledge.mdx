@@ -1,0 +1,22 @@
+---
+title: Knowledge Reference
+description: KnowledgeRef、ReadDocumentsQuery、DocumentRead、检索目标、命中和索引证据参考。
+---
+
+# Knowledge Reference
+
+<span className="cg-status">Available</span> <span className="cg-status">Contract-only</span>
+
+## KnowledgeRef
+
+`document` 含 `knowledgeId` 和 locator；`collection` 还含 Document members。locator 当前支持 `relative-file` 和 `http`。
+
+## readDocuments
+
+输入包含非空 `selected`、可选 `knowledgeIds`、范围、修订和读取预算。返回批量结果，每个 `DocumentRead` 携带能力身份、知识 ID、来源、内容类型、内容身份和精确字节。
+
+Collection 不支持直接读；远程 Document 需要 `KnowledgeReader`。
+
+## queryKnowledge
+
+`KnowledgeSearchTarget` 是运输安全的已选目标，不含绝对知识根。`KnowledgeHit` 使用 UTF-8 字节偏移，`endOffset` 为开区间。`KnowledgeIndexEvidence` 必须证明映射、配置和内容身份与当前请求一致，即使零命中也不能省略。

@@ -1,0 +1,29 @@
+{
+  "allowedStatuses": ["Available", "Runnable", "Contract-only", "Conceptual", "Experimental"],
+  "requiredTerms": [
+    "Provider",
+    "Provider Specification",
+    "Static Capability",
+    "Runtime Instance",
+    "Canonical Capability Identity",
+    "Knowledge Document",
+    "Knowledge Collection",
+    "Effective Provider Scope",
+    "Static Revision",
+    "Runtime Revision",
+    "Authority",
+    "Retriever",
+    "Reader",
+    "Provider-owned API",
+    "Provider-owned MCP"
+  ],
+  "forbiddenClaims": [
+    "Core is an MCP Server",
+    "Core 是 MCP Server",
+    "Graph 自动选择能力",
+    "关系自动选择能力",
+    "VextJS Integration - Runnable",
+    "built-in vector database",
+    "内置向量数据库"
+  ]
+}

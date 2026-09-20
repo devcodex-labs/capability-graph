@@ -1,0 +1,22 @@
+---
+title: KnowledgeRetriever
+description: 为显式选中的 Knowledge targets 提供可追溯检索命中和完整索引证据。
+---
+
+# KnowledgeRetriever
+
+<span className="cg-status">Contract-only</span>
+
+`KnowledgeRetriever` 只搜索由非空已选能力展开出的 Document 或 Collection targets。`0.1.0` 不附带向量数据库或 RAG 后端。
+
+Adapter 必须返回：
+
+- UTF-8 字节偏移的 `KnowledgeHit`；
+- 每个 target 的内容身份；
+- 仅覆盖最终 targets Provider 的 `staticRevisionByProvider`；
+- `mappingRevision`、配置修订、观察时间和新鲜度；
+- 零命中时仍完整的索引证据。
+
+Core 提供查询级 `KnowledgeRetrievalAccess`，只允许读取请求列出的身份/knowledgeId，不能替换 locator 或沿关系扩大。访问能力在 `retrieve()` 结束后失效。
+
+证据过期、内容身份不一致或后端失败不会降级为本地全文读取。

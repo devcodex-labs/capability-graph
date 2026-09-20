@@ -1,0 +1,23 @@
+---
+title: Batch
+description: BatchItem 与 BatchResult 的槽位保持、逐项错误和页级元数据参考。
+---
+
+# Batch
+
+<span className="cg-status">Available</span>
+
+```ts
+type BatchItem<T> =
+  | { inputIndex: number; ok: true; value: T }
+  | { inputIndex: number; ok: false; error: ErrorShape };
+
+interface BatchResult<T> {
+  results: readonly BatchItem<T>[];
+  meta: ResultMeta;
+}
+```
+
+失败项不会从数组消失，因此调用方可以按 `inputIndex` 对齐原请求。不要只过滤 `ok: true` 后误认为结果与输入一一对应。
+
+页级 `meta.completeness` 描述整个操作的可用性；逐项错误描述特定槽位。指定修订不可读等全局承诺失败时，方法会直接抛出查询级错误，而不是制造每项失败。

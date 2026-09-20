@@ -1,0 +1,36 @@
+{
+  "provider.json": {
+    "providerId": "acme.http",
+    "name": "Acme HTTP",
+    "version": "0.1.0",
+    "specification": {
+      "specificationId": "acme.http.conventions",
+      "version": "1",
+      "appliesTo": {
+        "software": "acme-http",
+        "versionRange": ">=0.1.0 <1.0.0"
+      },
+      "entryRef": {
+        "type": "relative-file",
+        "path": "PROVIDER.md"
+      }
+    }
+  },
+  "route.capability.json": {
+    "capabilityId": "route",
+    "name": "Routing",
+    "description": "Define how requests reach application handlers.",
+    "whenToUse": "Choose a routing capability before changing an entrypoint.",
+    "distinction": "A static capability family, not registered runtime routes."
+  },
+  "route-http.capability.json": {
+    "capabilityId": "route.http",
+    "name": "HTTP routing",
+    "description": "Expose a request handler through an HTTP route.",
+    "whenToUse": "The application accepts HTTP requests.",
+    "distinction": "Describes an HTTP routing capability, not a live route instance.",
+    "parents": [
+      "route"
+    ]
+  }
+}

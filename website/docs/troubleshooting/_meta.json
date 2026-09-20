@@ -1,0 +1,10 @@
+[
+  { "type": "file", "name": "open-and-configuration", "label": "Open and Configuration" },
+  { "type": "file", "name": "scope-and-selection", "label": "Scope and Selection" },
+  { "type": "file", "name": "revision-and-reload", "label": "Revision and Reload" },
+  { "type": "file", "name": "runtime-states", "label": "Runtime States" },
+  { "type": "file", "name": "knowledge-read", "label": "Knowledge Read" },
+  { "type": "file", "name": "retrieval-and-adapter", "label": "Retrieval and Adapter" },
+  { "type": "file", "name": "budget-and-pagination", "label": "Budget and Pagination" },
+  { "type": "file", "name": "timeout-semantics", "label": "Timeout Semantics" }
+]

@@ -1,0 +1,17 @@
+---
+title: First Provider Tutorial
+description: 使用文档专属 Fixture 验证从 Provider 定义到首个目录查询的完整入门代码。
+---
+
+# First Provider Tutorial
+
+<span className="cg-status">Runnable</span>
+
+本教程对应 [First Provider](../getting-started/first-provider) 和 [First Query](../getting-started/first-query) 的完整代码。Fixture 位于 `website/fixtures/first-provider`，包含 `docs.first` Provider 及 `route`、`route.http` 两个能力。
+
+```sh
+cd website
+npm run check:examples
+```
+
+验证器会先使用根包构建产物，再从公开入口打开 Fixture，断言目录包含两个能力、`route.http` 的 parent 为 `route`，最后关闭图实例。文档片段由同一 Fixture 生成，手工修改会触发漂移检查。

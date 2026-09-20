@@ -1,0 +1,26 @@
+---
+title: Product Boundary
+description: 区分 Capability Graph Core、Provider 接入层、Agent 与第三方能力执行系统的职责。
+---
+
+# Product Boundary
+
+<span className="cg-status">Available</span>
+
+Capability Graph 是本地优先、协议无关的能力发现基础设施。它定义和校验能力、关系、修订、范围、知识引用与 Runtime 观察合同，但不执行第三方能力。
+
+## 责任链
+
+1. **Provider** 维护能力定义、Specification、知识引用和 Adapter。
+2. **Core** 打开权威来源，校验并提供目录、详情、关系、知识和 Runtime 查询原语。
+3. **Provider-owned API/MCP** 把这些原语映射到 Provider 选择的协议、认证和工具设计。
+4. **Agent** 根据用户意图选择能力和后续操作。
+5. **业务系统** 执行真正的路由、构建、部署或其他第三方能力。
+
+因此，Core 不是统一 MCP Server、任务编排器、权限系统或执行沙箱。它也不会扫描任意框架源码来猜能力。
+
+## 当前边界
+
+文件权威、本地 Document、真实 Seed API/MCP 和 HTTP Runtime 参考可运行。数据库、能力召回、知识检索和远程 Reader 只提供扩展合同与测试边界。
+
+下一步阅读 [Provider and Specification](./provider-and-specification)。

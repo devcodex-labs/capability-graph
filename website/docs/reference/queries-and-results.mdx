@@ -1,0 +1,26 @@
+---
+title: Queries and Results
+description: Catalog、Detail、Neighbor 和 Provider 查询的输入、分页、修订与返回结构参考。
+---
+
+# Queries and Results
+
+<span className="cg-status">Available</span>
+
+## CatalogQuery
+
+`requestProviderScope`、`requiredStaticRevision`、`capabilityIdPrefix`、`parent`、`cursor` 和 `limit`。过滤用于发现，不提供授权。
+
+`CatalogPage` 返回 `items`、`meta` 和可选 `nextCursor`。每项包含完整二元 `id`、`qualifiedId`、用途、使用时机、区别和来源修订。
+
+## CapabilityDetailQuery
+
+支持 `requiredStaticRevision`、`neighborLimitPerKind`、`knowledgeLimit` 和每能力知识续页游标。详情只返回有界关系摘要和 KnowledgeRef，不递归读取邻居或正文。
+
+## NeighborQuery
+
+可指定关系种类、每组游标、页大小和静态修订。结果为六组固定键，每组独立报告完整性和续页位置。
+
+## Provider 查询
+
+`listProviders()` 返回页级 `meta`；`getProvider()` 保留 Provider 摘要顶层字段并增加 `meta`，便于读取 `servedFrom` 和 `refreshFailed`。

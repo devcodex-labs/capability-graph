@@ -1,0 +1,32 @@
+---
+title: CapabilityGraph
+description: CapabilityGraph 顶层类的生命周期、跨 Provider 查询和可选扩展方法参考。
+---
+
+import PublicApi from '../../generated/snippets/public-api.mdx';
+
+# CapabilityGraph
+
+<span className="cg-status">Available</span>
+
+`CapabilityGraph` 是协议无关的顶层入口。它拥有 Authority 视图生命周期，但不启动 API 或 MCP 服务。
+
+| 方法 | 作用 | 关键约束 |
+|---|---|---|
+| `CapabilityGraph.open(config)` | 校验配置和全部初始 Authority | 任一初始来源失败则拒绝 open |
+| `forProvider(providerId)` | 创建 Provider 绑定查询 facade | 共享图生命周期，不绑定修订 |
+| `listProviders(query?)` | 列出范围内 Provider | 不读取 Specification 正文 |
+| `getProvider(providerId, query?)` | 读取 Provider metadata 和来源状态 | 返回 `meta`、`servedFrom`、`refreshFailed` |
+| `listCatalog(query?)` | 跨 Provider 平坦发现 | 有界、可分页、保留二元身份 |
+| `getCapabilities(ids, query?)` | 批量读取能力详情 | 保留输入槽位和逐项失败 |
+| `getNeighbors(ref, query?)` | 分页读取六种关系组 | 单 Provider、非递归 |
+| `readDocuments(query)` | 读取已选能力的 Document | 选择非空，Collection 不支持直接读 |
+| `retrieveCapabilities(query)` | 可选候选召回 | 不替代目录，需配置 Retriever |
+| `queryKnowledge(query)` | 检索已选知识 | 返回证据片段，不生成答案 |
+| `queryRuntime(query)` | 查询运行实例 | 需要 Provider、项目和环境 |
+| `reload(options?)` | 串行刷新一个或全部 Provider | 每个 Provider 独立发布结果 |
+| `close()` | 停止新工作并释放 Core 资源 | 不取消 Adapter 自有任务 |
+
+方法的准确类型由包内 `dist/index.d.ts` 提供；本页的公共符号覆盖由生成器校验。
+
+<PublicApi />

@@ -1,0 +1,79 @@
+---
+title: First Provider
+description: 创建 provider.json 和第一组能力定义，并用真实文件权威打开它们。
+---
+
+# First Provider
+
+<span className="cg-status">Runnable</span>
+
+一个文件权威 Provider 至少需要 `provider.json` 和一个 `*.capability.json`。Core 会递归收集能力文件，但会按精确目录名跳过 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache` 和 `.tmp`。
+
+## 1. 定义 Provider
+
+```json title="provider.json"
+{
+  "providerId": "acme.http",
+  "name": "Acme HTTP",
+  "version": "0.1.0",
+  "specification": {
+    "specificationId": "acme.http.conventions",
+    "version": "1",
+    "appliesTo": {
+      "software": "acme-http",
+      "versionRange": ">=0.1.0 <1.0.0"
+    },
+    "entryRef": { "type": "relative-file", "path": "PROVIDER.md" }
+  }
+}
+```
+
+`entryRef` 只是 Provider Specification 的引用。正文由 Provider 维护和投递，Core 不读取正文来改变图行为。
+
+## 2. 定义主能力
+
+```json title="route.capability.json"
+{
+  "capabilityId": "route",
+  "name": "Routing",
+  "description": "Define how requests reach application handlers.",
+  "whenToUse": "Choose a routing capability before changing an entrypoint.",
+  "distinction": "A static capability family, not registered runtime routes."
+}
+```
+
+再添加一个细分能力：
+
+```json title="route-http.capability.json"
+{
+  "capabilityId": "route.http",
+  "name": "HTTP routing",
+  "description": "Expose a request handler through an HTTP route.",
+  "whenToUse": "The application accepts HTTP requests.",
+  "distinction": "Describes an HTTP routing capability, not a live route instance.",
+  "parents": ["route"]
+}
+```
+
+关系端点必须位于同一 Provider。`parents` 和 `specializes` 分别无环；Core 不从命名层级推导关系。
+
+## 3. 打开 Provider
+
+```ts
+import { CapabilityGraph } from '@devcodex-labs/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: { kind: 'file', rootDir: '/absolute/path/to/acme-provider' }
+  }]
+});
+```
+
+有效启用范围中的每个 Provider 必须恰有一个 Authority。缺少来源会得到 `CG_CONFIG_INCOMPLETE`，不会被解释为空目录。
+
+## 下一步
+
+在 [First Query](./first-query) 中先列出主能力，再按用户意图读取所需详情和子能力。

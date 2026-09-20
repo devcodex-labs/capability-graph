@@ -1,0 +1,194 @@
+name: Release npm and Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/release.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.contract.outputs.release_id }}
+      package_version: ${{ steps.contract.outputs.package_version }}
+      package_mode: ${{ steps.contract.outputs.package_mode }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.12.0"
+      - id: contract
+        run: node website/scripts/check-release.mjs
+
+  gates:
+    needs: freeze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.12.0"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:package
+      - run: npm run evaluate
+      - run: npm ci --ignore-scripts
+        working-directory: examples/seed-mcp
+      - run: npm test
+        working-directory: examples/seed-mcp
+      - run: npm ci
+        working-directory: website
+      - run: npx playwright install --with-deps chromium
+        working-directory: website
+      - run: npm run check
+        working-directory: website
+      - run: npm run build:ai
+        working-directory: website
+
+  package:
+    needs: [freeze, gates]
+    runs-on: ubuntu-latest
+    environment: npm-production
+    concurrency:
+      group: npm-${{ needs.freeze.outputs.release_id }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
+      PACKAGE_MODE: ${{ needs.freeze.outputs.package_mode }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install --global npm@11.15.0
+      - run: npm ci
+      - run: npm run build
+      - name: Enforce registry mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="@devcodex-labs/capability-graph@${PACKAGE_VERSION}"
+          if npm view "$package" version --json >existing.json 2>registry-error.log; then
+            exists=true
+          elif grep -q 'E404' registry-error.log; then
+            exists=false
+          else
+            cat registry-error.log >&2
+            exit 1
+          fi
+          if [[ "$PACKAGE_MODE" == "publish" && "$exists" == "true" ]]; then
+            echo "$package already exists; refusing duplicate publish" >&2
+            exit 1
+          fi
+          if [[ "$PACKAGE_MODE" == "verify" && "$exists" == "false" ]]; then
+            echo "$package is absent; verify mode cannot deploy newer docs" >&2
+            exit 1
+          fi
+      - name: Publish first or next package version
+        if: needs.freeze.outputs.package_mode == 'publish'
+        run: npm publish --access public --provenance
+      - name: Wait for registry propagation
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="@devcodex-labs/capability-graph@${PACKAGE_VERSION}"
+          for attempt in {1..12}; do
+            if [[ "$(npm view "$package" version 2>/dev/null || true)" == "$PACKAGE_VERSION" ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "$package did not propagate" >&2
+          exit 1
+      - name: Install from registry in a clean consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          temporary="$(mktemp -d)"
+          trap 'rm -rf "$temporary"' EXIT
+          cd "$temporary"
+          npm init -y >/dev/null
+          npm install --ignore-scripts --no-audit --no-fund "@devcodex-labs/capability-graph@${PACKAGE_VERSION}"
+          node --input-type=module --eval "import { parseQualifiedId } from '@devcodex-labs/capability-graph'; const value=parseQualifiedId('seed.http::route.http'); if(value.providerId!=='seed.http'||value.capabilityId!=='route.http') process.exit(1);"
+
+  pages-build:
+    needs: [freeze, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.12.0"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: website
+      - run: npm run build:ai
+        working-directory: website
+      - run: npm run check:build
+        working-directory: website
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: website/doc_build
+
+  deploy:
+    needs: [freeze, pages-build]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-${{ needs.freeze.outputs.release_id }}
+      cancel-in-progress: false
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  public-verification:
+    needs: [freeze, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.12.0"
+      - run: node website/scripts/verify-public.mjs
+        env:
+          PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}

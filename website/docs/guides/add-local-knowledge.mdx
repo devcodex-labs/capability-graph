@@ -1,0 +1,45 @@
+---
+title: Add Local Knowledge
+description: 为已选能力关联并安全读取 Provider 根目录内的本地 Document。
+---
+
+# Add Local Knowledge
+
+<span className="cg-status">Runnable</span>
+
+## 1. 放置文档
+
+将 Markdown 或文本放在 Provider 权威根内，例如 `knowledge/route-validation.md`。
+
+## 2. 关联能力
+
+```json
+{
+  "capabilityId": "route.validation",
+  "knowledge": [{
+    "kind": "document",
+    "knowledgeId": "route-validation-guide",
+    "locator": {
+      "type": "relative-file",
+      "path": "knowledge/route-validation.md"
+    }
+  }]
+}
+```
+
+## 3. 只读取已选能力
+
+```ts
+const result = await provider.readDocuments({
+  selected: ['route.validation'],
+  requiredStaticRevision
+});
+```
+
+Core 会校验相对路径仍位于 Provider 根的真实路径中，并按条目返回内容或错误。符号链接不能绕过根边界。
+
+## 当前边界
+
+- Collection 不能直接读取，需要 `KnowledgeRetriever`。
+- HTTP/HTTPS 引用需要 `KnowledgeReader`；没有 Reader 会返回明确未配置错误。
+- 知识只从非空已选能力集合展开，不沿关系自动扩大。

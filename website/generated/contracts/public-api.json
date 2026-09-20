@@ -1,0 +1,399 @@
+{
+  "schemaVersion": "CapabilityGraphPublicContractsV1",
+  "package": "@devcodex-labs/capability-graph",
+  "entry": "dist/index.d.ts",
+  "symbols": [
+    {
+      "name": "AuthoritySpec",
+      "kind": "type"
+    },
+    {
+      "name": "BatchItem",
+      "kind": "type"
+    },
+    {
+      "name": "BatchResult",
+      "kind": "interface"
+    },
+    {
+      "name": "BoundProviderGraph",
+      "kind": "class"
+    },
+    {
+      "name": "BudgetConfig",
+      "kind": "interface"
+    },
+    {
+      "name": "BudgetOverrides",
+      "kind": "type"
+    },
+    {
+      "name": "CanonicalCapabilityId",
+      "kind": "interface"
+    },
+    {
+      "name": "CapabilityCandidate",
+      "kind": "interface"
+    },
+    {
+      "name": "CapabilityDetail",
+      "kind": "interface"
+    },
+    {
+      "name": "CapabilityDetailQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "CapabilityGraph",
+      "kind": "class"
+    },
+    {
+      "name": "CapabilityGraphError",
+      "kind": "class"
+    },
+    {
+      "name": "CapabilityRef",
+      "kind": "type"
+    },
+    {
+      "name": "CapabilityRetriever",
+      "kind": "interface"
+    },
+    {
+      "name": "CatalogPage",
+      "kind": "interface"
+    },
+    {
+      "name": "CatalogQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "CatalogRecord",
+      "kind": "interface"
+    },
+    {
+      "name": "CurrentCapabilityView",
+      "kind": "interface"
+    },
+    {
+      "name": "DatabaseAuthorityAdapter",
+      "kind": "interface"
+    },
+    {
+      "name": "DatabaseReadView",
+      "kind": "interface"
+    },
+    {
+      "name": "DiscoveryAdapter",
+      "kind": "type"
+    },
+    {
+      "name": "DocumentRead",
+      "kind": "interface"
+    },
+    {
+      "name": "equalId",
+      "kind": "function"
+    },
+    {
+      "name": "ErrorCode",
+      "kind": "type",
+      "literals": [
+        "CG_CONFIG_INCOMPLETE",
+        "CG_DUAL_AUTHORITY",
+        "CG_SCOPE_DENIED",
+        "CG_IDENTITY_AMBIGUOUS",
+        "CG_IDENTITY_INVALID",
+        "CG_NOT_FOUND",
+        "CG_VALIDATION_FAILED",
+        "CG_RELATION_CROSS_PROVIDER",
+        "CG_RELATION_CYCLE",
+        "CG_LOAD_FAILED",
+        "CG_NO_ACTIVE_VIEW",
+        "CG_REVISION_MISMATCH",
+        "CG_INDEX_STALE",
+        "CG_INPUT_INVALID",
+        "CG_RUNTIME_CONTEXT_REQUIRED",
+        "CG_RUNTIME_DISABLED",
+        "CG_RUNTIME_UNAVAILABLE",
+        "CG_RUNTIME_RESULT_MISMATCH",
+        "CG_ADAPTER_CONTRACT_INVALID",
+        "CG_KNOWLEDGE_NOT_ASSOCIATED",
+        "CG_KNOWLEDGE_TYPE_UNSUPPORTED",
+        "CG_READER_UNCONFIGURED",
+        "CG_READER_UNAVAILABLE",
+        "CG_RETRIEVER_UNCONFIGURED",
+        "CG_RETRIEVER_UNAVAILABLE",
+        "CG_SOURCE_UNREADABLE",
+        "CG_PATH_TRAVERSAL",
+        "CG_BUDGET_EXCEEDED",
+        "CG_TIMEOUT",
+        "CG_PARTIAL_ITEM"
+      ]
+    },
+    {
+      "name": "ErrorShape",
+      "kind": "interface"
+    },
+    {
+      "name": "formatQualifiedId",
+      "kind": "function"
+    },
+    {
+      "name": "ID_PATTERN",
+      "kind": "value"
+    },
+    {
+      "name": "idKey",
+      "kind": "function"
+    },
+    {
+      "name": "isId",
+      "kind": "function"
+    },
+    {
+      "name": "isKnowledgeId",
+      "kind": "function"
+    },
+    {
+      "name": "KNOWLEDGE_ID_PATTERN",
+      "kind": "value"
+    },
+    {
+      "name": "KnowledgeCollectionRef",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeContentId",
+      "kind": "type"
+    },
+    {
+      "name": "KnowledgeDocumentRef",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeHit",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeIndexEvidence",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeKind",
+      "kind": "type",
+      "literals": [
+        "document",
+        "collection"
+      ]
+    },
+    {
+      "name": "KnowledgeLocator",
+      "kind": "type"
+    },
+    {
+      "name": "KnowledgeReadContext",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeReader",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeRef",
+      "kind": "type"
+    },
+    {
+      "name": "KnowledgeRetrievalAccess",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeRetriever",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeSearchTarget",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeSummary",
+      "kind": "type"
+    },
+    {
+      "name": "NeighborGroup",
+      "kind": "interface"
+    },
+    {
+      "name": "NeighborKind",
+      "kind": "type",
+      "literals": [
+        "parents",
+        "children",
+        "specializes",
+        "specializedBy",
+        "related",
+        "relatedBy"
+      ]
+    },
+    {
+      "name": "NeighborPage",
+      "kind": "interface"
+    },
+    {
+      "name": "NeighborQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "NeighborSummaryGroup",
+      "kind": "interface"
+    },
+    {
+      "name": "NextAction",
+      "kind": "type",
+      "literals": [
+        "fix_input",
+        "narrow_scope",
+        "page_or_filter",
+        "configure_backend",
+        "repair_source",
+        "refresh",
+        "select_capabilities",
+        "use_retrieval",
+        "reduce_document"
+      ]
+    },
+    {
+      "name": "OpenConfig",
+      "kind": "interface"
+    },
+    {
+      "name": "parseQualifiedId",
+      "kind": "function"
+    },
+    {
+      "name": "ProviderListQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "ProviderLoadSpec",
+      "kind": "interface"
+    },
+    {
+      "name": "ProviderResult",
+      "kind": "interface"
+    },
+    {
+      "name": "ProviderSummary",
+      "kind": "interface"
+    },
+    {
+      "name": "ProviderSummaryPage",
+      "kind": "interface"
+    },
+    {
+      "name": "QUALIFIED_SEPARATOR",
+      "kind": "value"
+    },
+    {
+      "name": "QualifiedCapabilityId",
+      "kind": "type"
+    },
+    {
+      "name": "QueryKnowledgePage",
+      "kind": "interface"
+    },
+    {
+      "name": "QueryKnowledgeQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "QueryRuntimePage",
+      "kind": "interface"
+    },
+    {
+      "name": "QueryRuntimeQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "ReadDocumentsQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "ReloadResult",
+      "kind": "interface"
+    },
+    {
+      "name": "ResultMeta",
+      "kind": "interface"
+    },
+    {
+      "name": "RetrieveCapabilitiesPage",
+      "kind": "interface"
+    },
+    {
+      "name": "RetrieveCapabilitiesQuery",
+      "kind": "interface"
+    },
+    {
+      "name": "RuntimeAdapter",
+      "kind": "interface"
+    },
+    {
+      "name": "RuntimeAdapterResult",
+      "kind": "interface"
+    },
+    {
+      "name": "RuntimeAssociation",
+      "kind": "interface"
+    },
+    {
+      "name": "RuntimeCompatibility",
+      "kind": "type",
+      "literals": [
+        "compatible",
+        "unknown",
+        "refresh_required"
+      ]
+    },
+    {
+      "name": "RuntimeInstance",
+      "kind": "interface"
+    },
+    {
+      "name": "RuntimeObservation",
+      "kind": "interface"
+    },
+    {
+      "name": "RuntimeRevision",
+      "kind": "type"
+    },
+    {
+      "name": "SourceChange",
+      "kind": "interface"
+    },
+    {
+      "name": "SpecificationMetadata",
+      "kind": "interface"
+    },
+    {
+      "name": "StaticRevision",
+      "kind": "type"
+    },
+    {
+      "name": "StorePage",
+      "kind": "interface"
+    },
+    {
+      "name": "StorePageRequest",
+      "kind": "interface"
+    },
+    {
+      "name": "UnvalidatedCapabilityRecord",
+      "kind": "interface"
+    },
+    {
+      "name": "UnvalidatedProviderRecord",
+      "kind": "interface"
+    }
+  ]
+}

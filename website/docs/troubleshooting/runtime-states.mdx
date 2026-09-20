@@ -1,0 +1,18 @@
+---
+title: Runtime States
+description: 区分 Runtime 未启用、不可用、观察为空、过期、部分和结果不匹配。
+---
+
+# Runtime States
+
+| 状态 | 识别方式 | 处理 |
+|---|---|---|
+| 未启用 | `CG_RUNTIME_DISABLED` | 为该 Provider 配置一个 RuntimeAdapter |
+| 上下文缺失 | `CG_RUNTIME_CONTEXT_REQUIRED` | 提供非空 project 和 environment |
+| 来源不可用 | `CG_RUNTIME_UNAVAILABLE` | 检查 Adapter 服务、认证和网络 |
+| 观察为空 | 成功结果，`availability: empty`，items 为空 | 这是有效观察，不要改成错误 |
+| 部分 | `availability: partial` 或 `meta.partial` | 检查覆盖说明和 warning |
+| 过期 | `freshness: stale` | 刷新 Adapter 来源或按限制使用 |
+| 不匹配 | `CG_RUNTIME_RESULT_MISMATCH` | 修正 Provider、项目、环境或 instanceOf |
+
+Core 超时只停止等待。确认 Adapter 是否仍在运行、是否会消费迟到拒绝，再决定重试；不要假设底层任务已经取消。

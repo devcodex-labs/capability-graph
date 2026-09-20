@@ -1,0 +1,34 @@
+---
+title: Model a Provider
+description: 从职责边界、身份、能力目录、关系、知识和验证六步完成 Provider 建模。
+---
+
+# Model a Provider
+
+<span className="cg-status">Available</span>
+
+## 1. 冻结 Provider 边界
+
+先写清 Provider 拥有哪些能力、由哪个权威来源维护，以及哪些执行、认证和规范职责留在接入层。不要用一个 Provider 混合没有共同版本和所有权的系统。
+
+## 2. 选择稳定身份
+
+为 Provider 和能力选择稳定、Provider 内唯一的 ID。概念替换使用新 ID，不用改描述掩盖不兼容语义。
+
+## 3. 建立平坦目录
+
+先为每个可独立选择的能力填写 `description`、`whenToUse` 和 `distinction`。用真实用户意图验证第一轮目录是否足以区分主能力。
+
+## 4. 添加显式关系
+
+只声明能解释的 `parents`、`specializes` 和 `related`。端点必须存在于同一 Provider；不要从名称或文件夹推导边。
+
+## 5. 关联知识和 Runtime
+
+本地文档使用 `relative-file`；需要检索或远程读取时配置相应 Adapter。Runtime 由独立 Adapter 观察，不把实例写成静态节点。
+
+## 6. 从公共入口验证
+
+使用 `CapabilityGraph.open()` 加载真实目录，执行目录、详情、关系、知识和负向 Fixture。直接调用内部校验函数不足以证明接入可用。
+
+参考可运行定义：[Seed Provider](../examples/seed-provider)。

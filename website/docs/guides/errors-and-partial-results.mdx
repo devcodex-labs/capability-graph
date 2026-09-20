@@ -1,0 +1,32 @@
+---
+title: Handle Errors and Partial Results
+description: 按错误阶段、NextAction、ResultMeta 和逐项结果恢复，而不是把失败统一成空数据。
+---
+
+# Handle Errors and Partial Results
+
+<span className="cg-status">Available</span>
+
+## 先分错误层级
+
+- **配置/加载失败**：Provider 无法建立有效权威视图。
+- **查询级失败**：范围拒绝、指定修订失效或请求整体无效。
+- **逐项失败**：批量详情、文档或候选中的单项失败，其他槽位仍可成功。
+- **后端未配置/不可用**：Retriever、Reader 或 Runtime Adapter 缺失或失败。
+
+```ts
+try {
+  const result = await provider.getCapabilities(ids);
+  for (const item of result.items) {
+    if (!item.ok) console.warn(item.error.code, item.error.nextAction);
+  }
+} catch (error) {
+  if (error instanceof CapabilityGraphError) {
+    console.error(error.code, error.nextAction);
+  }
+}
+```
+
+不要按 `CapabilityGraphError` 类型盲目信任 Adapter 填充的字段；Core 只投影已知诊断。处理 `partial` 时保留成功项和原始失败类别。
+
+常见恢复：修正 scope、刷新发现结果、缩小请求或分页、配置对应 Adapter。完整对照见 [ErrorCode and NextAction](../reference/errors) 与 [Troubleshooting](../troubleshooting/)。

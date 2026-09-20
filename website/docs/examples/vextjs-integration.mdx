@@ -1,0 +1,27 @@
+---
+title: VextJS Integration
+description: 说明 VextJS 项目接入 Capability Graph 的概念结构，不宣称已有可运行适配器。
+---
+
+# VextJS Integration
+
+<span className="cg-status">Conceptual</span>
+
+本页描述推荐结构，不是可运行示例。当前仓库没有 VextJS Adapter、Fixture 或自动验证，因此状态不能升级为 Runnable。
+
+## 推荐结构
+
+1. VextJS 项目或扩展包定义自己的 Provider、主能力和显式关系。
+2. 应用配置启用的 Provider 和文件/数据库 Authority。
+3. Provider-owned MCP 首先调用 `listCatalog()` 暴露主能力。
+4. Agent 根据意图选择能力，再调用详情或邻居工具进入子能力。
+5. 若需要展示真实路由，由 VextJS 专属 `RuntimeAdapter` 显式采集；Core 不扫描框架源码。
+
+## 变为 Runnable 的条件
+
+- 存在公开 VextJS 示例仓库或本仓库 Fixture；
+- 使用当前公开包入口编译；
+- 真实执行主能力、子能力和错误路径；
+- CI 自动验证且文档片段与源码同源。
+
+在这些条件满足前，请参考 [Seed MCP](./seed-mcp) 和 [Seed Runtime](./seed-runtime) 的可运行结构。

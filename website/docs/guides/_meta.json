@@ -1,0 +1,10 @@
+[
+  { "type": "file", "name": "model-a-provider", "label": "Model a Provider" },
+  { "type": "file", "name": "choose-capability-granularity", "label": "Choose Capability Granularity" },
+  { "type": "file", "name": "design-relations", "label": "Design Relations" },
+  { "type": "file", "name": "add-local-knowledge", "label": "Add Local Knowledge" },
+  { "type": "file", "name": "use-runtime", "label": "Use Runtime" },
+  { "type": "file", "name": "multiple-providers", "label": "Work with Multiple Providers" },
+  { "type": "file", "name": "lifecycle-and-reload", "label": "Manage Lifecycle and Reload" },
+  { "type": "file", "name": "errors-and-partial-results", "label": "Handle Errors and Partial Results" }
+]

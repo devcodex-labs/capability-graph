@@ -1,0 +1,22 @@
+---
+title: DatabaseAuthorityAdapter Reference
+description: Database read view 的稳定性、扫描、点读、关系、预算和关闭合同参考。
+---
+
+# DatabaseAuthorityAdapter
+
+<span className="cg-status">Contract-only</span>
+
+`openView(providerId)` 返回一个 `DatabaseReadView`。view 暴露 Provider metadata、sourceRevision、可选知识根，以及 `getCapability()`、`scanCapabilities()`、`neighbors()` 和 `close()`。
+
+## 稳定性
+
+同一 view 的 Provider、知识根、sourceRevision 和记录必须保持稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。
+
+## 分阶段校验
+
+端点和环检查发生在完整扫描之后，不能边扫边判不存在。parents 和 specializes 独立检查无环。Core 用与文件模式相同的规范序列化算法计算 Static Revision。
+
+## 资源
+
+Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有查询 pin 时会延迟关闭。Adapter 不提供通用写入、CRUD 或迁移能力。

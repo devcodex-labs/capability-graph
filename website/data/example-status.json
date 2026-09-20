@@ -1,0 +1,79 @@
+[
+  {
+    "id": "seed-provider",
+    "status": "Runnable",
+    "source": "../examples/seed-provider",
+    "verify": "npm test",
+    "claims": ["file authority", "local document"]
+  },
+  {
+    "id": "seed-api",
+    "status": "Runnable",
+    "source": "../examples/seed-api",
+    "verify": "npm test",
+    "claims": ["provider-owned API reference"]
+  },
+  {
+    "id": "seed-mcp",
+    "status": "Runnable",
+    "source": "../examples/seed-mcp",
+    "verify": "npm test",
+    "claims": ["provider-owned MCP reference"]
+  },
+  {
+    "id": "seed-runtime",
+    "status": "Runnable",
+    "source": "../examples/seed-runtime",
+    "verify": "npm test",
+    "claims": ["real HTTP runtime observation"]
+  },
+  {
+    "id": "first-provider-tutorial",
+    "status": "Runnable",
+    "source": "fixtures/first-provider",
+    "verify": "npm run check:examples",
+    "claims": ["first provider tutorial"]
+  },
+  {
+    "id": "multi-provider",
+    "status": "Runnable",
+    "source": "../test/provider-isolation.test.ts",
+    "verify": "npm test",
+    "claims": ["provider isolation", "union catalog"]
+  },
+  {
+    "id": "vextjs-integration",
+    "status": "Conceptual",
+    "source": null,
+    "verify": null,
+    "claims": ["recommended integration shape only"]
+  },
+  {
+    "id": "database-authority",
+    "status": "Contract-only",
+    "source": "../src/store/types.ts",
+    "verify": "npm test",
+    "claims": ["adapter contract", "contract tests"]
+  },
+  {
+    "id": "capability-retrieval",
+    "status": "Contract-only",
+    "source": "../src/retrieval/types.ts",
+    "verify": "npm test",
+    "claims": ["adapter contract", "contract tests"]
+  },
+  {
+    "id": "knowledge-retrieval",
+    "status": "Contract-only",
+    "source": "../src/retrieval/types.ts",
+    "verify": "npm test",
+    "claims": ["adapter contract", "contract tests"]
+  },
+  {
+    "id": "remote-reader",
+    "status": "Contract-only",
+    "source": "../src/knowledge/types.ts",
+    "verify": "npm test",
+    "claims": ["reader contract", "negative tests"]
+  }
+]

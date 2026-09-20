@@ -1,0 +1,9 @@
+[
+  { "type": "file", "name": "node-api", "label": "Node.js API" },
+  { "type": "file", "name": "provider-owned-mcp", "label": "Provider-owned MCP" },
+  { "type": "file", "name": "runtime-adapter", "label": "RuntimeAdapter" },
+  { "type": "file", "name": "capability-retriever", "label": "CapabilityRetriever" },
+  { "type": "file", "name": "knowledge-retriever", "label": "KnowledgeRetriever" },
+  { "type": "file", "name": "knowledge-reader", "label": "KnowledgeReader" },
+  { "type": "file", "name": "database-authority-adapter", "label": "DatabaseAuthorityAdapter" }
+]

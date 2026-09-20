@@ -1,0 +1,8 @@
+{
+  "capabilityId": "route.http",
+  "name": "HTTP routing",
+  "description": "Expose a request handler through an HTTP route.",
+  "whenToUse": "The application accepts HTTP requests.",
+  "distinction": "Describes an HTTP routing capability, not a live route instance.",
+  "parents": ["route"]
+}

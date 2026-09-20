@@ -1,0 +1,24 @@
+---
+title: Knowledge
+description: 区分本地 Document、Collection、Retriever 与 Reader 的职责和可追溯证据。
+---
+
+# Knowledge
+
+<span className="cg-status">Document available; retrieval contracts only</span>
+
+能力可以声明 `KnowledgeRef`，但知识不自动随关系展开。调用方先选择非空能力集合，再决定读取或检索哪些知识。
+
+## Document
+
+本地 `relative-file` Document 可由 Core 直接读取，不依赖模型、数据库或网络。路径受 Provider 根、真实路径和字节预算约束，每次读取都会取得内容身份。
+
+## Collection
+
+Collection 表示需要检索的知识集合，不能通过 `readDocuments()` 拼接读取。它需要显式 `KnowledgeRetriever`，并返回与当前静态修订和知识映射一致的证据。
+
+## 远程 Reader
+
+HTTP/HTTPS 等引用已关联但没有 Reader 时，应返回 `CG_READER_UNCONFIGURED`。这表示后端未配置，不表示“没有知识”。
+
+Core 校验证据和边界，不生成最终答案。实现步骤见 [Add Local Knowledge](../guides/add-local-knowledge)。

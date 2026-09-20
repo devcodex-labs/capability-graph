@@ -1,0 +1,23 @@
+---
+title: Choose Capability Granularity
+description: 依据独立意图、选择价值和演进边界决定能力节点大小。
+---
+
+# Choose Capability Granularity
+
+<span className="cg-status">Available</span>
+
+把一个候选概念建模为独立能力前，回答四个问题：
+
+1. Agent 是否会在真实任务中单独选择它？
+2. 它是否有不同于相邻能力的 `whenToUse` 或限制？
+3. 它能否在不改变身份语义的情况下独立演进？
+4. 详情、关系或知识是否能帮助后续选择？
+
+如果答案多数为否，它更可能是字段、参数或实现细节。不要把每个函数、HTTP 路由实例或配置键建成 Static Capability。
+
+反过来，一个节点若同时包含多个互斥意图，目录会失去判别力。拆分时保留一个主能力，再用 `parents` 或 `specializes` 表达真实结构。
+
+## 验证方法
+
+用至少三个相邻能力运行首轮目录评审：只看 `name`、`description`、`whenToUse` 和 `distinction`，评审者能否稳定选中目标。不能靠读详情猜出区别时，应先修正文案或粒度。

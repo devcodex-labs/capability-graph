@@ -1,0 +1,36 @@
+---
+title: Use Runtime
+description: 配置 RuntimeAdapter，按 Provider、项目和环境查询真实运行实例及观察状态。
+---
+
+# Use Runtime
+
+<span className="cg-status">Core available; HTTP reference Runnable</span>
+
+Runtime 接入从一个明确 Adapter 开始。Adapter 接收 Provider、项目、环境、可选静态能力过滤和分页游标，返回实例与观察证据。
+
+```ts
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['seed.http'],
+  integrationEnabledProviders: ['seed.http'],
+  providers,
+  runtimeAdapters: [runtimeAdapter]
+});
+
+const page = await graph.forProvider('seed.http').queryRuntime({
+  project: 'demo-app',
+  environment: 'development',
+  instanceOf: { capabilityId: 'route.http' },
+  requiredStaticRevision
+});
+```
+
+## Adapter 必须保证
+
+- 项目与环境不会混淆；
+- 实例身份稳定，`instanceOf` 无歧义；
+- 观察状态区分可用、空、过期、部分和失败；
+- `runtimeRevision` 与观察依据可追溯；
+- 超时停止等待，但不谎称已取消底层工作。
+
+真实参考服务会实际采集已注册 HTTP 路由，并验证路由变化、环境隔离和失败恢复。Core 不启动该服务，也不扫描任意框架。

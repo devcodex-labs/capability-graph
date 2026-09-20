@@ -1,0 +1,23 @@
+---
+title: DatabaseAuthorityAdapter
+description: 提供稳定只读数据库快照、严格扫描顺序、关系反查和可验证资源生命周期。
+---
+
+# DatabaseAuthorityAdapter
+
+<span className="cg-status">Contract-only</span>
+
+数据库权威是 Provider 的唯一真相源，不是文件模式的派生缓存。`0.1.0` 提供合同和正负测试，不附真实数据库驱动、CRUD、ORM 或迁移平台。
+
+`openView(providerId)` 返回一个不可变逻辑快照。Core 对它执行分阶段校验：
+
+1. 扫描所有记录并建立完整 ID 集合；
+2. 校验字段和值；
+3. 在完整集合上检查端点；
+4. 分别检查 parents 与 specializes 无环；
+5. 用同一规范算法生成静态哈希；
+6. 通过点读和关系查询复核扫描记录。
+
+Adapter 必须按 `capabilityId` 严格升序扫描，游标单调前进，并同时遵守条目数和 UTF-8 页字节预算。反向关系必须能由存储的正向边证明。
+
+Core 拥有 read view 的 `close()` 调用，但会在仍有查询 pin 时延迟退休。Provider metadata、`sourceRevision`、知识根和记录在该 view 生命周期内必须稳定。

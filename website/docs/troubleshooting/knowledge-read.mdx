@@ -1,0 +1,15 @@
+---
+title: Knowledge Read
+description: 诊断知识未关联、类型不支持、Reader 缺失、来源不可读和路径越界。
+---
+
+# Knowledge Read
+
+- `CG_KNOWLEDGE_NOT_ASSOCIATED`：已选能力没有匹配的 knowledgeId；核对选择和过滤。
+- `CG_KNOWLEDGE_TYPE_UNSUPPORTED`：对 Collection 使用了直接读取；改用 `queryKnowledge()`。
+- `CG_READER_UNCONFIGURED`：远程引用存在，但没有 Reader；配置 Reader，不要写成“没有知识”。
+- `CG_READER_UNAVAILABLE`：匹配 Reader 执行失败；检查外部来源和资源清理。
+- `CG_SOURCE_UNREADABLE`：本地或远程来源当前不可读。
+- `CG_PATH_TRAVERSAL`：相对路径或真实路径逃离 Provider 根；修正定义和符号链接。
+
+批量读取逐项返回错误。保留成功文档，不要把混合结果统一改成 `not found`。知识正文不在 Static Revision 中，每次读取使用新的 contentId。

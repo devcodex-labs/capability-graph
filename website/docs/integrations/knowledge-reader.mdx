@@ -1,0 +1,31 @@
+---
+title: KnowledgeReader
+description: 为非本地 KnowledgeRef 实现受预算约束的精确读取，并避免泄露私有来源根。
+---
+
+# KnowledgeReader
+
+<span className="cg-status">Contract-only for remote sources</span>
+
+内置本地 Reader 优先处理 `relative-file` Document。自定义 `KnowledgeReader` 只用于其他来源：
+
+```ts
+interface KnowledgeReader {
+  readonly id: string;
+  canRead(ref: KnowledgeRef): boolean;
+  read(
+    ref: KnowledgeDocumentRef,
+    context: KnowledgeReadContext,
+    budget: { maxBytes: number }
+  ): Promise<{
+    bytes: Uint8Array;
+    contentType: string;
+    contentId: string;
+    source: string;
+  }>;
+}
+```
+
+`canRead()` 必须同步、稳定。Reader 返回的 `source` 要与声明 locator 一致，并严格遵守字节预算；网络连接和资源释放归 Reader 所有。
+
+`KnowledgeReadContext.sourceContext` 只用于本地读取，不能序列化进 Retriever 请求或公开响应。远程引用存在但无 Reader 时返回 `CG_READER_UNCONFIGURED`。

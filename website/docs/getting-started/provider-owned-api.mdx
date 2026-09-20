@@ -1,0 +1,43 @@
+---
+title: Provider-owned API
+description: 在 Provider 自己的 API 中暴露渐进式能力发现，而不把 Core 变成统一服务。
+---
+
+# Provider-owned API
+
+<span className="cg-status">Runnable pattern</span>
+
+Provider 自己决定 HTTP 路径、认证、请求范围和返回形状。下面的处理函数只是把一个业务端点映射到 Core 原语：
+
+```ts
+export async function listMainCapabilities(graph: CapabilityGraph) {
+  const provider = graph.forProvider('acme.http');
+  const catalog = await provider.listCatalog({ limit: 20 });
+
+  return {
+    capabilities: catalog.items,
+    revision: catalog.meta.staticRevision,
+    completeness: catalog.meta.completeness,
+    nextCursor: catalog.nextCursor
+  };
+}
+```
+
+后续端点可以接收已选 `capabilityId` 和 `requiredStaticRevision`，再调用 `getCapabilities()` 或 `getNeighbors()`。这样 Agent 不会在首轮接收全部能力详情，也不会因目录更新把一次任务中的发现结果悄悄切换到新修订。
+
+## Provider 必须负责
+
+- 身份认证和租户/项目绑定；
+- 将宿主允许范围转换为 `requestProviderScope`；
+- 工具或端点命名；
+- Agent 意图判断和选择策略；
+- Provider Specification 的发现与投递；
+- 把 Core 错误映射为协议错误，但保留 `ErrorCode` 与 `NextAction`。
+
+## Core 不负责
+
+Core 不监听端口、不启动业务服务、不执行能力，也不保证 Agent 采纳规范。可运行参考见 [Seed API](../examples/seed-api)。
+
+## 下一步
+
+需要工具协议时，继续阅读 [Provider-owned MCP](../integrations/provider-owned-mcp)。

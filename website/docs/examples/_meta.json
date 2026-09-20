@@ -1,0 +1,9 @@
+[
+  { "type": "file", "name": "seed-provider", "label": "Seed Provider" },
+  { "type": "file", "name": "seed-api", "label": "Seed API" },
+  { "type": "file", "name": "seed-mcp", "label": "Seed MCP" },
+  { "type": "file", "name": "seed-runtime", "label": "Seed Runtime" },
+  { "type": "file", "name": "first-provider-tutorial", "label": "First Provider Tutorial" },
+  { "type": "file", "name": "multi-provider", "label": "Multi Provider" },
+  { "type": "file", "name": "vextjs-integration", "label": "VextJS Integration", "tag": "Conceptual" }
+]

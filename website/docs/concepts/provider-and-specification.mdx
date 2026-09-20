@@ -1,0 +1,24 @@
+---
+title: Provider and Specification
+description: 理解 Provider 身份、定义权威与 Provider Specification 的所有权和投递边界。
+---
+
+# Provider and Specification
+
+<span className="cg-status">Available</span>
+
+Provider 是一组能力及其接入规则的所有者。每个 Provider 在有效启用范围内必须恰有一个权威来源，文件或数据库二选一。
+
+Provider Specification 描述如何正确使用该 Provider，但正文不由 Core 管理。`provider.json` 只关联以下元数据：
+
+- `specificationId` 和版本；
+- 适用软件、版本范围和可选条件；
+- Provider 自己提供的 `entryRef`。
+
+接入方负责首次可发现入口、正文读取、适用版本判断、冲突处理和向 Agent 投递。Specification 不能覆盖用户指令、宿主 Policy、权限或执行授权。
+
+## 为什么分开
+
+静态图需要确定、可哈希的数据合同；规范正文可能独立发布、按版本变化或由宿主选择投递。分开后，Core 可以稳定校验身份和适用性，而不冒充规范分发系统。
+
+下一步阅读 [Capability Identity](./capability-identity)。

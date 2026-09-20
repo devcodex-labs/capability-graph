@@ -1,0 +1,31 @@
+---
+title: Design Relations
+description: 选择正确关系类型，验证端点、方向和独立环约束。
+---
+
+# Design Relations
+
+<span className="cg-status">Available</span>
+
+## 决策顺序
+
+1. “B 是 A 的直接分类或组成上位概念”时，B 可作为 A 的 `parents`。
+2. “A 保留 B 的核心语义但更具体”时，A 可 `specializes` B。
+3. “两者只需要提示关联，且方向有意义”时，使用 `related`。
+
+不要为了让图更密而同时声明多种关系。`parents` 和 `specializes` 分别独立检查无环；一个关系图无环不能替另一个关系图背书。
+
+```json
+{
+  "capabilityId": "route.validation",
+  "parents": ["route"],
+  "specializes": ["route.http"],
+  "related": ["schema.request"]
+}
+```
+
+反向组 `children`、`specializedBy` 和 `relatedBy` 在查询时生成，不写回定义。`related` 不自动对称；需要双向语义时，两端分别声明。
+
+## 验证
+
+通过 `getNeighbors()` 分组检查方向，并加入悬空端点、自环、parents 环和 specializes 环负向 Fixture。

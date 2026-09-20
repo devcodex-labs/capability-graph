@@ -1,0 +1,36 @@
+---
+title: Work with Multiple Providers
+description: 在明确 Effective Provider Scope 内联合发现多个 Provider，同时保持图和修订隔离。
+---
+
+# Work with Multiple Providers
+
+<span className="cg-status">Available</span>
+
+在 `open()` 时声明宿主允许、集成启用和每个 Provider 的唯一 Authority：
+
+```ts
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http', 'acme.database'],
+  integrationEnabledProviders: ['acme.http', 'acme.database'],
+  providers: [httpProvider, databaseProvider]
+});
+
+const page = await graph.listCatalog({
+  requestProviderScope: ['acme.http', 'acme.database'],
+  limit: 40
+});
+```
+
+联合目录保留完整二元身份和各 Provider 静态修订。它不会建立跨 Provider 图边，也不会把两个 Provider 的 `capabilityId` 合并为同一节点。
+
+## 选择之后
+
+绑定具体 Provider 再查详情或关系：
+
+```ts
+const http = graph.forProvider('acme.http');
+const detail = await http.getCapabilities(['route.http']);
+```
+
+单个未指定修订的来源故障应被隔离，不清空其他 Provider 的合法候选。指定修订不可读时则明确失败。跨 Provider 组合由 Agent 或上层工作流完成。

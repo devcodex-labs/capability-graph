@@ -1,0 +1,22 @@
+---
+title: Result Completeness
+description: 正确解释 complete、truncated、partial、warning、逐项失败和续页位置。
+---
+
+# Result Completeness
+
+<span className="cg-status">Available</span>
+
+查询成功不代表返回全集。每次消费结果都应同时查看数据、`meta.completeness`、`warnings` 和游标。
+
+| 状态 | 含义 | 调用方动作 |
+|---|---|---|
+| `complete` | 当前请求范围内完整 | 可继续业务选择 |
+| `truncated` | 命中数量或页预算上限 | 使用 `nextCursor` 续页或收窄过滤 |
+| `partial` | 某些来源、分组或条目失败 | 保留正常项，检查 warning 和逐项错误 |
+
+批量查询保留输入槽位，每个 `BatchItem` 都要检查 `ok`。单个 Provider 离线不应清空其他来源的合法结果；指定权威修订不可读则是查询级失败。
+
+预算不会通过静默删除 `whenToUse` 或 `distinction` 来制造“成功”。无法取得任何进展时会返回 `CG_BUDGET_EXCEEDED`。
+
+实践见 [Handle Errors and Partial Results](../guides/errors-and-partial-results)。

@@ -1,0 +1,21 @@
+---
+title: Runtime
+description: 将静态能力与项目环境中的运行实例、观察修订和兼容状态分离。
+---
+
+# Runtime
+
+<span className="cg-status">Core and HTTP reference available</span>
+
+Static Capability 是 Provider 作者声明的稳定模型；Runtime Instance 是某个项目、工作区和环境中实际观察到的实例。二者是不同实体。
+
+Runtime Adapter 显式采集：
+
+- Provider、项目和环境；
+- 实例身份与 `instanceOf` 静态能力；
+- 观察时间、Runtime Revision 与来源静态修订；
+- 当前可用、空、过期、部分、不可用等状态。
+
+Runtime 观察不会写回静态图，也不形成通用 Runtime Graph。静态修订变化后，Adapter 可以确认兼容、要求刷新或标记未知；Core 不计算语义等价。
+
+`CG_RUNTIME_DISABLED` 表示没有配置 Adapter，不等于当前环境没有实例。真实参考见 [Seed Runtime](../examples/seed-runtime)。

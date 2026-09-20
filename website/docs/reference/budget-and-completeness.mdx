@@ -1,0 +1,22 @@
+---
+title: Budget and Completeness
+description: 默认预算、UTF-8 字节口径、覆盖方式和 complete/truncated/partial 语义参考。
+---
+
+# Budget and Completeness
+
+<span className="cg-status">Available</span>
+
+| 操作 | 关键默认预算 |
+|---|---|
+| Catalog | 24,576 页字节、200 项、2,048 单项字节 |
+| Neighbors | 50 默认页、100 最大页、24,576 页字节、2,048 单项字节 |
+| Detail | 20 能力、16,384 单项字节、131,072 总字节 |
+| Document read | 32,768 字节、每次 8 文档 |
+| Capability retrieval | 20 候选、512 单候选字节 |
+| Knowledge query | 8 命中、2,048 snippet 字节 |
+| Runtime | 50 默认页、100 最大页、5,000 ms 等待、4,096 facts 字节 |
+
+字节预算使用 UTF-8 或原始 bytes，不是 JavaScript 字符数。预算覆盖只有一层已知字段，必须是正有限整数，默认页不能大于最大页。
+
+`truncated` 表示继续分页，`partial` 表示检查 warning 或逐项失败。单项过大不会被截断成看似合法的数据；无法取得进展时返回 `CG_BUDGET_EXCEEDED`。

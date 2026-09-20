@@ -1,0 +1,58 @@
+---
+title: Capability Graph
+description: 面向 Provider 的能力建模、发现与知识导航基础设施。
+---
+
+# Capability Graph
+
+Capability Graph 是 Provider 底层的能力发现模块。Provider 使用 Core 建模和查询静态能力，再通过自己拥有的 API、MCP 或其他协议向 Agent 暴露能力。
+
+<div className="cg-flow" role="img" aria-label="Provider 定义能力，Core 建模和查询，Provider 自有 API 或 MCP 暴露结果，Agent 渐进发现能力。">
+  <div><strong>Provider</strong><br />定义能力、关系、规范引用和可选知识</div>
+  <span aria-hidden="true" />
+  <div><strong>Capability Graph Core</strong><br />校验、索引并提供协议无关的查询原语</div>
+  <span aria-hidden="true" />
+  <div><strong>Provider-owned API / MCP</strong><br />按项目需要设计入口、认证和意图路由</div>
+  <span aria-hidden="true" />
+  <div><strong>Agent</strong><br />先看主能力，再按意图进入所需能力和子能力</div>
+</div>
+
+## Start here
+
+- [Getting Started](./getting-started/)：从安装到第一个 Provider 和第一次查询。
+- [Concepts](./concepts/)：理解身份、关系、范围、修订、知识和 Runtime。
+- [GitHub](https://github.com/devcodex-labs/capability-graph)：查看源码、测试和真实 Seed。
+
+## Documentation
+
+- [Getting Started](./getting-started/)
+- [Concepts](./concepts/)
+- [Guides](./guides/)
+- [Integrations](./integrations/)
+- [Examples](./examples/)
+- [Reference](./reference/)
+- [Troubleshooting](./troubleshooting/)
+
+## Minimal discovery
+
+```ts
+import { CapabilityGraph } from '@devcodex-labs/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: { kind: 'file', rootDir: '/absolute/path/to/provider' }
+  }]
+});
+
+try {
+  const catalog = await graph.forProvider('acme.http').listCatalog();
+  console.log(catalog.items);
+} finally {
+  await graph.close();
+}
+```
+
+下一步从 [First Provider](./getting-started/first-provider) 创建真实定义，再通过 [Provider-owned MCP](./integrations/provider-owned-mcp) 把主能力、意图收窄和子能力逐层暴露给 Agent。

@@ -1,0 +1,24 @@
+---
+title: Provider-owned MCP
+description: 用少量 Provider-owned MCP 工具实现主能力、意图收窄和子能力的渐进发现。
+---
+
+# Provider-owned MCP
+
+<span className="cg-status">Runnable reference</span>
+
+Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程中使用 Core，并把工具设计成渐进发现链：
+
+1. **列出主能力**：调用 `listCatalog()`，返回足以区分用途的摘要和修订。
+2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`；可选 Retriever 只能召回已有身份。
+3. **进入能力详情**：调用 `getCapabilities()` 获取完整定义。
+4. **展开子能力或关联**：按需调用 `getNeighbors()`，不在首轮暴露整图。
+5. **读取已选知识/Runtime**：只对非空已选能力继续查询。
+
+工具名称、数量、输入 Schema、认证和规范投递由 Provider 决定。参考示例使用私有 MCP 包，避免把 SDK 变成主包运行时依赖。
+
+## 错误映射
+
+保留 Core 的 `ErrorCode`、`NextAction`、`meta.completeness` 和逐项失败。MCP 层可以调整消息文本，但不能把 `CG_SCOPE_DENIED`、`CG_REVISION_MISMATCH` 或后端未配置统一改写为“没有结果”。
+
+可运行代码见 [Seed MCP](../examples/seed-mcp)。

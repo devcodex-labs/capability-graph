@@ -1,0 +1,23 @@
+---
+title: BoundProviderGraph
+description: Provider 绑定 facade 的本地 ID 输入、固定范围和共享生命周期参考。
+---
+
+# BoundProviderGraph
+
+<span className="cg-status">Available</span>
+
+通过 `graph.forProvider(providerId)` 获得。绑定对象把查询限制在一个 Provider，并允许使用 Provider 内 `capabilityId` 字符串。
+
+| 方法 | 与顶层方法的差异 |
+|---|---|
+| `getProvider()` | 不再传 providerId |
+| `listCatalog()` | `parent` 可省略 providerId |
+| `getCapabilities(ids)` | `ids` 是 Provider 内字符串数组 |
+| `getNeighbors(capabilityId)` | 只接受 Provider 内字符串 ID |
+| `readDocuments({ selected })` | `selected` 是字符串数组 |
+| `retrieveCapabilities()` | 召回限制在绑定 Provider |
+| `queryKnowledge()` | 缺省 Provider 身份由绑定补全 |
+| `queryRuntime()` | Runtime 来源固定为绑定 Provider |
+
+绑定查询禁止传 `requestProviderScope`，即使 JavaScript 调用方绕过 TypeScript 也会得到 `CG_INPUT_INVALID`。Facade 不拥有 Authority 句柄，也没有独立 `close()`；生命周期仍由原 `CapabilityGraph` 管理。

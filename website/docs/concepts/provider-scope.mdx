@@ -1,0 +1,24 @@
+---
+title: Provider Scope
+description: 通过宿主允许、集成启用和请求范围的交集计算 Effective Provider Scope。
+---
+
+# Provider Scope
+
+<span className="cg-status">Available</span>
+
+有效 Provider 范围是三层集合的交集：
+
+```text
+hostAllowedProviders
+∩ integrationEnabledProviders
+∩ requestProviderScope（若提供）
+```
+
+请求只能收窄，不能扩大宿主或集成配置。V1 的授权粒度是 Provider 集合；ID 前缀、父节点和分类是查询过滤，不是节点级授权。
+
+“未被 Agent 选择”也不等于“被 scope 拒绝”。能力仍可在目录中被发现，Runtime `instanceOf` 也可引用它；只有知识查询必须限制在非空已选能力集合内。
+
+Adapter 与 Core 在同一进程中运行，Provider scope 不是进程沙箱。接入层仍需负责用户、租户和项目授权。
+
+故障排查见 [Scope and Selection](../troubleshooting/scope-and-selection)。

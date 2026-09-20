@@ -1,0 +1,29 @@
+---
+title: Manage Lifecycle and Reload
+description: 正确管理 open、reload、current/previous 视图和 close 的资源所有权。
+---
+
+# Manage Lifecycle and Reload
+
+<span className="cg-status">Available</span>
+
+## 生命周期
+
+1. `CapabilityGraph.open()` 固定来源根并完整校验初始视图。
+2. 查询持有当前视图的读取引用。
+3. 作者更新定义后显式 `reload({ providerId })`。
+4. 新候选完整通过才成为 current；旧 current 成为 previous。
+5. `close()` 停止接受新查询并回收 Core 拥有的视图句柄。
+
+```ts
+const graph = await CapabilityGraph.open(config);
+try {
+  await graph.reload({ providerId: 'acme.http' });
+} finally {
+  await graph.close();
+}
+```
+
+`rootDir` 在 open 时固定为绝对根，之后改变 `cwd` 不会重定位来源。Core 不监听文件，也不定时刷新。
+
+刷新失败不会删除仍可完整读取的旧 current；状态会通过 Provider 结果中的 `refreshFailed` 暴露。句柄清理失败也不会覆盖已经成功的业务结果，而是在生命周期诊断中有界汇总。

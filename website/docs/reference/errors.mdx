@@ -1,0 +1,31 @@
+---
+title: ErrorCode and NextAction
+description: Capability Graph 公开错误码、恢复动作和错误层级参考。
+---
+
+import GeneratedErrors from '../../generated/snippets/errors.mdx';
+
+# ErrorCode and NextAction
+
+<span className="cg-status">Available</span>
+
+`CapabilityGraphError` 提供 `code`、稳定默认 `message`、`nextAction` 和可选的有限 `details`。Adapter 内部异常不会原样暴露私有路径或对象。
+
+## 常用错误
+
+| 错误码 | 含义 | 常见恢复 |
+|---|---|---|
+| `CG_CONFIG_INCOMPLETE` | 配置缺失或无效 | `configure_backend` |
+| `CG_SCOPE_DENIED` | 请求超出 Effective Provider Scope | `narrow_scope` |
+| `CG_VALIDATION_FAILED` | 来源定义无效 | `repair_source` |
+| `CG_REVISION_MISMATCH` | 指定修订或游标不可读 | `refresh` |
+| `CG_BUDGET_EXCEEDED` | 响应或工作预算不足 | 收窄请求或分页 |
+| `CG_RETRIEVER_UNCONFIGURED` | 没有配置 Retriever | `configure_backend` |
+| `CG_READER_UNCONFIGURED` | 没有匹配 Reader | `configure_backend` |
+| `CG_RUNTIME_DISABLED` | Provider 未配置 Runtime Adapter | `configure_backend` |
+| `CG_TIMEOUT` | Core 停止等待 | 检查 Adapter 任务状态后重试 |
+| `CG_PARTIAL_ITEM` | 当前条目无法返回 | 检查条目详情和 warning |
+
+完整 ErrorCode 与 NextAction 联合由声明提取器生成并执行全集覆盖检查。排错路径见 [Troubleshooting](../troubleshooting/)。
+
+<GeneratedErrors />

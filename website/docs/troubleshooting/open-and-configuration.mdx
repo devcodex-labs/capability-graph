@@ -1,0 +1,21 @@
+---
+title: Open and Configuration
+description: 诊断 open 失败、缺失 Authority、双 Authority、来源不可读和定义校验错误。
+---
+
+# Open and Configuration
+
+## 症状
+
+`CapabilityGraph.open()` 返回 `CG_CONFIG_INCOMPLETE`、`CG_DUAL_AUTHORITY`、`CG_LOAD_FAILED` 或 `CG_VALIDATION_FAILED`。
+
+## 检查顺序
+
+1. `hostAllowedProviders`、`integrationEnabledProviders` 和 `providers` 都是数组。
+2. 有效启用范围中的每个 Provider 恰有一个 `ProviderLoadSpec`。
+3. 文件根存在且进程可读，`provider.json` 的 ID 与配置一致。
+4. 单个定义文件不超过 262,144 UTF-8 字节，JSON 可解析。
+5. 所有必填字段、关系端点和知识 locator 合法。
+6. parents 与 specializes 分别无环。
+
+首次加载失败没有旧视图可回退。修复来源后重新 open，不要把缺 Authority 改成空目录成功。
