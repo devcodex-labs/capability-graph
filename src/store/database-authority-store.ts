@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { CapabilityGraphError } from "../errors.js";
 import { canonicalJson, computeStaticRevision } from "../hash.js";
 import { isId } from "../identity.js";
@@ -37,8 +38,10 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
   const close = async () => { if (!closed) { closed = true; await view.close(); } };
   try {
     const sourceRevision = view.sourceRevision;
-    const root = view.knowledgeRootDir;
-    if (typeof sourceRevision !== "string" || !sourceRevision.trim() || (root !== undefined && (typeof root !== "string" || !root))) contract("source_context_invalid");
+    const declaredRoot = view.knowledgeRootDir;
+    if (typeof sourceRevision !== "string" || !sourceRevision.trim() || (declaredRoot !== undefined && (typeof declaredRoot !== "string" || !declaredRoot))) contract("source_context_invalid");
+    // Capture the effective root before validation awaits; keep checking the adapter's original declaration.
+    const root = declaredRoot === undefined ? undefined : path.resolve(declaredRoot);
     const provider = await validateProvider(view.provider, root);
     if (provider.providerId !== expectedProviderId) contract("provider_identity_mismatch");
     const providerDigest = digest(view.provider);
@@ -48,7 +51,7 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
       if (closed || view.sourceRevision !== sourceRevision) {
         throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh" });
       }
-      if (view.knowledgeRootDir !== root || digest(view.provider) !== providerDigest) contract("source_context_changed");
+      if (view.knowledgeRootDir !== declaredRoot || digest(view.provider) !== providerDigest) contract("source_context_changed");
     };
     const call = async <T>(read: () => Promise<T>): Promise<T> => { stable(); const value = await read(); stable(); return value; };
     async function* scan() {

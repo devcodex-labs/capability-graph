@@ -5,8 +5,9 @@ import { fileURLToPath } from "node:url";
 import { cleanOutput } from "./clean-output.mjs";
 
 const repository = await realpath(fileURLToPath(new URL("../", import.meta.url)));
-await cleanOutput(repository, "dist");
-const result = spawnSync(process.execPath, [path.join(repository, "node_modules/typescript/bin/tsc"), "-p", "tsconfig.json"], {
+// TypeScript overwrites present modules but does not remove outputs whose sources were deleted.
+await cleanOutput(repository, "dist-test");
+const result = spawnSync(process.execPath, [path.join(repository, "node_modules/typescript/bin/tsc"), "-p", "tsconfig.test.json"], {
   cwd: repository, stdio: "inherit",
 });
 if (result.error) throw result.error;

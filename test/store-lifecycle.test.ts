@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 import { CoreHost, type StaticOpenConfig } from "../src/core-host.js";
 import { CapabilityGraphError } from "../src/errors.js";
@@ -187,11 +188,12 @@ test("reload serializes and failed candidates preserve readable slots with refre
 
 test("previous selection retains its knowledge root; dead backend maps to requested-view failure", async () => {
   const old = new FakeDatabase([record("a")]); old.knowledgeRootDir = "old-root";
+  const oldRoot = path.resolve("old-root");
   let calls = 0;
   const host = await CoreHost.open(config(async () => ++calls === 1 ? old : new FakeDatabase([record("a", { name: "new" })])));
   const revision = await host.query(undefined, undefined, async (ctx) => ctx.meta.staticRevision!);
   await host.reload();
-  await host.query(undefined, revision, async (ctx) => { assert.equal(ctx.meta.servedFrom, "previous"); assert.equal(ctx.graph.getView("seed")!.sourceContext.knowledgeRootDir, "old-root"); });
+  await host.query(undefined, revision, async (ctx) => { assert.equal(ctx.meta.servedFrom, "previous"); assert.equal(ctx.graph.getView("seed")!.sourceContext.knowledgeRootDir, oldRoot); });
   old.getCapability = async () => { throw new Error("dead"); };
   await assert.rejects(host.query(undefined, revision, async (ctx) => ctx.graph.getView("seed")!.getCapability("a")), code("CG_REVISION_MISMATCH"));
   await host.close();

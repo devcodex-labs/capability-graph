@@ -24,6 +24,48 @@ const wrap = (run: (input: Parameters<KnowledgeRetriever["retrieve"]>[0], access
   id: "fake-modified", retrieve: async (input, access) => run(input, access, await fakeKnowledgeRetriever.retrieve(input, access)),
 });
 
+test("deep R3: unrelated reload does not invalidate selected knowledge evidence", async () => {
+  const requests: Parameters<KnowledgeRetriever["retrieve"]>[0][] = [];
+  let saved: Awaited<ReturnType<KnowledgeRetriever["retrieve"]>> | undefined; let name = "first";
+  const graph = await CapabilityGraph.open(config({
+    hostAllowedProviders: ["seed", "other"], integrationEnabledProviders: ["seed", "other"],
+    providers: [...config().providers, { providerId: "other", authority: { kind: "database", adapter: { id: "other", openView: async () => {
+      const db = new FakeDatabase([record("a", { name, knowledge: [document("other-doc")] })]); db.provider.providerId = "other"; return db;
+    } } } }],
+    knowledgeRetriever: { id: "reuse-evidence", retrieve: async (input, access) => {
+      requests.push(input); saved ??= await fakeKnowledgeRetriever.retrieve(input, access); return saved;
+    } },
+  }));
+  try {
+    const query = { text: "find", selected: [id()], knowledgeIds: ["intro"] };
+    await graph.queryKnowledge(query); name = "second"; await graph.reload({ providerId: "other" });
+    const page = await graph.queryKnowledge(query);
+    assert.equal(page.knowledgeState, "searched"); assert.deepEqual(page.meta.scope, ["other", "seed"]);
+    assert.deepEqual(Object.keys(requests[0]!.staticRevisionByProvider), ["seed"]);
+    assert.deepEqual(requests[0], requests[1]);
+  } finally { await graph.close(); }
+});
+
+test("deep R3: filtered and empty knowledge providers are not evidence dependencies", async () => {
+  let extraEvidence = false;
+  const graph = await CapabilityGraph.open(config({
+    hostAllowedProviders: ["seed", "other"], integrationEnabledProviders: ["seed", "other"],
+    providers: [...config().providers, { providerId: "other", authority: { kind: "database", adapter: { id: "other", openView: async () => {
+      const db = new FakeDatabase([record("a", { knowledge: [document("other-doc")] }), record("b")]); db.provider.providerId = "other"; return db;
+    } } } }],
+    knowledgeRetriever: wrap((input, _access, output) => {
+      assert.deepEqual(Object.keys(input.staticRevisionByProvider), ["seed"]);
+      assert.ok(input.targets.every((target) => target.id.providerId === "seed"));
+      return extraEvidence ? { ...output, evidence: { ...output.evidence, staticRevisionByProvider: { ...input.staticRevisionByProvider, other: "s:extra" } } } : output;
+    }),
+  }));
+  try {
+    const query = { text: "find", selected: [id(), id("a", "other"), id("b", "other")], knowledgeIds: ["intro"] };
+    assert.equal((await graph.queryKnowledge(query)).knowledgeState, "searched");
+    extraEvidence = true; await assert.rejects(graph.queryKnowledge(query), code("CG_REVISION_MISMATCH"));
+  } finally { await graph.close(); }
+});
+
 test("R8: all-invalid selections retain their cause, with bounded mixed failure details", async () => {
   for (const configured of [false, true]) {
     const graph = await CapabilityGraph.open(config(configured ? { knowledgeRetriever: fakeKnowledgeRetriever } : {}));

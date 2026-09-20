@@ -40,6 +40,7 @@ export interface ProviderSourceContext {
   readonly providerId: string;
   readonly authorityKind: "file" | "database";
   readonly sourceRevision: string;
+  /** Private absolute root captured for this view; never include it in public query output. */
   readonly knowledgeRootDir?: string;
 }
 export interface ValidatedProviderSnapshot {
@@ -73,6 +74,7 @@ export interface DatabaseAuthorityAdapter {
 export interface DatabaseReadView {
   readonly provider: UnvalidatedProviderRecord;
   readonly sourceRevision: string;
+  /** Relative roots resolve once when Core receives this view, before validation awaits; the declaration must stay stable. */
   readonly knowledgeRootDir?: string;
   /** Return this view's record or undefined for an absent ID; throw when the view itself is no longer readable. */
   getCapability(capabilityId: string): Promise<UnvalidatedCapabilityRecord | undefined>;

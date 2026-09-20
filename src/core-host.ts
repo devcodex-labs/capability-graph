@@ -1,3 +1,4 @@
+import path from "node:path";
 import { resolveBudgets, type BudgetConfig, type BudgetOverrides } from "./budgets.js";
 import { CapabilityGraphError, type ErrorShape } from "./errors.js";
 import { isId } from "./identity.js";
@@ -10,7 +11,7 @@ import type { DatabaseAuthorityAdapter, ValidatedProviderView } from "./store/ty
 import type { ResultMeta, StaticRevision } from "./types.js";
 import { validateSnapshot } from "./validate/index.js";
 
-/** Exactly one authoritative source per provider; database indexes must not compete with file authority. */
+/** One source per enabled provider. File roots are resolved at open, independent of subsequent cwd changes. */
 export type AuthoritySpec = { readonly kind: "file"; readonly rootDir: string } |
   { readonly kind: "database"; readonly adapter: DatabaseAuthorityAdapter };
 export interface ProviderLoadSpec { readonly providerId: string; readonly authority: AuthoritySpec }
@@ -56,6 +57,7 @@ export class CoreHost {
     this.budgets = resolveBudgets(config.budgets);
     if (!Array.isArray(config.providers)) throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
     const seen = new Set<string>();
+    const cwd = process.cwd();
     this.specs = config.providers.map((spec) => {
       if (!spec || !isId(spec.providerId) || !spec.authority) throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
       if (seen.has(spec.providerId)) throw new CapabilityGraphError("CG_DUAL_AUTHORITY", { nextAction: "configure_backend" });
@@ -64,10 +66,15 @@ export class CoreHost {
       const authority = spec.authority;
       if ((authority.kind === "file" && typeof authority.rootDir === "string" && authority.rootDir.length && !("adapter" in authority)) ||
           (authority.kind === "database" && authority.adapter && typeof authority.adapter.openView === "function" && !("rootDir" in authority))) {
-        return Object.freeze({ providerId: spec.providerId, authority: Object.freeze({ ...authority }) });
+        return Object.freeze({ providerId: spec.providerId, authority: Object.freeze(authority.kind === "file"
+          ? { kind: "file" as const, rootDir: path.resolve(cwd, authority.rootDir) } : { ...authority }) });
       }
       throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
     });
+    // Missing authority is not a valid empty provider. Fail before opening any source handles.
+    if ([...this.scope].some((id) => !seen.has(id))) {
+      throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
+    }
   }
 
   private async load(spec: ProviderLoadSpec): Promise<ValidatedProviderView> {

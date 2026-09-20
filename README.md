@@ -71,7 +71,11 @@ try {
 }
 ```
 
-必填范围与 `providers` 可以显式为空，不能省略。请求范围只能缩小宿主与集成配置的交集。一个 Provider 只能选择一种正式权威来源；各 Provider 独立修订，联合目录不产生跨 Provider 图边。
+必填范围与 `providers` 不能省略。显式空启用范围配合空 `providers` 是合法空配置；有效启用范围中的每个 Provider 必须恰有一个权威来源，缺少来源报 `CG_CONFIG_INCOMPLETE`，不能当成空目录。请求范围只能缩小宿主与集成配置的交集；各 Provider 独立修订，联合目录不产生跨 Provider 图边。
+
+文件 `rootDir` 在 `open` 时解析为固定绝对根，后续工作目录变化不会重定位 `reload`。数据库 `knowledgeRootDir` 若为相对路径，在 Core 收到该只读视图时立即固定；current/previous 分别保留自己的根。知识 locator 仍是作者声明的相对路径，私有根不出现在公共结果或检索请求中。
+
+文件模式从根目录的 `provider.json` 和递归的 `*.capability.json` 收集定义；任何层级均跳过目录 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache`、`.tmp`，按精确名称匹配。正式定义不要放在这些目录内；其他嵌套目录继续支持，不要求迁移到固定 `capabilities/` 布局。
 
 <a id="queries"></a>
 
@@ -94,6 +98,10 @@ try {
 能力召回同样隔离单个离线来源的候选；候选自己的旧修订进入 warning，指定权威视图不可读则整次失败，包括 Retriever 调用期间发生的失效。合法候选保留原始排名，不因其他项失败重排。
 
 邻居默认单项上限 2048 字节、整页 24576 字节，可通过 `budgets.neighbors.maxItemBytes/maxBytes` 覆盖。超大项省略并标记 warning/partial，不截断描述；分页时将仍有 `nextCursor` 的关系组作为下一次 `kinds`，并传回对应 `cursors`，已经完成的组无需重复请求。元数据及所有游标也计入预算，无法取得任何进展时明确报超预算。
+
+公开分页游标最多 32768 个 base64url 字符。Core 在最终编码后检查上限，Adapter 的游标或 Runtime 修订过长时先报 `CG_BUDGET_EXCEEDED`，不返回无法续查的游标；调用方输入超长游标仍报 `CG_INPUT_INVALID`。提高整页预算不放宽此上限。
+
+知识检索的 `staticRevisionByProvider` 只覆盖最终选中并展开的 Knowledge targets 所属 Provider，检索证据必须匹配这个集合；无关 Provider 刷新不使本次知识证据失效。授权 `meta.scope` 不因此改变，能力召回仍以其自身查询范围为准。
 
 作者修改正式定义后显式调用 `graph.reload({ providerId: "seed.http" })`。候选完整校验成功才替换对应视图；失败保留仍可读视图并标记 `refreshFailed`。Core 保留 current/previous，允许指定旧 `requiredStaticRevision`；更旧或不可读视图明确失败。知识正文不属于静态定义哈希，每次读取重新取得内容身份。Core 不监听文件、不定时刷新，不自动建立或更新外部索引；后端须在返回中提供符合当前静态修订及知识映射的证据，过期证据不会静默降级为全文读取。
 
@@ -124,9 +132,11 @@ npm run test:package
 npm run evaluate
 ```
 
-`npm test` 先构建和核对独立 TypeScript 消费者，再运行编译后的测试；`test:package` 在无 dist 的源码副本中执行标准打包，并核对旧产物清理、预构建一致性、独立项目离线安装与类型，结束后清理临时文件，不执行发布。
+`npm test` 先构建和核对独立 TypeScript 消费者，再清理 `dist-test`、重新编译并发现测试；删除或重命名源码后不会继续执行旧测试输出。`test:package` 在无 dist 的源码副本中执行标准打包，并核对旧产物清理、预构建一致性、独立项目离线安装与类型，结束后清理临时文件，不执行发布。
 
 只构建使用 `npm run build`，会清理仓库内 dist 后重新编译；标准 `npm pack` 的 prepack 自动执行同一构建，不能跳过脚本后假定产物仍然有效。构建产物位于 `dist/`，测试编译产物位于 `dist-test/`。CI 配置覆盖 Windows/Linux 与 Node 20.19.0、22.12.0，远端运行结果以实际 CI 为准。
+
+`npm run build:tests` 单独清理并编译测试，`evaluate` 也使用此入口。根包及私有 MCP 示例的构建清理只接受已知、归当前包所有的输出目录，拒绝符号链接或普通文件，不跟随输出链接删除其他目录。
 
 `evaluate` 使用明确期望的 Seed 任务记录正确性、遗漏、UTF-8 返回字节、调用数和本机耗时，不调用模型、不推断真实 Agent 准确率或节省比例。未配置检索后端的质量对照不适用。
 

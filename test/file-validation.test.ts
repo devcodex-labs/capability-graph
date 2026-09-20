@@ -61,6 +61,21 @@ test("PR3: missing and malformed JSON return load failure without absolute paths
   });
 });
 
+test("deep R5: metadata and generated directories are excluded at every depth", async () => fixture(async (root) => {
+  await writeFile(path.join(root, "provider.json"), JSON.stringify(provider));
+  for (const prefix of ["", "nested"]) {
+    for (const directory of [".git", "node_modules", "dist", "dist-test", "coverage", ".cache", ".tmp"]) {
+      const target = path.join(root, prefix, directory, "objects"); await mkdir(target, { recursive: true });
+      await writeFile(path.join(target, "bad.capability.json"), "invalid");
+    }
+  }
+  await writeFile(path.join(root, "nested/valid.capability.json"), JSON.stringify(row("nested")));
+  await mkdir(path.join(root, "coverage-guide"));
+  await writeFile(path.join(root, "coverage-guide/valid.capability.json"), JSON.stringify(row("guide")));
+  const snapshot = await new FileAuthorityStore().load(root);
+  assert.deepEqual(snapshot.capabilities.map((entry) => entry.capabilityId), ["guide", "nested"]);
+}));
+
 test("PR3: full endpoint set accepts forward references, multi-parent DAG and independent edge types", async () => {
   const valid = await validateSnapshot(snapshot([
     row("a", { parents: ["b", "z"], related: ["z"] }), row("b", { specializes: ["a"] }), row("z", { related: ["a"] }),

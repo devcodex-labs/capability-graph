@@ -3,6 +3,8 @@ import path from "node:path";
 import { CapabilityGraphError } from "../errors.js";
 import type { UnvalidatedCapabilityRecord, UnvalidatedProviderRecord, UnvalidatedProviderSnapshot } from "./types.js";
 
+const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist", "dist-test", "coverage", ".cache", ".tmp"]);
+
 /** File authority reads definitions only, never application entrypoints or knowledge bodies. */
 export class FileAuthorityStore {
   async load(rootDir: string): Promise<UnvalidatedProviderSnapshot> {
@@ -27,7 +29,7 @@ export class FileAuthorityStore {
       try {
         for (const entry of await readdir(path.join(root, current), { withFileTypes: true })) {
           const file = path.posix.join(current, entry.name);
-          if (entry.isDirectory() && !["node_modules", "dist"].includes(entry.name)) directories.push(file);
+          if (entry.isDirectory() && !IGNORED_DIRECTORIES.has(entry.name)) directories.push(file);
           else if ((entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith(".capability.json")) files.push(file);
         }
       } catch {

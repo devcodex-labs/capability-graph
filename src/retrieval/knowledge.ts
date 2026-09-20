@@ -9,7 +9,7 @@ import type { KnowledgeHit, KnowledgeIndexEvidence, KnowledgeReader, KnowledgeRe
 import { bytes, capability, identity, inputInvalid, limit } from "../query/common.js";
 import type { KnowledgeDocumentRef, ResultMeta, StaticCapability } from "../types.js";
 import { freeze } from "../validate/values.js";
-import { contract, invoke, queryText, revisions, warning } from "./common.js";
+import { contract, invoke, queryText, warning } from "./common.js";
 import type { QueryKnowledgePage, QueryKnowledgeQuery } from "./types.js";
 
 const key = (target: Pick<KnowledgeSearchTarget, "id" | "knowledgeId">) => `${formatQualifiedId(target.id)}::${target.knowledgeId}`;
@@ -82,7 +82,8 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
   const mappingRevision = `m:${hash(entries.map(([, entry]) => ({ target: projectKnowledgeTarget(entry.target),
     contextDigest: hash({ providerId: entry.context.providerId, authorityKind: entry.context.sourceContext.authorityKind,
       knowledgeRootDir: entry.context.sourceContext.knowledgeRootDir ?? null }) })))}`;
-  const staticRevisionByProvider = revisions(context);
+  // Authorization scope is not an index dependency: only expanded, selected targets contribute revisions.
+  const staticRevisionByProvider = Object.fromEntries(entries.map(([, entry]) => [entry.context.providerId, entry.context.staticRevision]));
   const request = freeze({ text: query.text, staticRevisionByProvider, mappingRevision,
     targets: entries.map(([, entry]) => projectKnowledgeTarget(entry.target)), limit: count });
   let active = true;

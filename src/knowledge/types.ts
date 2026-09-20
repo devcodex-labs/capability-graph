@@ -30,6 +30,7 @@ export interface KnowledgeRetrievalAccess {
 }
 /** Prove mapping, configuration and content freshness for all targets, including queries returning zero hits. */
 export interface KnowledgeIndexEvidence {
+  /** Exactly the providers represented in this request's final targets, not the entire authorized scope. */
   readonly staticRevisionByProvider: Readonly<Record<string, StaticRevision>>;
   readonly mappingRevision: string; readonly observedAt: string; readonly freshness: "current" | "stale" | "unknown";
   readonly sourceConfigRevision: string; readonly indexedConfigRevision: string;
@@ -44,7 +45,7 @@ export interface KnowledgeHit {
 /** Optional knowledge search contract; actual indexing/backends are integration-owned. */
 export interface KnowledgeRetriever {
   readonly id: string;
-  /** Return at most limit hits plus complete evidence; use access for controlled reads, never expand graph relations. */
+  /** Return bounded hits/evidence for final targets. Revisions cover only their providers; access cannot expand relations. */
   retrieve(input: { text: string; staticRevisionByProvider: Readonly<Record<string, StaticRevision>>;
     mappingRevision: string; targets: readonly KnowledgeSearchTarget[]; limit: number }, access: KnowledgeRetrievalAccess):
     Promise<{ hits: readonly KnowledgeHit[]; evidence: KnowledgeIndexEvidence }>;
