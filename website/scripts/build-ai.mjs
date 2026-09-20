@@ -26,7 +26,7 @@ await access(llmsPath);
 await access(fullPath);
 const llms = await readFile(llmsPath, 'utf8');
 const full = await readFile(fullPath, 'utf8');
-for (const section of ['Getting Started', 'Concepts', 'Guides', 'Integrations', 'Examples', 'Reference', 'Troubleshooting']) {
+for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
   assert(llms.includes(section), `llms.txt is missing ${section}`);
 }
 for (const boundary of ['Capability Graph', 'Provider', 'MCP', 'CapabilityGraph.open']) {
