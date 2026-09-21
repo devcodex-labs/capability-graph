@@ -12,10 +12,13 @@ const lock = JSON.parse(await readFile(path.join(repositoryRoot, 'package-lock.j
 const websiteManifest = JSON.parse(await readFile(path.join(websiteRoot, 'package.json'), 'utf8'));
 const websiteLock = JSON.parse(await readFile(path.join(websiteRoot, 'package-lock.json'), 'utf8'));
 const releaseTag = process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME;
+const isManualResume = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
 const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 assert(stableVersion.test(manifest.version), `release package version must be stable SemVer: ${manifest.version}`);
 assert(releaseTag === `v${manifest.version}`, `tag ${releaseTag ?? '<missing>'} must equal v${manifest.version}`);
-if (process.env.GITHUB_REF_TYPE) assert(process.env.GITHUB_REF_TYPE === 'tag', 'release workflow must run from a tag');
+if (process.env.GITHUB_REF_TYPE) {
+  assert(process.env.GITHUB_REF_TYPE === 'tag' || isManualResume, 'release workflow must run from a tag or an explicit manual resume');
+}
 assert(manifest.name === '@devcodex/capability-graph', 'unexpected root package name');
 for (const [name, value] of [
   ['root lock', lock.version],
@@ -29,7 +32,7 @@ const readme = await readFile(path.join(repositoryRoot, 'README.md'), 'utf8');
 assert(readme.includes(`changelogs/${manifest.version}.md`), 'README must link the release changelog');
 
 const releaseId = `capability-graph-${manifest.version}`;
-const releaseCommit = process.env.GITHUB_SHA ?? execFileSync('git', ['rev-parse', 'HEAD'], {
+const releaseCommit = process.env.RELEASE_COMMIT ?? execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: repositoryRoot,
   encoding: 'utf8'
 }).trim();

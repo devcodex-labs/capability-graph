@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing immutable release tag to resume
+        required: true
+        type: string
 
 concurrency:
   group: capability-graph-production
@@ -24,22 +30,35 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
           fetch-depth: 0
           persist-credentials: false
+      - id: target
+        name: Resolve the immutable release tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          release_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          echo "release_commit=$release_commit" >>"$GITHUB_OUTPUT"
       - uses: actions/setup-node@v7
         with:
           node-version: "22.12.0"
       - id: contract
         run: node website/scripts/check-release.mjs
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+          RELEASE_COMMIT: ${{ steps.target.outputs.release_commit }}
       - name: Require the tag commit to belong to main
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-tags origin main:refs/remotes/origin/main
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
-            echo "$GITHUB_REF_NAME must point to a commit reachable from main" >&2
+          release_commit="${{ steps.target.outputs.release_commit }}"
+          git merge-base --is-ancestor "$release_commit" origin/main || {
+            echo "${{ github.event.inputs.release_tag || github.ref_name }} must point to a commit reachable from main" >&2
             exit 1
           }
 
@@ -49,6 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -86,6 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -165,14 +186,16 @@ jobs:
           set -euo pipefail
           name="@devcodex/capability-graph"
           package="${name}@${PACKAGE_VERSION}"
-          for attempt in {1..12}; do
-            version="$(npm view "$package" version 2>/dev/null || true)"
-            shasum="$(npm view "$package" dist.shasum 2>/dev/null || true)"
-            latest="$(npm view "$name" dist-tags.latest 2>/dev/null || true)"
+          for attempt in {1..30}; do
+            cache="$RUNNER_TEMP/npm-registry-probe-$attempt"
+            version="$(npm view "$package" version --prefer-online --cache "$cache" 2>/dev/null || true)"
+            shasum="$(npm view "$package" dist.shasum --prefer-online --cache "$cache" 2>/dev/null || true)"
+            latest="$(npm view "$name" dist-tags.latest --prefer-online --cache "$cache" 2>/dev/null || true)"
+            echo "registry probe $attempt: version=${version:-<missing>} shasum=${shasum:-<missing>} latest=${latest:-<missing>}"
             if [[ "$version" == "$PACKAGE_VERSION" && "$shasum" == "${{ steps.pack.outputs.shasum }}" && "$latest" == "$PACKAGE_VERSION" ]]; then
               break
             fi
-            if [[ "$attempt" == 12 ]]; then
+            if [[ "$attempt" == 30 ]]; then
               echo "$package did not propagate with the expected tarball and latest tag" >&2
               exit 1
             fi
@@ -204,6 +227,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -266,6 +290,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.inputs.release_tag || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
