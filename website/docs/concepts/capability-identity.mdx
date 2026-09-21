@@ -10,10 +10,10 @@ description: 使用二元能力身份和显式关系，避免跨来源歧义、�
 规范身份是：
 
 ```ts
-{ providerId: 'seed.http', capabilityId: 'route.validation' }
+{ providerId: 'acme.http', capabilityId: 'route.validation' }
 ```
 
-可逆显示形式为 `seed.http::route.validation`。`::` 是正式分隔符；不能按点号猜 Provider 和 Capability 的边界。
+可逆显示形式为 `acme.http::route.validation`。`::` 是正式分隔符；不能按点号猜 Provider 和 Capability 的边界。
 
 `capabilityId` 只在所属 Provider 内唯一。查询必须已经绑定 Provider，或传入完整二元身份。正式关系边只能连接同一 Provider 内的节点。
 
@@ -36,3 +36,5 @@ description: 使用二元能力身份和显式关系，避免跨来源歧义、�
 `related` 不自动补反向边；`relatedBy` 只是查询投影。命名层级、共同前缀和 Runtime `instanceOf` 都不会生成静态边。
 
 关系端点必须属于同一 Provider。跨 Provider 组合发生在 Agent 任务层，而不是写入 V1 正式图。实践见 [设计关系](../guides/design-relations)。
+
+例如 Acme 扩展示例中，`route.validation.parents = ['route']` 表示验证归属路由族，`related = ['schema.request']` 提示可以配合请求 Schema。查询 `route` 的 `children` 可发现验证能力，但不会自动选择它的知识。另一个 Provider 即使也叫 `route.validation`，仍是不同身份，不能用本 Provider 的边指向它。

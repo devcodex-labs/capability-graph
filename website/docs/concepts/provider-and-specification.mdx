@@ -19,7 +19,20 @@ Provider Specification 描述如何正确使用该 Provider，但正文不由 Co
 
 ## 为什么分开
 
-静态图需要确定、可哈希的数据合同；规范正文可能独立发布、按版本变化或由宿主选择投递。分开后，Core 可以稳定校验身份和适用性，而不冒充规范分发系统。
+静态图需要确定、可哈希的数据合同；规范正文可能独立发布、按版本变化或由宿主选择投递。Core 校验身份和适用性元数据的格式；实际项目版本匹配仍归接入层，不由 Core 执行。
+
+## 贯穿示例：Acme HTTP
+
+入门中的 `acme.http` 定义 `route` 和 `route.http`。能力增长后可扩展为：
+
+| 能力 | 负责什么 | 何时选择 |
+|---|---|---|
+| `route` | 路由能力族 | 先寻找请求入口相关能力 |
+| `route.http` | HTTP 路由注册 | 新增或调整 HTTP handler |
+| `route.validation` | 路由请求校验 | 在 handler 前验证输入 |
+| `schema.request` | 请求结构声明 | 描述必填字段和输入类型 |
+
+后两项是概念扩展示例，不会由两节点入门 Fixture 自动生成。`PROVIDER.md` 放跨能力规则，验证指南绑定 `route.validation`；具体 `POST /users` 留给 Runtime，避免把每个业务路由变成静态能力。
 
 ## 能力建模
 

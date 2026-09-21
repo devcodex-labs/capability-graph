@@ -14,17 +14,24 @@ import {
   CapabilityGraph,
   CapabilityGraphError,
   type OpenConfig
-} from '@devcodex-labs/capability-graph';
+} from '@devcodex/capability-graph';
 ```
 
-典型生命周期：
+典型生命周期（配置片段，先准备入门教程的 Provider 并替换目录）：
 
 ```ts
+const config: OpenConfig = {
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{ providerId: 'acme.http', authority: {
+    kind: 'file', rootDir: '/absolute/path/to/acme-provider'
+  } }]
+};
 const graph = await CapabilityGraph.open(config);
 try {
   const providers = await graph.listProviders();
   const catalog = await graph.listCatalog({ limit: 40 });
-  const bound = graph.forProvider(providers.items[0].providerId);
+  const bound = graph.forProvider('acme.http');
   const detail = await bound.getCapabilities(['route']);
   console.log({ catalog, detail });
 } catch (error) {
@@ -36,5 +43,9 @@ try {
   await graph.close();
 }
 ```
+
+`config` 指定唯一权威来源；本例显式绑定已知 Provider，避免把目录第一项当作业务默认来源。预期 Catalog 包含教程的两个能力，`detail.results[0].ok` 为 `true`。如果在 `open()` 阶段失败，还没有可用图对象，应修正配置或定义后重试；后续查询失败仍通过 `finally` 释放资源。
+
+短脚本可执行完即关闭；长运行 API/MCP 应在服务启动时打开图、停机时关闭，不要为每次请求创建或关闭共享实例。接入方负责认证与请求范围，Core 负责来源校验、有界查询和修订一致性。
 
 `forProvider()` 只绑定查询范围，不拥有来源句柄。完整生命周期与 `BoundProviderGraph` 差异见 [Core 与生命周期](../reference/capability-graph)。

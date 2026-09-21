@@ -33,6 +33,13 @@ body {
   outline-offset: 3px;
 }
 
+button.rp-search-button--mobile {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+}
+
 .rp-doc table {
   display: table;
   width: 100%;

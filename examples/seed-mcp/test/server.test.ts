@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { CapabilityGraph, CapabilityGraphError, type RuntimeAdapter } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph, CapabilityGraphError, type RuntimeAdapter } from "@devcodex/capability-graph";
 import { createSeedServer } from "../src/server.js";
 
 const root = fileURLToPath(new URL("../../../seed-provider/", import.meta.url));

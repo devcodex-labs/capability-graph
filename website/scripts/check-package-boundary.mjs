@@ -17,7 +17,7 @@ const runNpm = (args) => execFileSync(process.execPath, [npm, ...args], {
 });
 
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
-assert(manifest.name === '@devcodex-labs/capability-graph', 'unexpected package name');
+assert(manifest.name === '@devcodex/capability-graph', 'unexpected package name');
 assert(Object.keys(manifest.dependencies ?? {}).length === 0, 'public package must keep zero runtime dependencies');
 const [dryRun] = JSON.parse(runNpm(['pack', '--dry-run', '--json', '--ignore-scripts']));
 const paths = dryRun.files.map(({ path: file }) => file);

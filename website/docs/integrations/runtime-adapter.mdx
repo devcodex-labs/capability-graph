@@ -7,6 +7,10 @@ description: 实现 Provider 专属 Runtime 数据源，并保持项目、环境
 
 <span className="cg-status">合同可用；HTTP 参考实现可运行</span>
 
+RuntimeAdapter 将“当前项目实际存在的实例”交给 Core。例如框架支持 HTTP 路由是静态能力，开发环境已注册的 `POST /users` 才是实例。只有调用 `queryRuntime()` 时 Core 才调用 Adapter，不会在 `open()` 时替你启动业务或扫描源码。
+
+下面是接口节选，相关类型均从主包根入口导出：
+
 ```ts
 interface RuntimeAdapter {
   readonly id: string;
@@ -29,3 +33,70 @@ Adapter 返回有界实例页和 `RuntimeObservation`。`source`、`observedAt`�
 网络访问、刷新、取消和资源清理由 Adapter 负责。Core 的超时只限制等待，不会自动取消正在运行的 Adapter Promise；V1 也不会自动调用 `invalidate()`。
 
 实例必须包含 Provider、项目、环境、`instanceId` 和无歧义 `instanceOf`。Runtime-only association 不会写回静态图。
+
+## 最小实现骨架
+
+以下工厂可通过类型检查，但不包含后端。`readSnapshot` 由集成方实现：它必须读取真实注册表、按输入过滤和分页，并返回同一观察快照的元数据。不要用手写实例冒充当前项目的观察。
+
+```ts title="runtime-skeleton.ts"
+import type { RuntimeAdapter, RuntimeObservation } from '@devcodex/capability-graph';
+
+type RuntimeInput = Parameters<RuntimeAdapter['query']>[0];
+type RouteSnapshot = {
+  project: string;
+  environment: string;
+  routes: readonly { method: string; path: string }[];
+  observation: RuntimeObservation;
+  nextCursor?: string;
+};
+
+export function createRuntimeAdapter(
+  readSnapshot: (input: RuntimeInput) => Promise<RouteSnapshot>
+): RuntimeAdapter {
+  return {
+    id: 'acme-http-runtime',
+    providerId: 'acme.http',
+    async query(input) {
+      const snapshot = await readSnapshot(input);
+      if (snapshot.project !== input.project || snapshot.environment !== input.environment) {
+        throw new Error('Runtime context mismatch');
+      }
+      return {
+        instances: snapshot.routes.map((route) => ({
+          providerId: 'acme.http', project: snapshot.project, environment: snapshot.environment,
+          instanceId: `${route.method} ${route.path}`,
+          instanceOf: { providerId: 'acme.http', capabilityId: 'route.http' },
+          facts: { method: route.method, path: route.path }
+        })),
+        observation: snapshot.observation,
+        ...(snapshot.nextCursor === undefined ? {} : { nextCursor: snapshot.nextCursor })
+      };
+    }
+  };
+}
+```
+
+创建的对象放入 `OpenConfig.runtimeAdapters`，每个 Provider 至多一个。`id` 标识 Adapter，`providerId` 绑定来源；实例 ID 应在该 Provider/项目/环境内稳定。骨架只有 HTTP 路由一种类型，其他类型需映射到其真实 `instanceOf`，不能统一改写成 `route.http`。
+
+## 观察字段如何填写
+
+| 字段 | 来源与选择 |
+|---|---|
+| `source` / `sourceIdentity` | 来源种类及可选进程/部署身份，便于区分相同项目的不同观察者 |
+| `observedAt` | 实际取得观察的时间，不是读取旧缓存时伪造的新时间 |
+| `runtimeRevision` | 来源实例集合/构建的稳定观察修订；续页必须保留同一快照 |
+| `observedAgainstStaticRevision` | 该来源构建/映射实际依据的静态修订；不能机械复制请求修订 |
+| `compatibility` | 来源确认兼容才用 `compatible`；未知用 `unknown`，需刷新用 `refresh_required` |
+| `availability` | 完整且有实例为 `available`；完整观察无实例为 `empty`；未覆盖完整来源为 `partial` |
+| `freshness` | 当前观察为 `current`；保留旧观察时标 `stale` |
+| `coverage` / `freshnessLimit` | 说明只覆盖当前进程、排除什么、何时需要重新查询 |
+
+`input.currentStaticRevision` 用来比较观察依据，不证明来源已更新。`instanceOf`、`instanceId`、`limit`、`cursor` 是请求过滤/分页条件，应原样约束后端；过滤后无实例仍需给出覆盖和新鲜度证据。
+
+## 验证与失败
+
+成功页应在 `items` 中保留正确上下文和二元身份，`observation` 与来源一致。Core 会检查返回形状、身份、上下文、静态能力存在性、观察状态及预算；部分实例被剔除会标记部分结果/诊断，全部被拒则查询失败，不能解释为有效空观察。`available` 搭配空实例不满足结果合同。
+
+Adapter 抛错或超时为 `CG_RUNTIME_UNAVAILABLE`；错误上下文可为 `CG_RUNTIME_RESULT_MISMATCH`，合同形状错误可为 `CG_ADAPTER_CONTRACT_INVALID`。返回空数组不能用来掩盖网络失败。
+
+真实参考使用仓库的 `HttpRuntimeAdapter({ endpoint: 'http://127.0.0.1:<实际端口>/__capabilities/runtime' })`，其构造器只接受明确 loopback 端点并限制 I/O 时间和字节。该类位于示例源码，不是主包导出；运行和资源清理见 [Seed Runtime](../examples/seed-provider#真实-runtime)。

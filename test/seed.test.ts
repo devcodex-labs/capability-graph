@@ -3,7 +3,7 @@ import { cp, mkdtemp, readFile, realpath, rm, writeFile, unlink } from "node:fs/
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { CapabilityGraph } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph } from "@devcodex/capability-graph";
 import { runSeedTask, seedProviderRoot } from "../examples/seed-api/main.js";
 import { seedRuntimeFixture } from "./contract/fixture-runtime-adapter.js";
 

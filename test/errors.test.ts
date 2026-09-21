@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CapabilityGraphError, type BatchItem, type ErrorShape } from "@devcodex-labs/capability-graph";
+import { CapabilityGraphError, type BatchItem, type ErrorShape } from "@devcodex/capability-graph";
 
 test("public errors retain code, action, message and projected details", () => {
   const input = { reason: "all_runtime_items_rejected" };

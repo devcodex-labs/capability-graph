@@ -43,7 +43,7 @@ try {
   await writeFile(path.join(temporary, "package.json"), JSON.stringify({ name: "isolated-consumer", private: true, type: "module" }));
   command([npm, "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--package-lock=false",
     path.join(temporary, packed.filename)], temporary);
-  const installed = path.join(temporary, "node_modules", "@devcodex-labs", "capability-graph");
+  const installed = path.join(temporary, "node_modules", "@devcodex", "capability-graph");
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.deepEqual(Object.keys(metadata.exports), ["."]);
   assert.deepEqual(metadata.dependencies ?? {}, {});
@@ -53,14 +53,14 @@ try {
   const output = command(["--input-type=module", "--eval", `
     import assert from 'node:assert/strict';
     import { fileURLToPath } from 'node:url';
-    import * as api from '@devcodex-labs/capability-graph';
-    assert.equal(fileURLToPath(import.meta.resolve('@devcodex-labs/capability-graph')), ${JSON.stringify(path.join(installed, "dist/index.js"))});
+    import * as api from '@devcodex/capability-graph';
+    assert.equal(fileURLToPath(import.meta.resolve('@devcodex/capability-graph')), ${JSON.stringify(path.join(installed, "dist/index.js"))});
     assert.deepEqual(api.parseQualifiedId('seed.http::route.http'), {providerId:'seed.http', capabilityId:'route.http'});
     assert.equal(api.computeStaticRevision, undefined);
     assert.equal(api.resolveBudgets, undefined);
     assert.equal(api.bindCapabilityId, undefined);
-    await assert.rejects(import('@devcodex-labs/capability-graph/mcp'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
-    await assert.rejects(import('@devcodex-labs/capability-graph/hash'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+    await assert.rejects(import('@devcodex/capability-graph/mcp'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+    await assert.rejects(import('@devcodex/capability-graph/hash'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
     console.log('Installed tarball runtime checks passed');
   `], temporary);
   await copyFile(path.join(repository, "test/consumer/public-api.ts"), path.join(temporary, "consumer.ts"));

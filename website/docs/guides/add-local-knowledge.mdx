@@ -5,13 +5,17 @@ description: 为已选能力关联并安全读取 Provider 根目录内的本地
 
 # 添加本地知识
 
-<span className="cg-status">可运行</span>
+<span className="cg-status">接入片段；本地读取有可运行示例</span>
+
+当一个能力需要长说明、操作步骤或限制时，把正文单独放入 Knowledge，避免目录每次携带全文。短用途和选择条件仍写在 Capability 的摘要字段。本页假设你已有包含 `route.validation` 的 Provider；从空目录操作请先完成[第一个 Provider](../getting-started/first-provider)。
 
 ## 1. 放置文档
 
 将 Markdown 或文本放在 Provider 权威根内，例如 `knowledge/route-validation.md`。
 
 ## 2. 关联能力
+
+以下是**配置片段**，合并进已有能力文件，保留其必填名称、描述、使用时机和已有关系；不要用片段覆盖整个文件。
 
 ```json
 {
@@ -29,14 +33,30 @@ description: 为已选能力关联并安全读取 Provider 根目录内的本地
 
 ## 3. 只读取已选能力
 
+查询片段：`provider` 是已打开图的 Provider 绑定对象。修订从此次目录结果取得：
+
 ```ts
+const catalog = await provider.listCatalog();
+const requiredStaticRevision = catalog.meta.staticRevision;
 const result = await provider.readDocuments({
   selected: ['route.validation'],
   requiredStaticRevision
 });
+for (const item of result.results) {
+  if (item.ok) console.log(item.value.knowledgeId, item.value.text);
+  else console.error(item.error.code, item.error.nextAction);
+}
 ```
 
 Core 会校验相对路径仍位于 Provider 根的真实路径中，并按条目返回内容或错误。符号链接不能绕过根边界。
+
+`knowledgeId` 用于在已选能力的知识集合中继续收窄；`locator.path` 相对 Authority 根，不相对脚本位置。`kind: document` 允许精确读取；没有知识需求时不必配置该数组。
+
+## 预期结果
+
+成功项的 `value.knowledgeId` 为 `route-validation-guide`，`value.text` 为文件正文，`contentId` 标识实际读取的字节。空的 `selected` 无效；拼错知识 ID、文件不存在或越出根边界应检查逐项错误，不能解释成“能力没有知识”。仅改正文无需重建能力身份；改关联需要重新加载静态定义。
+
+下一步需要全文检索时再考虑[检索 Adapter](../integrations/capability-retriever)，不要把 Collection 当作可直接拼接的文档。
 
 ## 当前边界
 

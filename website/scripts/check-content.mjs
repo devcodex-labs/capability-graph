@@ -72,7 +72,7 @@ const expectedPageTitles = new Map();
 
 const home = await readFile(path.join(docsRoot, 'index.mdx'), 'utf8');
 for (const section of sections) {
-  if (!home.includes(`./${section}/`)) fail(`home does not link section ${section}`);
+  if (!home.includes(`./${section}/index`)) fail(`home does not link canonical section index ${section}`);
 }
 
 const titles = new Map();
@@ -128,6 +128,9 @@ for (const file of publicPages) {
   descriptions.set(meta.description, relative);
   if (source.includes('.devcodex') || /[A-Z]:[\\/](?:Worker|Users)[\\/]/i.test(source)) {
     fail(`${relative} exposes an internal path`);
+  }
+  if (source.includes('@devcodex-labs/')) {
+    fail(`${relative} uses the retired npm scope @devcodex-labs`);
   }
   if (/\b(?:TODO|TBD)\b/.test(source)) fail(`${relative} contains an unfinished marker`);
   for (const claim of terminology.forbiddenClaims) {

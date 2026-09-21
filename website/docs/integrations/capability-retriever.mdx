@@ -7,7 +7,11 @@ description: 接入能力召回与知识检索后端，并由 Core 校验身份�
 
 <span className="cg-status">仅合同</span>
 
-`CapabilityRetriever` 是可选候选召回合同。`0.1.0` 不附带向量或模型后端。
+`CapabilityRetriever` 是可选候选召回合同。`1.0.0` 不附带向量或模型后端。
+
+当能力多到仅靠分类浏览不易找到目标时，可以按用户文字召回候选；规模较小时先用 Catalog 和关系查询即可。Flat Catalog 是可确定分页的静态摘要接口，Retriever 是另一个显式调用，不会替换目录或自动判断最终选择。
+
+以下为接口节选，类型从主包根入口导出：
 
 ```ts
 interface CapabilityRetriever {
@@ -31,9 +35,32 @@ Retriever 只能返回已有身份，不能创建新能力或图边。Core 会�
 
 目录查询始终可用，Retriever 不会静默替换 Flat Catalog。未配置时调用召回返回 `CG_RETRIEVER_UNCONFIGURED`。
 
+## 能力召回骨架
+
+下面展示后端边界，可编译但未附带索引实现。传入的 `search` 必须查询你构建的索引，按输入 Provider 集合和 `limit` 限制结果。代码不把请求中的修订填到旧索引结果上。
+
+```ts title="capability-retriever-skeleton.ts"
+import type { CapabilityRetriever } from '@devcodex/capability-graph';
+
+export function createCapabilityRetriever(
+  search: CapabilityRetriever['retrieve']
+): CapabilityRetriever {
+  return {
+    id: 'acme-capability-index',
+    async retrieve(input) {
+      return await search(input);
+    }
+  };
+}
+```
+
+将对象放入 `OpenConfig.capabilityRetriever`，再调用 `retrieveCapabilities({ text, limit })`。后端返回每项的 `id`、可选 `score` 和 `sourceStaticRevision`，后者应是建立该候选索引时记录的权威静态修订。`input.staticRevisionByProvider` 告诉后端当前查询要求的视图，不是让旧索引伪装为新索引。
+
+Core 保留后端顺序，`rank` 是原始的一基序号，不会按 `score` 重新排序或归一化。预期合法候选仍可继续 `getCapabilities()`；过期/越界候选可被逐项剔除并留 warnings，后端故障不能变成成功空列表。静态定义变更后由接入方重建或刷新索引，V1 不自动调用 `invalidate()`。
+
 ## KnowledgeRetriever
 
-`KnowledgeRetriever` 只搜索由非空已选能力展开出的 Document 或 Collection targets。`0.1.0` 不附带向量数据库或 RAG 后端。
+`KnowledgeRetriever` 只搜索由非空已选能力展开出的 Document 或 Collection targets。`1.0.0` 不附带向量数据库或 RAG 后端。
 
 Adapter 必须返回：
 
@@ -46,3 +73,40 @@ Adapter 必须返回：
 传给 Retriever 的 `KnowledgeSearchTarget` 只包含能力身份、`knowledgeId`、声明 locator 和 Collection 路径，不包含本机知识根或 `readContext`。需要读取原文时，Adapter 只能使用查询级 `KnowledgeRetrievalAccess`；它只允许读取本次请求列出的身份与 `knowledgeId`，不能替换 locator 或沿关系扩大，且在 `retrieve()` 结束后失效。
 
 证据过期、内容身份不一致或后端失败不会降级为本地全文读取，也不能伪装成成功零命中。
+
+## 知识检索的实现顺序
+
+1. Core 根据 `selected` 和可选 `knowledgeIds` 展开本次 targets，并计算 `mappingRevision`。
+2. Adapter 只在这些 targets 中查询索引。需要原文时通过本次 `access.read()` 获取真实字节与 `contentId`。
+3. 对每个 target 核对索引内容与来源内容身份、配置修订及映射；先完成核对，再返回命中或合法零命中。
+4. Core 检查 evidence 后校验各命中的身份、来源、UTF-8 字节区间与 snippet，返回结果和诊断。
+
+以下骨架可编译，具体 `searchIndex` 由接入项目实现。传入查询级 access，而非本地根路径，是为了把读取限定在已选知识中。
+
+```ts title="knowledge-retriever-skeleton.ts"
+import type { KnowledgeRetriever } from '@devcodex/capability-graph';
+
+export function createKnowledgeRetriever(
+  searchIndex: KnowledgeRetriever['retrieve']
+): KnowledgeRetriever {
+  return {
+    id: 'acme-knowledge-index',
+    async retrieve(input, access) {
+      return await searchIndex(input, access);
+    }
+  };
+}
+```
+
+| 输出证据 | 谁产生，为什么需要 |
+|---|---|
+| `staticRevisionByProvider` | 必须匹配 Core 提供的最终 targets 来源修订；不能额外带未参与 targets 的 Provider |
+| `mappingRevision` | Core 计算本次映射标识；后端确认实际索引覆盖此映射后才能回填匹配值 |
+| `sourceConfigRevision` / `indexedConfigRevision` | 集成方为分块、索引/检索配置生成版本；当前来源配置与索引构建配置应一致 |
+| `documents` | 所有 targets 的身份、knowledgeId、来源与索引 contentId；零命中也必须齐全 |
+| `observedAt` / `freshness` | 后端真实核对时间和索引状态，不用查询时间掩盖旧数据 |
+| `hits` | 已选知识中的可追溯片段，`startOffset`/`endOffset` 为 UTF-8 字节偏移，结束位置不含在内 |
+
+零命中有两种可能：确实没有匹配，或索引根本没覆盖最新知识。Evidence 用来区分两者；不能只返回 `hits: []`。`access` 在 `retrieve()` settle 后失效，不得保存到后台任务继续读取。Adapter 管理网络/索引资源及取消，Core 不提供实际 RAG 后端。
+
+成功检索的 `knowledgeState` 为 `searched`，零命中时仍有有效 `indexStatus`；过期证据为 `CG_INDEX_STALE`，指定来源修订不可读为 `CG_REVISION_MISMATCH`。接入后用“有命中、真实零命中、旧映射、正文已更新、中文多字节偏移、尝试读取未选知识”分别验证，合同测试样本不代表生产检索质量。

@@ -1,4 +1,5 @@
-import { access, readFile, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { access, cp, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '../../dist/index.js';
 import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
@@ -30,7 +31,7 @@ assert(vextjs?.status === 'Conceptual', 'VextJS must remain Conceptual in V1');
 
 const fixtureRoot = path.join(websiteRoot, 'fixtures', 'first-provider');
 const fixtureFiles = ['provider.json', 'route.capability.json', 'route-http.capability.json'];
-const fixtureDocuments = ['PROVIDER.md', 'knowledge/routing.md'];
+const fixtureDocuments = ['PROVIDER.md', 'knowledge/routing.md', 'discover.mjs'];
 const fixture = Object.fromEntries(await Promise.all(fixtureFiles.map(async (file) => [
   file,
   JSON.parse(await readFile(path.join(fixtureRoot, file), 'utf8'))
@@ -84,5 +85,25 @@ try {
   await graph.close();
 }
 
+const fixtureRunRoot = await mkdtemp(path.join(repositoryRoot, '.first-provider-run-'));
+try {
+  await cp(fixtureRoot, fixtureRunRoot, { recursive: true });
+  const fixtureOutput = JSON.parse(execFileSync(
+    process.execPath,
+    [path.join(fixtureRunRoot, 'discover.mjs')],
+    { cwd: fixtureRunRoot, encoding: 'utf8', timeout: 30_000 }
+  ));
+  assert(fixtureOutput.catalog.join(',') === 'route,route.http', 'standalone fixture catalog drifted');
+  assert(fixtureOutput.detail === 'route.http', 'standalone fixture detail drifted');
+  assert(fixtureOutput.parents.join(',') === 'route', 'standalone fixture relation drifted');
+  assert(fixtureOutput.document === 'routing-guide', 'standalone fixture knowledge drifted');
+  assert(fixtureOutput.completeness === 'complete', 'standalone fixture must remain complete');
+} finally {
+  assert(path.dirname(fixtureRunRoot) === repositoryRoot, 'fixture run root escaped the repository');
+  assert(path.basename(fixtureRunRoot).startsWith('.first-provider-run-'), 'unexpected fixture run directory');
+  await rm(fixtureRunRoot, { recursive: true, force: true });
+}
+
 await access(path.join(repositoryRoot, 'dist', 'index.d.ts'));
+await import('./check-doc-code.mjs');
 console.log(`example check passed: ${statuses.length} status entries and runnable First Provider flow`);

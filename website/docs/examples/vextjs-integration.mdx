@@ -13,9 +13,45 @@ description: 说明 VextJS 项目接入 Capability Graph 的概念结构，不�
 
 1. VextJS 项目或扩展包定义自己的 Provider、主能力和显式关系。
 2. 应用配置启用的 Provider 和文件/数据库 Authority。
-3. Provider-owned MCP 首先调用 `listCatalog()` 暴露主能力。
+3. Provider-owned MCP 根据显式主入口表暴露首轮摘要；`listCatalog()` 本身是平坦目录，需要由接入层选择展示策略。
 4. Agent 根据意图选择能力，再调用详情或邻居工具进入子能力。
 5. 若需要展示真实路由，由 VextJS 专属 `RuntimeAdapter` 显式采集；Core 不扫描框架源码。
+
+## 能力与文件如何组织
+
+以下是建议目录，不代表 VextJS 的实际 API 或现有发行包：
+
+```text
+vextjs-provider/
+├── provider.json
+├── PROVIDER.md
+├── route.capability.json
+├── route-http.capability.json
+├── route-validation.capability.json
+├── schema-request.capability.json
+└── knowledge/
+    ├── validation.md
+    └── request-schema.md
+```
+
+Provider 可选择稳定身份 `vextjs`。`route.http` 与 `route.validation` 显式声明 `parents: ['route']`；验证能力用 `related: ['schema.request']` 指向请求结构能力。只有经框架作者确认真实语义，才额外声明特化关系。两个知识文件分别绑定验证、Schema 能力；全局规范入口放在 `PROVIDER.md`。
+
+## 一次真实任务应该怎样发现
+
+以“给已有 `POST /users` 增加请求校验”为例，预期集成流程是：
+
+| 步骤 | 接入层行为 | Agent 得到什么 |
+|---|---|---|
+| 主入口 | 读取作者维护的 `route`、`schema.request` 摘要，保留修订 | 首轮选择依据，无整图正文 |
+| 子能力 | 对已选 `route` 查询 `children` | `route.http`、`route.validation` 摘要 |
+| 详情/关系 | 查询验证能力详情及关联 | 明确验证和 Schema 各自职责 |
+| 项目实例 | 专属 Adapter 读取框架实际路由注册表 | 当前项目/环境的 `POST /users` 及观察证据 |
+| 知识 | 显式选择验证和 Schema 后读取指南 | 与本次任务有关的正文 |
+| 执行 | 宿主修改代码并运行项目检查 | 业务变更结果，不由 Core 执行 |
+
+MCP 工具可包装这些查询，但不必为每个能力创建工具。请求携带发现阶段返回的修订；认证、项目绑定、规范投递和错误映射由 Provider-owned MCP/API 完成。
+
+Runtime Adapter 的概念实现是“读取注册表快照 → 核对项目/环境 → 映射实例及 `instanceOf` → 返回实际构建修订和覆盖说明”。未核对 VextJS 公开采集接口前，不给出虚构导入或采集方法。现在可实跑的是 Seed 的 Node.js HTTP 参考，这里尚无 VextJS 执行证据。
 
 ## 变为 Runnable 的条件
 

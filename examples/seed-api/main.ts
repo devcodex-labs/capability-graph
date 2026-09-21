@@ -1,5 +1,5 @@
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { CapabilityGraph, type RuntimeAdapter } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph, type RuntimeAdapter } from "@devcodex/capability-graph";
 
 // This example runs after tsc emits dist-test/examples/seed-api/main.js.
 export const seedProviderRoot = fileURLToPath(new URL("../../../examples/seed-provider/", import.meta.url));

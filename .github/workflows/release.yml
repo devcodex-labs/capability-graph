@@ -2,10 +2,13 @@ name: Release npm and Pages
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "website/release.json"
-  workflow_dispatch:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: capability-graph-production
+  cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
@@ -15,18 +18,30 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.contract.outputs.release_id }}
+      release_tag: ${{ steps.contract.outputs.release_tag }}
+      release_commit: ${{ steps.contract.outputs.release_commit }}
       package_version: ${{ steps.contract.outputs.package_version }}
-      package_mode: ${{ steps.contract.outputs.package_mode }}
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: "22.12.0"
       - id: contract
         run: node website/scripts/check-release.mjs
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+      - name: Require the tag commit to belong to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "$GITHUB_REF_NAME must point to a commit reachable from main" >&2
+            exit 1
+          }
 
   gates:
     needs: freeze
@@ -63,16 +78,11 @@ jobs:
     needs: [freeze, gates]
     runs-on: ubuntu-latest
     environment: npm-production
-    concurrency:
-      group: npm-${{ needs.freeze.outputs.release_id }}
-      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
     env:
       PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
-      PACKAGE_MODE: ${{ needs.freeze.outputs.package_mode }}
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -84,44 +94,91 @@ jobs:
       - run: npm install --global npm@11.15.0
       - run: npm ci
       - run: npm run build
-      - name: Enforce registry mode
+      - id: pack
+        name: Build the immutable package artifact
         shell: bash
         run: |
           set -euo pipefail
-          package="@devcodex-labs/capability-graph@${PACKAGE_VERSION}"
-          if npm view "$package" version --json >existing.json 2>registry-error.log; then
-            exists=true
+          npm pack --json >pack.json
+          filename="$(node --input-type=module --eval "import fs from 'node:fs'; const [pack]=JSON.parse(fs.readFileSync('pack.json')); console.log(pack.filename)")"
+          shasum="$(node --input-type=module --eval "import fs from 'node:fs'; const [pack]=JSON.parse(fs.readFileSync('pack.json')); console.log(pack.shasum)")"
+          echo "filename=$filename" >>"$GITHUB_OUTPUT"
+          echo "shasum=$shasum" >>"$GITHUB_OUTPUT"
+      - id: registry
+        name: Reject duplicate, stale or divergent releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="@devcodex/capability-graph"
+          package="${name}@${PACKAGE_VERSION}"
+          if npm view "$name" name --json >package-view.json 2>package-error.log; then
+            package_exists=true
+            if ! latest="$(npm view "$name" dist-tags.latest 2>latest-error.log)"; then
+              cat latest-error.log >&2
+              exit 1
+            fi
+          elif grep -q 'E404' package-error.log; then
+            package_exists=false
+            latest=""
+          else
+            cat package-error.log >&2
+            exit 1
+          fi
+          if npm view "$package" dist.shasum --json >version.json 2>registry-error.log; then
+            version_exists=true
+            published_shasum="$(node --input-type=module --eval "import fs from 'node:fs'; console.log(JSON.parse(fs.readFileSync('version.json')))")"
+            if [[ "$published_shasum" != "${{ steps.pack.outputs.shasum }}" ]]; then
+              echo "$package exists with a different tarball; refusing to continue" >&2
+              exit 1
+            fi
+            if [[ "$latest" != "$PACKAGE_VERSION" ]]; then
+              echo "$package is not npm latest ($latest); this release is stale" >&2
+              exit 1
+            fi
           elif grep -q 'E404' registry-error.log; then
-            exists=false
+            version_exists=false
+            node website/scripts/check-release-order.mjs "$PACKAGE_VERSION" "$latest"
           else
             cat registry-error.log >&2
             exit 1
           fi
-          if [[ "$PACKAGE_MODE" == "publish" && "$exists" == "true" ]]; then
-            echo "$package already exists; refusing duplicate publish" >&2
+          echo "package_exists=$package_exists" >>"$GITHUB_OUTPUT"
+          echo "version_exists=$version_exists" >>"$GITHUB_OUTPUT"
+      - name: Publish the first version with the bootstrap token
+        if: steps.registry.outputs.version_exists == 'false' && steps.registry.outputs.package_exists == 'false'
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "NPM_TOKEN is required only for the first publication" >&2
             exit 1
           fi
-          if [[ "$PACKAGE_MODE" == "verify" && "$exists" == "false" ]]; then
-            echo "$package is absent; verify mode cannot deploy newer docs" >&2
-            exit 1
-          fi
-      - name: Publish first or next package version
-        if: needs.freeze.outputs.package_mode == 'publish'
-        run: npm publish --access public --provenance
+          npm publish "${{ steps.pack.outputs.filename }}" --access public --provenance
+      - name: Publish subsequent versions with npm trusted publishing
+        if: steps.registry.outputs.version_exists == 'false' && steps.registry.outputs.package_exists == 'true'
+        run: npm publish "${{ steps.pack.outputs.filename }}" --access public
       - name: Wait for registry propagation
         shell: bash
         run: |
           set -euo pipefail
-          package="@devcodex-labs/capability-graph@${PACKAGE_VERSION}"
+          name="@devcodex/capability-graph"
+          package="${name}@${PACKAGE_VERSION}"
           for attempt in {1..12}; do
-            if [[ "$(npm view "$package" version 2>/dev/null || true)" == "$PACKAGE_VERSION" ]]; then
-              exit 0
+            version="$(npm view "$package" version 2>/dev/null || true)"
+            shasum="$(npm view "$package" dist.shasum 2>/dev/null || true)"
+            latest="$(npm view "$name" dist-tags.latest 2>/dev/null || true)"
+            if [[ "$version" == "$PACKAGE_VERSION" && "$shasum" == "${{ steps.pack.outputs.shasum }}" && "$latest" == "$PACKAGE_VERSION" ]]; then
+              break
+            fi
+            if [[ "$attempt" == 12 ]]; then
+              echo "$package did not propagate with the expected tarball and latest tag" >&2
+              exit 1
             fi
             sleep 10
           done
-          echo "$package did not propagate" >&2
-          exit 1
-      - name: Install from registry in a clean consumer
+      - name: Install the documented default and run the complete tutorial
         shell: bash
         run: |
           set -euo pipefail
@@ -129,8 +186,8 @@ jobs:
           trap 'rm -rf "$temporary"' EXIT
           cd "$temporary"
           npm init -y >/dev/null
-          npm install --ignore-scripts --no-audit --no-fund "@devcodex-labs/capability-graph@${PACKAGE_VERSION}"
-          node --input-type=module --eval "import { parseQualifiedId } from '@devcodex-labs/capability-graph'; const value=parseQualifiedId('seed.http::route.http'); if(value.providerId!=='seed.http'||value.capabilityId!=='route.http') process.exit(1);"
+          npm install --ignore-scripts --no-audit --no-fund "@devcodex/capability-graph"
+          node "$GITHUB_WORKSPACE/website/scripts/check-installed-tutorial.mjs" "$temporary" "$PACKAGE_VERSION"
 
   pages-build:
     needs: [freeze, package]
@@ -139,6 +196,11 @@ jobs:
       contents: read
       pages: write
       id-token: write
+    env:
+      PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
+      RELEASE_ID: ${{ needs.freeze.outputs.release_id }}
+      RELEASE_TAG: ${{ needs.freeze.outputs.release_tag }}
+      RELEASE_COMMIT: ${{ needs.freeze.outputs.release_commit }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -154,9 +216,16 @@ jobs:
       - run: npm run build
       - run: npm ci
         working-directory: website
+      - name: Refuse a stale documentation release
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest="$(npm view @devcodex/capability-graph dist-tags.latest)"
+          [[ "$latest" == "$PACKAGE_VERSION" ]] || {
+            echo "npm latest is $latest, not $PACKAGE_VERSION" >&2
+            exit 1
+          }
       - run: npm run build:ai
-        working-directory: website
-      - run: npm run check:build
         working-directory: website
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
@@ -166,9 +235,6 @@ jobs:
   deploy:
     needs: [freeze, pages-build]
     runs-on: ubuntu-latest
-    concurrency:
-      group: pages-${{ needs.freeze.outputs.release_id }}
-      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
@@ -176,6 +242,21 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: Refuse a stale Pages deployment
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          latest="$(npm view @devcodex/capability-graph dist-tags.latest)"
+          [[ "$latest" == "$PACKAGE_VERSION" ]] || {
+            echo "npm latest is $latest, not $PACKAGE_VERSION" >&2
+            exit 1
+          }
       - id: deployment
         uses: actions/deploy-pages@v4
 
@@ -192,3 +273,6 @@ jobs:
       - run: node website/scripts/verify-public.mjs
         env:
           PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
+          RELEASE_ID: ${{ needs.freeze.outputs.release_id }}
+          RELEASE_TAG: ${{ needs.freeze.outputs.release_tag }}
+          RELEASE_COMMIT: ${{ needs.freeze.outputs.release_commit }}

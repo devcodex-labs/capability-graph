@@ -13,7 +13,7 @@ for (const [query, expectedResult] of queries) {
   test(`search returns documentation for ${query}`, async ({ page }) => {
     await page.goto('./');
     await page.locator('.rp-search-button').click();
-    const input = page.getByRole('textbox', { name: 'SearchPanelInput' });
+    const input = page.getByRole('textbox', { name: '搜索文档' });
     await expect(input).toBeVisible();
     await input.fill(query);
     await expect(input).toHaveValue(query);

@@ -62,7 +62,7 @@ const symbols = checker.getExportsOfModule(moduleSymbol)
 
 const contracts = {
   schemaVersion: 'CapabilityGraphPublicContractsV1',
-  package: '@devcodex-labs/capability-graph',
+  package: '@devcodex/capability-graph',
   entry: 'dist/index.d.ts',
   symbols
 };

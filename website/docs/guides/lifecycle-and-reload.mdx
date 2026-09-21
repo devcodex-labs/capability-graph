@@ -16,13 +16,25 @@ description: 正确管理 open、reload、current/previous 视图和 close 的�
 5. `close()` 停止接受新查询并回收 Core 拥有的视图句柄。
 
 ```ts
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+// Configuration fragment: replace the path with the provider from the tutorial.
+const config = {
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{ providerId: 'acme.http',
+    authority: { kind: 'file' as const, rootDir: '/absolute/path/to/acme-provider' } }]
+};
 const graph = await CapabilityGraph.open(config);
 try {
-  await graph.reload({ providerId: 'acme.http' });
+  const reloaded = await graph.reload({ providerId: 'acme.http' });
+  console.log(reloaded.ok, reloaded.providers);
 } finally {
   await graph.close();
 }
 ```
+
+这是接入片段，先准备入门页的 Provider 并替换目录。适合作者更新定义后主动刷新；只改知识正文不需要为了静态图重新加载。预期 `reloaded.ok` 为 `true`；定义内容未变时修订也可不变。刷新返回 `ok: false` 时读取 `providers` 内的错误，不要只等 Promise resolve 就报告更新成功。
 
 `rootDir` 在 open 时固定为绝对根，之后改变 `cwd` 不会重定位来源。Core 不监听文件，也不定时刷新。
 

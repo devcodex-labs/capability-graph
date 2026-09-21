@@ -46,6 +46,12 @@ export default defineConfig({
   base,
   siteOrigin,
   lang: 'zh',
+  i18nSource: {
+    menuTitle: { zh: '文档导航', en: 'Documentation navigation' },
+    outlineTitle: { zh: '本页目录', en: 'Page outline' },
+    searchPlaceholderText: { zh: '搜索文档', en: 'Search documentation' },
+    searchPanelCancelText: { zh: '关闭', en: 'Close' }
+  },
   llms: process.env.DOCS_ENABLE_LLMS === 'true',
   plugins: [pluginSitemap({ customMaps: sitemapMaps })],
   head: [

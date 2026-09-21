@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { BudgetConfig, BudgetOverrides } from "@devcodex-labs/capability-graph";
+import type { BudgetConfig, BudgetOverrides } from "@devcodex/capability-graph";
 import { DEFAULT_BUDGETS, resolveBudgets } from "../src/budgets.js";
 
 test("T-F11: one nested override retains every other default", () => {

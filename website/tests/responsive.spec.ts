@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 const pages = [
   ['home', './'],
   ['first-provider', 'getting-started/first-provider'],
+  ['installation', 'getting-started/installation'],
+  ['adapter', 'integrations/runtime-adapter'],
   ['runtime', 'guides/use-runtime'],
   ['reference', 'reference/capability-graph']
 ] as const;
@@ -45,6 +47,13 @@ test('home process is vertical and ordered', async ({ page }) => {
     expect(Math.abs(positions[index].x - positions[0].x)).toBeLessThanOrEqual(1);
     expect(Math.abs(positions[index].width - positions[0].width)).toBeLessThanOrEqual(1);
   }
+});
+
+test('mobile home exposes the first action without scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./');
+  await expect(page.getByRole('link', { name: '运行第一个示例' })).toBeInViewport();
+  await expect(page.getByRole('link', { name: '判断是否适合' })).toBeInViewport();
 });
 
 test('wide desktop keeps the compact navigation controls visible', async ({ page }) => {

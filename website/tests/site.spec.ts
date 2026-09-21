@@ -31,6 +31,36 @@ test('top navigation is compact and all sidebar sections are expanded by default
   }
 });
 
+test('home section links use canonical index routes and quick start continues to installation', async ({ page }) => {
+  await page.goto('./');
+  const main = page.getByRole('main');
+  for (const [label, section] of [
+    ['快速开始', 'getting-started'],
+    ['核心概念', 'concepts'],
+    ['使用指南', 'guides'],
+    ['集成', 'integrations'],
+    ['示例', 'examples'],
+    ['API 参考', 'reference'],
+    ['故障排查', 'troubleshooting']
+  ] as const) {
+    await expect(main.getByRole('link', { name: label, exact: true }).first())
+      .toHaveAttribute('href', `/capability-graph/${section}/index.html`);
+  }
+
+  await main.getByRole('link', { name: '快速开始', exact: true }).first().click();
+  await expect(page).toHaveURL(/\/capability-graph\/getting-started\/index\.html$/);
+  await expect(page.locator('.rp-prev-next-page__next')).toContainText('安装');
+});
+
+test('first Provider starts with a complete runnable path', async ({ page }) => {
+  await page.goto('getting-started/first-provider.html');
+  await expect(page.locator('h2').first()).toContainText('最快跑通');
+  await expect(page.getByRole('link', { name: '完整受检示例目录' }))
+    .toHaveAttribute('href', 'https://github.com/devcodex-labs/capability-graph/tree/main/website/fixtures/first-provider');
+  await expect(page.getByText('node first-provider/discover.mjs', { exact: true })).toBeVisible();
+  await expect(page.getByText('npm run check:examples', { exact: true })).toHaveCount(0);
+});
+
 for (const [route, canonical] of [
   ['./', base],
   ['getting-started/', `${base}getting-started/`],

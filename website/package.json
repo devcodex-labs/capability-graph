@@ -1,6 +1,6 @@
 {
-  "name": "@devcodex-labs/capability-graph-website",
-  "version": "0.1.0",
+  "name": "@devcodex/capability-graph-website",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,20 +8,21 @@
   },
   "scripts": {
     "dev": "npm run generate && rspress dev",
-    "build": "npm run generate && npm run check:content && npm run check:reference && npm run check:examples && rspress build && node scripts/write-route-redirects.mjs",
-    "build:site": "rspress build && node scripts/write-route-redirects.mjs",
+    "build": "npm run generate && npm run check:content && npm run check:reference && npm run check:examples && rspress build && node scripts/write-route-redirects.mjs && node scripts/write-public-release.mjs",
+    "build:site": "rspress build && node scripts/write-route-redirects.mjs && node scripts/write-public-release.mjs",
     "prebuild:ai": "npm run generate",
-    "build:ai": "node scripts/build-ai.mjs",
+    "build:ai": "node scripts/build-ai.mjs && npm run check:build",
     "preview": "rspress preview",
     "pregenerate": "npm --prefix .. run build",
     "generate": "node scripts/generate.mjs",
     "check:content": "node scripts/check-content.mjs",
     "check:reference": "node scripts/check-reference-coverage.mjs",
     "check:examples": "node scripts/check-examples.mjs",
+    "check:release-order": "node scripts/check-release-order.test.mjs",
     "check:package": "node scripts/check-package-boundary.mjs",
     "check:build": "node scripts/check-build-output.mjs",
     "test:site": "playwright test",
-    "check": "npm run build && npm run check:build && npm run test:site && npm run check:package"
+    "check": "npm run check:release-order && npm run build && npm run check:build && npm run test:site && npm run check:package"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

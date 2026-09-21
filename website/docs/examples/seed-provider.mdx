@@ -9,10 +9,28 @@ description: 查看共享 Seed Provider 如何串联 Provider-owned API、MCP �
 
 Seed Provider 是仓库内其他示例共享的真实权威来源。它包含 Provider metadata、路由主能力、HTTP/验证细分能力、请求 Schema 能力和本地知识文档。
 
+场景是“给现有 `POST /users` 加请求校验”：调用方发现验证能力、查看关联 Schema、选择两者的知识，需要时再确认真实路由实例。它验证 Core 的发现与边界，不自动修改业务代码。
+
+## 目录与运行前提
+
+以下命令在完整源码仓库中执行，安装主包的项目不会附带这些测试和示例。
+
+```text
+examples/
+├── seed-provider/  provider.json、5 个能力、PROVIDER.md、knowledge/
+├── seed-api/       main.ts：普通 API 查询链
+├── seed-mcp/       独立私有包及 stdio 入口
+└── seed-runtime/   service.ts、adapter.ts、main.ts
+test/              端到端与合同测试
+```
+
+首次运行先在仓库根执行 `npm ci`。根测试会编译到 `dist-test/`，下面的 Node 命令读取这些产物，不直接运行 `.ts`。
+
 验证命令：
 
 ```sh
 npm test
+node dist-test/examples/seed-api/main.js
 ```
 
 测试从公开 `CapabilityGraph.open()` 入口加载该目录，验证目录、详情、六种关系、Document 读取、修订和负向定义。
@@ -29,6 +47,19 @@ npm test
 
 输出中的选择列表由调用方明确提供，关系不会自动选择知识。[查看 API 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-api)
 
+关键调用顺序（源码节选，`provider` 为该示例已绑定的 `seed.http`）：
+
+```ts
+const catalog = await provider.listCatalog();
+const requiredStaticRevision = catalog.meta.staticRevision;
+const detail = await provider.getCapabilities(['route.validation'], { requiredStaticRevision });
+const documents = await provider.readDocuments({
+  selected: ['route.validation', 'schema.request'], requiredStaticRevision
+});
+```
+
+预期 Node 输出 JSON：`catalog.items` 包含五个能力，`selected` 为 `['route.validation', 'schema.request']`，`documents.results` 包含两份知识。默认未配置 Runtime，结果不包含 `runtime`，不能从静态路由能力推断当前业务路由。示例使用 `try/finally` 关闭图；缺来源、旧修订等失败由根测试覆盖。
+
 ## Provider-owned MCP
 
 `examples/seed-mcp` 是独立私有包。它安装 MCP SDK 和 Zod，这些依赖不会进入 Capability Graph 主包。
@@ -41,6 +72,10 @@ npm test
 
 协议测试验证工具发现和调用。工具只是 Provider 接入参考，不冻结所有 Provider 都必须使用相同名称或数量。[查看 MCP 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-mcp)
 
+先完成根目录的 `npm test`，再运行上面的 MCP 命令。预期私有包测试通过，并能发现八个查询工具和 Specification Resource；默认 Runtime/检索未配置的调用应返回明确错误。
+
+手动连接时，让 MCP 客户端以 stdio 启动 `node`，参数为 `examples/seed-mcp/dist/src/main.js` 的绝对路径。它没有 HTTP URL；由 MCP 客户端管理子进程停止。首次工具调用及输入/输出见 [Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。
+
 ## 真实 Runtime
 
 `examples/seed-runtime` 启动独立 HTTP 服务，实际注册和变更路由，再由 `RuntimeAdapter` 采集实例。测试覆盖项目/环境隔离、实时变化、旧构建兼容和失败恢复。
@@ -50,6 +85,17 @@ npm test
 ```
 
 该参考不是通用框架扫描器，也不代表 Core 会启动业务服务。服务生命周期由示例测试管理并在结束时验证端口释放。[查看 Runtime 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-runtime)
+
+只复跑真实 HTTP 场景，可在根构建测试后执行：
+
+```sh
+npm run build:tests
+node --test dist-test/test/real-runtime.test.js
+```
+
+测试启动独立进程，使用同一注册表响应真实业务请求和 Runtime 查询。预期观察到 `GET /users`、`POST /users`，动态注册后 Runtime Revision 改变；错误环境、失联和旧游标不能返回假空结果。诊断输出包含 PID/端口，测试结束关闭进程并验证端口可重新绑定。
+
+手动运行服务前，必须从实际部署的 Provider 取得 Static Revision，按[服务 README](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/README.md)传入项目、环境和构建参数。不要把请求端最新修订填成旧服务的部署修订。
 
 ## 文档入门 Fixture
 

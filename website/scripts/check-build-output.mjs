@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { websiteRoot } from './lib/paths.mjs';
+import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
 
 const outputRoot = path.join(websiteRoot, 'doc_build');
 const docsRoot = path.join(websiteRoot, 'docs');
@@ -8,6 +9,10 @@ const publicBase = 'https://devcodex-labs.github.io/capability-graph/';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function hash(text) {
+  return createHash('sha256').update(text).digest('hex');
 }
 
 async function filesUnder(root, relative = '') {
@@ -51,6 +56,7 @@ for (const [source, target] of Object.entries(redirects)) {
   }
 }
 const canonicalUrls = [];
+const pageHashes = {};
 for (const file of htmlFiles) {
   const html = await readFile(path.join(outputRoot, file), 'utf8');
   const canonicals = [...html.matchAll(/<link\s+rel="canonical"\s+href="([^"]+)"/g)].map((match) => match[1]);
@@ -63,15 +69,60 @@ for (const file of htmlFiles) {
   assert(pathname.startsWith('/capability-graph/'), `${file} is outside the deployment base`);
   assert(!pathname.startsWith('/capability-graph/capability-graph/'), `${file} deployment base is duplicated`);
   canonicalUrls.push(canonicals[0]);
+  pageHashes[canonicals[0]] = hash(html);
   assert(!html.includes('.devcodex') && !html.includes('D:\\Worker') && !html.includes('C:\\Users'), `${file} leaks an internal path`);
 }
 assert(new Set(canonicalUrls).size === canonicalUrls.length, 'canonical URLs are not unique');
+
+const normalizedFiles = new Set(files.map((file) => file.replaceAll('\\', '/')));
+const canonicalFileByPath = new Map(htmlFiles.map((file) => [
+  new URL(canonicalForHtml(file)).pathname,
+  file.replaceAll('\\', '/')
+]));
+const publicBaseUrl = new URL(publicBase);
+for (const sourceFile of htmlFiles) {
+  const sourceHtml = await readFile(path.join(outputRoot, sourceFile), 'utf8');
+  for (const match of sourceHtml.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)) {
+    const rawHref = match[1].replaceAll('&amp;', '&');
+    const targetUrl = new URL(rawHref, canonicalForHtml(sourceFile));
+    if (targetUrl.origin !== publicBaseUrl.origin) continue;
+    assert(targetUrl.pathname.startsWith(publicBaseUrl.pathname), `${sourceFile} links outside the deployment base: ${rawHref}`);
+
+    const directTarget = decodeURIComponent(targetUrl.pathname.slice(publicBaseUrl.pathname.length));
+    const targetFile = normalizedFiles.has(directTarget)
+      ? directTarget
+      : canonicalFileByPath.get(targetUrl.pathname);
+    assert(targetFile && normalizedFiles.has(targetFile), `${sourceFile} has a missing internal link target: ${rawHref}`);
+
+    if (targetUrl.hash && targetFile.endsWith('.html')) {
+      const fragment = decodeURIComponent(targetUrl.hash.slice(1));
+      const targetHtml = await readFile(path.join(outputRoot, targetFile), 'utf8');
+      assert(targetHtml.includes(`id="${fragment}"`), `${sourceFile} has a missing fragment ${targetUrl.hash} in ${targetFile}`);
+    }
+  }
+}
 
 const sitemap = await readFile(path.join(outputRoot, 'sitemap.xml'), 'utf8');
 const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
 assert(new Set(sitemapUrls).size === sitemapUrls.length, 'sitemap contains duplicate URLs');
 assert(sitemapUrls.length === canonicalUrls.length, 'sitemap and rendered page counts differ');
 assert(canonicalUrls.every((url) => sitemapUrls.includes(url)), 'sitemap does not exactly match page canonicals');
+
+const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
+const release = JSON.parse(await readFile(path.join(outputRoot, 'release.json'), 'utf8'));
+assert(release.schemaVersion === 'CapabilityGraphPublicReleaseV1', 'public release identity schema mismatch');
+assert(release.releaseId === `capability-graph-${manifest.version}`, 'public release id mismatch');
+assert(release.releaseTag === `v${manifest.version}`, 'public release tag mismatch');
+assert(release.packageName === manifest.name && release.packageVersion === manifest.version, 'public package identity mismatch');
+assert(/^[0-9a-f]{40}$/i.test(release.releaseCommit), 'public release commit is invalid');
+assert(JSON.stringify(release.pages) === JSON.stringify(Object.fromEntries(Object.entries(pageHashes).sort(([left], [right]) => left.localeCompare(right)))), 'public page hashes do not match the final build');
+const expectedReleaseRedirects = {};
+for (const [source, target] of Object.entries(redirects)) {
+  const url = `${publicBase}${source}/`;
+  const html = await readFile(path.join(outputRoot, source, 'index.html'), 'utf8');
+  expectedReleaseRedirects[url] = { target: new URL(target, publicBase).href, sha256: hash(html) };
+}
+assert(JSON.stringify(release.redirects) === JSON.stringify(Object.fromEntries(Object.entries(expectedReleaseRedirects).sort(([left], [right]) => left.localeCompare(right)))), 'public redirect hashes do not match the final build');
 
 const robots = await readFile(path.join(outputRoot, 'robots.txt'), 'utf8');
 assert(robots.includes('Allow: /'), 'robots.txt must allow public pages');

@@ -10,7 +10,7 @@
   "examples/seed-api": "examples/seed-provider/#provider-owned-api",
   "examples/seed-mcp": "examples/seed-provider/#provider-owned-mcp",
   "examples/seed-runtime": "examples/seed-provider/#真实-runtime",
-  "examples/first-provider-tutorial": "getting-started/first-provider/#验证这套-fixture",
+  "examples/first-provider-tutorial": "getting-started/first-provider/#最快跑通",
   "reference/bound-provider-graph": "reference/capability-graph/#boundprovidergraph",
   "reference/open-authority-reload": "reference/capability-graph/#openconfig-与-authority",
   "reference/identity": "reference/provider-definition/#身份模型",

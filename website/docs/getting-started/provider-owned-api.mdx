@@ -5,25 +5,47 @@ description: 在 Provider 自己的 API 中暴露渐进式能力发现，而不�
 
 # Provider 自有 API
 
-<span className="cg-status">可运行模式</span>
+<span className="cg-status">设计示例；Seed 参考可运行</span>
 
-Provider 自己决定 HTTP 路径、认证、请求范围和返回形状。下面的处理函数只是把一个业务端点映射到 Core 原语：
+Provider 自己决定 HTTP 路径、认证、请求范围和返回形状。先完成上一页并得到已打开的 `graph`。下面是供自有 handler 调用的 TypeScript 函数片段，不包含 HTTP 服务启动；完整普通 API 执行路径见下方 Seed 链接。
+
+本例由 Provider 显式维护主入口 `route`。Core 的 `listCatalog()` 返回平坦目录，不会自动筛选根节点；固定入口可直接调用批量详情，再投影首轮需要的摘要。
 
 ```ts
+import type { CapabilityGraph } from '@devcodex/capability-graph';
+
 export async function listMainCapabilities(graph: CapabilityGraph) {
   const provider = graph.forProvider('acme.http');
-  const catalog = await provider.listCatalog({ limit: 20 });
+  const details = await provider.getCapabilities(['route']);
 
   return {
-    capabilities: catalog.items,
-    revision: catalog.meta.staticRevision,
-    completeness: catalog.meta.completeness,
-    nextCursor: catalog.nextCursor
+    capabilities: details.results.map((item) => item.ok
+      ? { ok: true, id: item.value.id, name: item.value.name,
+          description: item.value.description, whenToUse: item.value.whenToUse,
+          distinction: item.value.distinction }
+      : item),
+    revision: details.meta.staticRevision,
+    meta: details.meta
   };
 }
 ```
 
-后续端点可以接收已选 `capabilityId` 和 `requiredStaticRevision`，再调用 `getCapabilities()` 或 `getNeighbors()`。这样 Agent 不会在首轮接收全部能力详情，也不会因目录更新把一次任务中的发现结果悄悄切换到新修订。
+`getCapabilities()` 返回逐项结果；缺失的主入口仍保留错误，不能过滤后伪装为空目录。成功时 `capabilities[0].id.capabilityId` 为 `route`，响应只包含首轮选择所需字段。`revision` 是实际返回的 Static Revision，`meta` 保留完整性和 warnings。
+
+## 一次请求如何逐步展开
+
+以下路径只是你的 API 设计示意，不是主包自带端点：
+
+| 请求 | Handler 调用 | 预期结果与下一步 |
+|---|---|---|
+| `GET /capabilities/main` | 上面的 `listMainCapabilities(graph)` | 返回 `route` 摘要及修订，Agent 根据意图选路由能力 |
+| `POST /capabilities/children`，输入能力 `route` 与上一步修订 | `getNeighbors('route', { kinds: ['children'], requiredStaticRevision })` | `groups.children.items` 包含 `route.http`，有游标时继续该组 |
+| `POST /capabilities/detail`，输入 `route.http` 与同一修订 | `getCapabilities(['route.http'], { requiredStaticRevision })` | `results[0]` 为能力详情，先检查 `ok` |
+| `POST /capabilities/documents`，显式选择 `route.http` | `readDocuments({ selected: ['route.http'], requiredStaticRevision })` | 返回该能力知识的逐项内容/错误 |
+
+请求体中的 `requiredStaticRevision` 取首个响应的真实值，不填写版本号。Handler 应验证输入，先按用户/租户解析允许的 Provider，再取得绑定对象；`forProvider()` 本身不做用户认证。服务关闭时等待在途请求完成，再关闭共享 `graph`，不要在每次 handler 结束时关闭它。
+
+显式修订已退休时，向调用方返回 `CG_REVISION_MISMATCH` 并重新发现；不能静默换成当前修订。分页结果保留对应关系组的游标、完整性和 warnings。
 
 ## Provider 必须负责
 
@@ -48,7 +70,7 @@ Core 不监听端口、不启动业务服务、不执行能力，也不保证 Ag
 | 暴露项目实际注册实例 | [使用运行时](../guides/use-runtime) |
 | 使用 MCP 渐进发现 | [Provider 自有 MCP](../integrations/provider-owned-mcp) |
 | 接入多个 Provider | [使用多个 Provider](../guides/multiple-providers) |
-| 查字段、错误和预算 | [API 参考](../reference/) |
-| 诊断失败 | [故障排查](../troubleshooting/) |
+| 查字段、错误和预算 | [API 参考](../reference/index) |
+| 诊断失败 | [故障排查](../troubleshooting/index) |
 
-数据库权威、能力召回、知识检索和远程 Reader 在 `0.1.0` 中提供公开合同，但不附带真实后端。只有 Provider 配置了对应 Adapter，相关原语才可用。
+数据库权威、能力召回、知识检索和远程 Reader 在 `1.0.0` 中提供公开合同，但不附带真实后端。只有 Provider 配置了对应 Adapter，相关原语才可用。

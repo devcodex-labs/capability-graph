@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
-import * as library from "@devcodex-labs/capability-graph";
+import * as library from "@devcodex/capability-graph";
 
 test("T-F09: the built ESM package imports through its public entry", () => {
   assert.equal(typeof library, "object");

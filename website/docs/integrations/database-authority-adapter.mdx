@@ -7,17 +7,62 @@ description: 提供稳定只读数据库快照、严格扫描顺序、关系反�
 
 <span className="cg-status">仅合同</span>
 
-数据库权威是 Provider 的唯一真相源，不是文件模式的派生缓存。`0.1.0` 提供合同和正负测试，不附真实数据库驱动、CRUD、ORM 或迁移平台。
+数据库权威是 Provider 的唯一真相源，不是文件模式的派生缓存。`1.0.0` 提供合同和正负测试，不附真实数据库驱动、CRUD、ORM 或迁移平台。
 
 `openView(providerId)` 返回一个不可变逻辑快照。Core 对它执行分阶段校验：
 
-1. 扫描所有记录并建立完整 ID 集合；
-2. 校验字段和值；
-3. 在完整集合上检查端点；
-4. 分别检查 parents 与 specializes 无环；
-5. 用同一规范算法生成静态哈希；
-6. 通过点读和关系查询复核扫描记录。
+1. 扫描时校验每条字段、严格顺序，收集完整 ID 集合，并按与文件来源相同的规范算法增量生成候选哈希；
+2. 扫描完整结束后，基于全量 ID 集合验证关系端点；
+3. 独立检查 parents 与 specializes 两类关系无环；
+4. 用点读和关系查询核对稳定视图及其扫描证据，全部通过才发布可查询视图。
 
 Adapter 必须按 `capabilityId` 严格升序扫描，游标单调前进，并同时遵守条目数和 UTF-8 页字节预算。反向关系必须能由存储的正向边证明。
 
 Core 拥有 read view 的 `close()` 调用，但会在仍有查询 pin 时延迟退休。Provider metadata、`sourceRevision`、知识根和记录在该 view 生命周期内必须稳定。
+
+## 接口如何组合
+
+下面是接入骨架，不包含数据库驱动。`beginSnapshot` 必须由你的数据库层实现，可基于一致性只读事务或固定版本读；它返回的各方法必须共享同一个快照，不能每次开启新的 current 查询。
+
+```ts title="database-skeleton.ts"
+import type { DatabaseAuthorityAdapter, DatabaseReadView } from '@devcodex/capability-graph';
+
+export function createDatabaseAuthority(
+  beginSnapshot: (providerId: string) => Promise<DatabaseReadView>
+): DatabaseAuthorityAdapter {
+  return {
+    id: 'acme-database-authority',
+    async openView(providerId) {
+      const view = await beginSnapshot(providerId);
+      return {
+        provider: view.provider,
+        sourceRevision: view.sourceRevision,
+        ...(view.knowledgeRootDir === undefined ? {} : { knowledgeRootDir: view.knowledgeRootDir }),
+        scanCapabilities: (page) => view.scanCapabilities(page),
+        getCapability: (id) => view.getCapability(id),
+        neighbors: (id, kind, page) => view.neighbors(id, kind, page),
+        close: () => view.close()
+      };
+    }
+  };
+}
+```
+
+该转接层展示调用与所有权，不替数据库完成隔离。把它作为 `authority: { kind: 'database', adapter }` 配入唯一 Provider 来源，不再同时提供 `rootDir` 文件来源。
+
+| 方法/字段 | 后端实现责任 |
+|---|---|
+| `openView()` | 获取新快照，返回前失败时自行释放已分配资源 |
+| `provider` / `sourceRevision` | 固定该快照的元数据和来源版本，来源版本不是 Core Static Revision |
+| `scanCapabilities()` | 在同一快照内用稳定排序/游标分页，全记录严格按 ID 升序，限制 `limit` 和 UTF-8 `maxBytes` |
+| `getCapability()` | 点读与扫描内容一致；ID 不存在返回 `undefined`，快照已不可读则抛错 |
+| `neighbors()` | 返回排序、唯一、同 Provider 的身份；反向组从已有正向边查询得出 |
+| `close()` | 释放该句柄拥有的事务/连接；不要关闭其他 view 共用但不归此句柄所有的池 |
+
+例如 `a.parents = ['z']`，`z` 在扫描后段合法出现。扫到 `a` 时还没见到 `z`，不能立即判悬空；全量 ID 扫描结束后才能检查端点。严格排序使文件和数据库能得到相同规范哈希，并让游标漏项/重复可检测；数据库排序规则必须与合同的 ID 比较规则一致。
+
+## 验证接入
+
+同一数据分别用文件和数据库打开，预期 Static Revision 一致，点读和六组邻居与定义匹配。至少覆盖跨页前向引用、重复/倒序 ID、悬空端点、两种独立环、游标不前进、点读漂移、刷新失败和关闭时机。违反定义合同会导致加载失败，不能将失败转成空图。
+
+仓库合同测试只证明 Core 会校验这些行为，不证明某个真实驱动的事务隔离或生产性能。选择具体数据库后，再验证长读事务、连接池和过期快照策略。

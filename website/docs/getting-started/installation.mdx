@@ -1,32 +1,65 @@
 ---
 title: 安装
-description: 安装 Capability Graph 0.1.0，并确认 Node.js、ESM 和包入口要求。
+description: 安装 Capability Graph v1.0.0，并确认 Node.js、ESM 和包入口要求。
 ---
 
 # 安装
 
-<span className="cg-status">0.1.0 可用</span>
+<span className="cg-status">v1.0.0 可用</span>
+
+把包装在负责加载 Provider、向 Agent 提供 API/MCP 的 Node.js 接入项目中。Provider 定义目录只是数据目录，不必单独安装一份包；一个接入项目可以加载多个 Provider。
 
 ## 前置条件
 
 - Node.js `^20.19.0 || >=22.12.0`，与包内 `engines.node` 完全一致。
-- 使用 ESM。主包只提供根入口，不提供 `./mcp` 子路径。
-- Provider 定义文件位于你的项目或独立资源目录中。
+- 使用 ESM。主包只提供根入口，不提供 CommonJS `require()` 入口或 `./mcp` 子路径。
+- 后续将创建 Provider 定义文件；安装命令本身不会生成它们。
+
+## 从空目录开始
 
 ```sh
-npm install @devcodex-labs/capability-graph
+mkdir capability-graph-demo
+cd capability-graph-demo
+npm init -y
+npm pkg set type=module
+npm install @devcodex/capability-graph
 ```
 
-安装后先确认根入口可解析：
+已有项目只需安装依赖，并确认模块配置。`npm pkg set type=module` 会在 `package.json` 写入 `"type": "module"`，让 `.js` 使用 ESM；已有 CommonJS 项目可以把接入脚本命名为 `.mjs`，无需改变整个项目的模块规则。
 
-```ts
-import { CapabilityGraph } from '@devcodex-labs/capability-graph';
+## 验证包入口
+
+在项目根创建 `check.mjs`：
+
+```js title="check.mjs"
+import { CapabilityGraph } from '@devcodex/capability-graph';
 
 console.log(typeof CapabilityGraph.open); // function
 ```
 
-主包没有运行时依赖。MCP SDK 只存在于仓库的私有示例项目中；需要 MCP 时，应在 Provider 自己的接入层安装所需 SDK。
+```sh
+node check.mjs
+```
+
+预期输出是 `function`。这只证明包入口可加载；下一页创建 Provider 并成功调用 `open()` 后，才证明定义和加载配置有效。使用 `.mjs` 不需要 TypeScript 编译器。
+
+## 安装内容
+
+主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及数据库 Authority、Runtime、两类 Retriever 和远程 Reader 的扩展合同。主包没有运行时依赖。
+
+它不安装 HTTP/MCP Server、数据库驱动、向量数据库、RAG 后端或 VextJS Adapter。MCP SDK 仅用于仓库的独立私有示例；要提供 MCP，由接入项目安装 SDK 并实现协议层。
+
+## 常见问题
+
+| 现象 | 检查 |
+|---|---|
+| `ERR_MODULE_NOT_FOUND` | 在运行脚本所属项目安装依赖，确认包名和当前工作目录 |
+| `Cannot use import statement outside a module` | 使用 `.mjs`，或在所属 `package.json` 配置 `type: module` |
+| Node 版本不满足要求 | 先用 `node --version` 检查上述范围 |
+| npm 返回版本或包不存在 | 用 `npm config get registry` 检查 registry 配置，再用 `npm view @devcodex/capability-graph version` 核对镜像是否已同步 |
+
+本文介绍 `1.0.0` 的公开接口。安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本。
 
 ## 下一步
 
-在 [First Provider](./first-provider) 中创建一个最小、可校验的 Provider。
+在[创建第一个 Provider](./first-provider)中建立 `providers/acme-http/`，完成第一次目录、关系和本地知识查询。

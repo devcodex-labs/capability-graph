@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer, request } from "node:http";
 import test from "node:test";
-import { CapabilityGraph, CapabilityGraphError, type RuntimeAdapter } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph, CapabilityGraphError, type RuntimeAdapter } from "@devcodex/capability-graph";
 import { HttpRuntimeAdapter } from "../examples/seed-runtime/adapter.js";
 import { runSeedTask, seedProviderRoot } from "../examples/seed-api/main.js";
 import { launchService, assertPortReleased } from "./contract/http-service-process.js";

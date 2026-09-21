@@ -14,7 +14,7 @@ description: Provider、Capability 定义字段、验证矩阵和二元身份合
 | `version` | 是 | Provider 定义版本，不属于能力身份 |
 | `specification` | 否 | Provider-owned Specification metadata |
 
-Specification 可含 `specificationId`、`version`、`appliesTo.software`、`versionRange`、`conditions` 和 `entryRef`。Core 只关联这些元数据，不读取正文来执行策略，也不判断当前项目版本。
+`specification` 可整体省略；提供时必须包含非空 `specificationId` 和 `version`。`appliesTo` 及其 `software`、`versionRange`、`conditions` 均可选，`entryRef` 也可选。Core 只关联这些元数据，不读取正文来执行策略，也不判断当前项目版本。
 
 文件 Authority 的 `provider.json` 必须与配置中的 `providerId` 一致。每个有效启用 Provider 必须恰有一个 Authority。
 

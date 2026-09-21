@@ -9,6 +9,30 @@ description: 查看联合目录如何保留 Provider 身份、隔离修订和限
 
 Multi Provider 场景同时打开多个 Authority，通过 `graph.listCatalog()` 建立联合候选，再用 `forProvider()` 进入具体图。
 
+适合 HTTP 框架和数据层分别维护能力、Agent 在同一个任务中组合使用的情况。两个 Provider 即使都有 `route`，身份仍不同；每个来源独立更新，不因此允许跨 Provider 正式图边。
+
+## 运行与预期结果
+
+本页展示仓库测试场景，不是安装主包后会附带的双后端服务。在仓库根 `npm ci` 后执行下方 `npm test`。`test/provider-isolation.test.ts` 使用真实 Seed 文件源与合同数据库假实现；后者仅用于故障注入，不是已交付数据库驱动。
+
+```text
+examples/seed-provider/            真实文件 Authority
+test/provider-isolation.test.ts   混合来源读取和失败隔离
+test/contract/fake-database.ts     可控合同假实现
+```
+
+关键查询片段，`graph` 由测试先打开两个来源：
+
+```ts
+const mixed = await graph.getCapabilities([
+  { providerId: 'seed.http', capabilityId: 'route.http' },
+  { providerId: 'seed', capabilityId: 'a' }
+]);
+console.log(mixed.results.map((item) => item.ok ? 'ok' : item.error.code));
+```
+
+当合同数据库被设为不可读时，预期两个槽位分别为 `ok`、`CG_NO_ACTIVE_VIEW`。这证明批量点读能隔离来源失败；不代表所有 API 都能部分成功，联合 `listCatalog()` 在该故障场景会整体失败。具体接入配置见[使用多个 Provider](../guides/multiple-providers)。
+
 根测试覆盖：
 
 - 相同 `capabilityId` 在不同 Provider 中保持不同二元身份；
@@ -22,3 +46,5 @@ npm test
 ```
 
 跨 Provider 的业务组合属于 Agent 或上层工作流，不写入 V1 静态边。
+
+预期测试全部通过，失败时以测试命名和断言定位身份/修订/范围问题。[查看测试源码](https://github.com/devcodex-labs/capability-graph/blob/main/test/provider-isolation.test.ts)。

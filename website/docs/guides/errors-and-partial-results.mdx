@@ -14,19 +14,28 @@ description: 按错误阶段、NextAction、ResultMeta 和逐项结果恢复，�
 - **逐项失败**：批量详情、文档或候选中的单项失败，其他槽位仍可成功。
 - **后端未配置/不可用**：Retriever、Reader 或 Runtime Adapter 缺失或失败。
 
+下面是查询片段，`provider` 为[入门教程](../getting-started/first-provider)中的绑定对象；这里故意混入不存在的 ID 来展示逐项失败。
+
 ```ts
+import { CapabilityGraphError } from '@devcodex/capability-graph';
+
+const ids = ['route.http', 'missing'];
 try {
   const result = await provider.getCapabilities(ids);
-  for (const item of result.items) {
+  for (const item of result.results) {
     if (!item.ok) console.warn(item.error.code, item.error.nextAction);
+    else console.log(item.value.id);
   }
 } catch (error) {
   if (error instanceof CapabilityGraphError) {
     console.error(error.code, error.nextAction);
   }
+  throw error;
 }
 ```
 
+预期 `route.http` 槽位成功，`missing` 槽位携带 `CG_NOT_FOUND`，前者不会因后者而消失。查询级错误进入 `catch` 并继续抛出，不能打印后伪装成功。`getCapabilities()` 和 `readDocuments()` 使用 `results`；Catalog 等分页接口使用 `items`。
+
 不要按 `CapabilityGraphError` 类型盲目信任 Adapter 填充的字段；Core 只投影已知诊断。处理 `partial` 时保留成功项和原始失败类别。
 
-常见恢复：修正 scope、刷新发现结果、缩小请求或分页、配置对应 Adapter。完整对照见 [ErrorCode and NextAction](../reference/errors) 与 [Troubleshooting](../troubleshooting/)。
+常见恢复：修正 scope、刷新发现结果、缩小请求或分页、配置对应 Adapter。完整对照见 [ErrorCode and NextAction](../reference/errors) 与 [Troubleshooting](../troubleshooting/index)。

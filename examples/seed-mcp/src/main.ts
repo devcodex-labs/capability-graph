@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { CapabilityGraph } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph } from "@devcodex/capability-graph";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createSeedServer } from "./server.js";
 

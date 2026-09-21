@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CapabilityGraphError, equalId, formatQualifiedId, idKey, isId,
-  isKnowledgeId, parseQualifiedId } from "@devcodex-labs/capability-graph";
+  isKnowledgeId, parseQualifiedId } from "@devcodex/capability-graph";
 import { bindCapabilityId } from "../src/identity.js";
 
 test("E-20: explicit and bound identities produce the same reversible key", () => {

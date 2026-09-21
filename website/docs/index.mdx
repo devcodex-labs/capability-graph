@@ -5,38 +5,65 @@ description: 面向 Provider 的能力建模、发现与知识导航基础设施
 
 # Capability Graph
 
-Capability Graph 是 Provider 底层的能力发现模块。Provider 使用 Core 建模和查询静态能力，再通过自己拥有的 API、MCP 或其他协议向 Agent 暴露能力。
+Capability Graph 帮助框架、SDK 或平台把能力整理成 Agent 可以逐步查询的目录。维护这组定义和接入规则的一方称为 Provider；它使用 Core 加载和查询定义，通过自己的 API 或 MCP 提供发现入口。
 
-<div className="cg-flow" role="img" aria-label="Provider 定义能力，Core 建模和查询，Provider 自有 API 或 MCP 暴露结果，Agent 渐进发现能力。">
-  <div><strong>Provider</strong><br />定义能力、关系、规范引用和可选知识</div>
+**下一步：** [运行第一个示例](./getting-started/first-provider) · [判断是否适合](#何时使用)
+
+## 它解决什么问题
+
+例如用户要求“给现有 `POST /users` 增加请求校验”。只有工具名称或一整本文档时，Agent 仍需判断哪些能力有关、项目是否已有这条路由，以及该读哪段说明。使用 Capability Graph 后，接入层可以让 Agent：
+
+1. 从路由目录发现 `route.validation`，按任务意图选择它。
+2. 查看它与 `schema.request` 的关系，决定是否还需要请求 Schema。
+3. 通过已配置的 Runtime Adapter 确认项目中的 `POST /users` 实例。
+4. 读取已选能力关联的知识，再由宿主完成代码修改和验证。
+
+Core 提供发现和查询结果，不执行能力，也不代替 Agent 判断意图。这个完整场景见示例分区；下方最小代码只演示静态目录。
+
+## 定义来源与查询方向
+
+定义来源：Provider 提供能力文件、知识引用和可选 Adapter，Core 按配置加载并校验。查询则由 Agent 发起，方向如下：
+
+<div className="cg-flow" role="img" aria-label="Agent 调用 Provider 自有 API 或 MCP，接入层查询 Core，Core 读取 Provider 权威来源并沿原调用链返回结果。">
+  <div><strong>Agent</strong><br />根据任务选择下一次查询</div>
   <span aria-hidden="true" />
-  <div><strong>Capability Graph Core</strong><br />校验、索引并提供协议无关的查询原语</div>
+  <div><strong>Provider-owned API / MCP</strong><br />认证、绑定项目和范围，再调用 Core</div>
   <span aria-hidden="true" />
-  <div><strong>Provider-owned API / MCP</strong><br />按项目需要设计入口、认证和意图路由</div>
+  <div><strong>Capability Graph Core</strong><br />校验来源并执行有界查询</div>
   <span aria-hidden="true" />
-  <div><strong>Agent</strong><br />先看主能力，再按意图进入所需能力和子能力</div>
+  <div><strong>Provider 权威来源</strong><br />提供静态定义；按需读取知识或调用 Adapter</div>
 </div>
+
+结构化结果沿调用链返回。目录不携带知识正文或 Runtime 实例；需要这些信息时再发起对应查询。
+
+## 何时使用
+
+适合能力较多、需要区分静态定义与项目实际实例、希望按所选能力读取知识的框架或平台。多个 Provider 也可以联合发现，但仍保留各自的身份和修订。
+
+如果只有几个固定工具，Agent 不需要发现、选择或查询能力关系，直接提供 API/MCP 通常就够了。
 
 ## 从这里开始
 
-- [快速开始](./getting-started/)：从安装到第一个 Provider 和第一次查询。
-- [核心概念](./concepts/)：理解身份、关系、范围、修订、知识和 Runtime。
+- [快速开始](./getting-started/index)：从安装到第一个 Provider 和第一次查询。
+- [核心概念](./concepts/index)：理解身份、关系、范围、修订、知识和 Runtime。
 - [GitHub](https://github.com/devcodex-labs/capability-graph)：查看源码、测试和真实 Seed。
 
 ## 文档目录
 
-- [快速开始](./getting-started/)
-- [核心概念](./concepts/)
-- [使用指南](./guides/)
-- [集成](./integrations/)
-- [示例](./examples/)
-- [API 参考](./reference/)
-- [故障排查](./troubleshooting/)
+- [快速开始](./getting-started/index)
+- [核心概念](./concepts/index)
+- [使用指南](./guides/index)
+- [集成](./integrations/index)
+- [示例](./examples/index)
+- [API 参考](./reference/index)
+- [故障排查](./troubleshooting/index)
 
 ## 最小能力发现
 
+前置条件：已安装包，并按快速开始创建 `acme.http` Provider。下面是接入片段，需将 `rootDir` 替换为该 Provider 的真实目录；它不会生成定义文件。
+
 ```ts
-import { CapabilityGraph } from '@devcodex-labs/capability-graph';
+import { CapabilityGraph } from '@devcodex/capability-graph';
 
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['acme.http'],
@@ -55,4 +82,31 @@ try {
 }
 ```
 
-下一步进入[快速开始](./getting-started/)，创建真实定义并把主能力、意图收窄和子能力逐层暴露给 Agent。
+这段代码的职责分工：
+
+| 调用或配置 | 含义 |
+|---|---|
+| `open()` | 加载有效启用的 Provider，并完整校验静态定义 |
+| `hostAllowedProviders` | 宿主允许访问的 Provider 上限 |
+| `integrationEnabledProviders` | 本次集成启用的 Provider；与宿主允许集合取交集 |
+| `providers` | 每个有效启用 Provider 的唯一权威来源配置 |
+| `authority.kind` / `rootDir` | 本例从指定文件根读取 `provider.json` 和能力文件 |
+| `forProvider()` | 将查询绑定到 `acme.http`，后续可以使用 Provider 内的能力 ID |
+| `listCatalog()` | 返回平坦能力摘要，不是根节点专用接口，也不展开详情、知识和 Runtime |
+| `close()` | 释放 Core 持有的权威视图句柄 |
+
+使用快速开始的两个能力时，`catalog.items` 中会同时有 `route` 和 `route.http`。其中一项的精简投影如下，省略修订等字段：
+
+```json
+{
+  "id": { "providerId": "acme.http", "capabilityId": "route" },
+  "name": "Routing",
+  "description": "Define how requests reach application handlers.",
+  "whenToUse": "Choose a routing capability before changing an entrypoint.",
+  "distinction": "A static capability family, not registered runtime routes."
+}
+```
+
+`meta.completeness` 为 `complete` 且没有 `nextCursor` 才表示本次目录已返回完整。要先只暴露主能力，由 Provider 接入层维护入口选择；不能把不带过滤的 `listCatalog()` 当作“只返回主能力”。加载失败时先检查 Provider ID、目录和定义必填字段。
+
+下一步进入[快速开始](./getting-started/index)，创建真实定义并把主能力、意图收窄和子能力逐层暴露给 Agent。

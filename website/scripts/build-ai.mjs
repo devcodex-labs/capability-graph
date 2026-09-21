@@ -19,6 +19,11 @@ await new Promise((resolve, reject) => {
   child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`Rspress AI build exited with ${code}`)));
 });
 
+// Rspress rebuilds doc_build from scratch. Restore every generated release
+// artifact before validating or deploying that final AI-enabled build.
+await import('./write-route-redirects.mjs');
+await import('./write-public-release.mjs');
+
 const outputRoot = path.join(websiteRoot, 'doc_build');
 const llmsPath = path.join(outputRoot, 'llms.txt');
 const fullPath = path.join(outputRoot, 'llms-full.txt');

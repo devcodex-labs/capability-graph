@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { CapabilityGraph, CapabilityGraphError, parseQualifiedId } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph, CapabilityGraphError, parseQualifiedId } from "@devcodex/capability-graph";
 
 const id = z.object({ providerId: z.string(), capabilityId: z.string() });
 const scope = { requestProviderScope: z.array(z.string()).optional(), requiredStaticRevision: z.string().optional() };

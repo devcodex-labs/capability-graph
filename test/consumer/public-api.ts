@@ -1,6 +1,6 @@
 import { CapabilityGraphError, formatQualifiedId, parseQualifiedId,
   type CanonicalCapabilityId, type BudgetConfig, type BudgetOverrides,
-  type ErrorShape, type BatchItem, type BatchResult, type ProviderResult, type NeighborPage } from "@devcodex-labs/capability-graph";
+  type ErrorShape, type BatchItem, type BatchResult, type ProviderResult, type NeighborPage } from "@devcodex/capability-graph";
 
 const id: CanonicalCapabilityId = { providerId: "seed.http", capabilityId: "route.http" };
 const encoded: string = formatQualifiedId(id);
@@ -35,16 +35,16 @@ new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "retry_anything" });
 // @ts-expect-error Logical identity fields are readonly.
 id.providerId = "other";
 // @ts-expect-error Internal hash implementation is not a public export.
-import { computeStaticRevision } from "@devcodex-labs/capability-graph";
+import { computeStaticRevision } from "@devcodex/capability-graph";
 // @ts-expect-error Internal configuration normalization is not a public export.
-import { resolveBudgets } from "@devcodex-labs/capability-graph";
+import { resolveBudgets } from "@devcodex/capability-graph";
 // @ts-expect-error No public MCP package subpath is provided.
-import {} from "@devcodex-labs/capability-graph/mcp";
+import {} from "@devcodex/capability-graph/mcp";
 // Raw records are intentionally public inputs to the database adapter contract.
-import type { UnvalidatedCapabilityRecord } from "@devcodex-labs/capability-graph";
+import type { UnvalidatedCapabilityRecord } from "@devcodex/capability-graph";
 // @ts-expect-error Validated internal graph nodes are not the public bounded detail projection.
-import type { StaticCapability } from "@devcodex-labs/capability-graph";
-import type { BoundProviderGraph, CapabilityDetail } from "@devcodex-labs/capability-graph";
+import type { StaticCapability } from "@devcodex/capability-graph";
+import type { BoundProviderGraph, CapabilityDetail } from "@devcodex/capability-graph";
 function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, raw: UnvalidatedCapabilityRecord, neighbors: NeighborPage) {
   const provider: Promise<ProviderResult> = bound.getProvider();
   void provider.then((value) => [value.staticRevision, value.meta.servedFrom, value.meta.refreshFailed]);

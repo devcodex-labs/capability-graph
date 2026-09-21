@@ -9,11 +9,18 @@ description: 在明确 Effective Provider Scope 内联合发现多个 Provider�
 
 在 `open()` 时声明宿主允许、集成启用和每个 Provider 的唯一 Authority：
 
+下面是配置片段。先准备两个完整 Provider 目录，分别在 `provider.json` 声明 `acme.http`、`acme.database`；后者是示例身份，本例仍使用文件 Authority，不意味着附带数据库后端。
+
 ```ts
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['acme.http', 'acme.database'],
   integrationEnabledProviders: ['acme.http', 'acme.database'],
-  providers: [httpProvider, databaseProvider]
+  providers: [
+    { providerId: 'acme.http', authority: { kind: 'file', rootDir: '/absolute/path/to/http-provider' } },
+    { providerId: 'acme.database', authority: { kind: 'file', rootDir: '/absolute/path/to/database-provider' } }
+  ]
 });
 
 const page = await graph.listCatalog({
@@ -23,6 +30,8 @@ const page = await graph.listCatalog({
 ```
 
 联合目录保留完整二元身份和各 Provider 静态修订。它不会建立跨 Provider 图边，也不会把两个 Provider 的 `capabilityId` 合并为同一节点。
+
+预期 `page.meta.scope` 有两个 Provider，`staticRevisionByProvider` 分别记录来源修订。不要向多 Provider 请求填单个 `requiredStaticRevision`；选定 Provider 后再从绑定查询取得修订。生产接入应将本页查询放入 `try/finally` 并在结束时 `await graph.close()`，完整结构见[第一个 Provider](../getting-started/first-provider)。
 
 ## 选择之后
 

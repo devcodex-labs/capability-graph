@@ -7,7 +7,37 @@ description: 创建 provider.json 和第一组能力定义，并用真实文件�
 
 <span className="cg-status">可运行</span>
 
+## 最快跑通
+
+已经完成[安装](./installation)时，先使用仓库中的[完整受检示例目录](https://github.com/devcodex-labs/capability-graph/tree/main/website/fixtures/first-provider)。它包含本页全部定义、知识文件和 `discover.mjs`，不需要把下方片段重新拼装。
+
+把该目录保存到项目后运行：
+
+```sh
+node first-provider/discover.mjs
+```
+
+成功输出必须包含 `catalog: ["route", "route.http"]`、`detail: "route.http"`、`parents: ["route"]` 和 `completeness: "complete"`。这证明静态定义、显式关系和本地知识已经通过同一公开入口跑通。下文逐项解释同一示例为什么这样建模，以及如何放进常见的 `providers/acme-http` 项目布局。
+
 一个文件权威 Provider 至少需要 `provider.json` 和一个 `*.capability.json`。Core 会递归收集能力文件，但会按精确目录名跳过 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache` 和 `.tmp`。
+
+## 前置条件与目标
+
+完成[安装](./installation)，在接入项目中创建下面的文件。本页从零定义两个静态能力，最后读取一份知识文档；无需启动 HTTP 服务、MCP 或数据库。
+
+```text
+capability-graph-demo/
+├── package.json
+├── discover.mjs
+└── providers/acme-http/
+    ├── provider.json
+    ├── PROVIDER.md
+    ├── route.capability.json
+    ├── route-http.capability.json
+    └── knowledge/routing.md
+```
+
+前四个定义/规范文件都放在 `providers/acme-http/`；知识放在其 `knowledge/` 子目录。
 
 ## 1. 定义 Provider
 
@@ -28,6 +58,19 @@ description: 创建 provider.json 和第一组能力定义，并用真实文件�
 }
 ```
 
+| 字段 | 必填 | 作用及本例选择 |
+|---|---|---|
+| `providerId` | 是 | 稳定机器身份；`acme.http` 必须与加载配置一致 |
+| `name` | 是 | 展示名称，改名不会自动生成新身份 |
+| `version` | 是 | Provider 定义的版本标签，不属于能力二元身份，也不代替 Static Revision |
+| `specification` | 否 | Provider 全局使用规则的元数据；不需要规范入口时可整体省略 |
+| `specificationId` | 声明规范时是 | 规范自身的稳定身份，本例与 Provider ID 分开 |
+| `specification.version` | 声明规范时是 | 规范版本，可独立于 Provider 版本演进 |
+| `appliesTo` | 否 | 适用性元数据，内部 `software`、`versionRange`、`conditions` 均可选 |
+| `appliesTo.software` | 否 | 本例规范面向 `acme-http` 软件 |
+| `appliesTo.versionRange` | 否 | 适用版本描述；Core 不探测项目版本或执行范围匹配 |
+| `entryRef` | 否 | 规范正文入口；本例按接入方约定从 Provider 目录读取 `PROVIDER.md` |
+
 `entryRef` 只是 Provider Specification 的引用。正文由 Provider 维护和投递，Core 不读取正文来改变图行为。
 
 创建引用的 `PROVIDER.md`：
@@ -35,10 +78,14 @@ description: 创建 provider.json 和第一组能力定义，并用真实文件�
 ```md title="PROVIDER.md"
 # Acme HTTP Provider
 
-This file is the Provider-owned specification entry used by the documentation fixture. Capability Graph associates the entry but does not manage or enforce this text.
+- 修改已有路由前，通过已配置的 Runtime 查询确认项目中的实例。
+- 路由注册与请求校验是不同能力，先按任务选择。
+- 只读取已选 Capability 关联的 Knowledge。
 ```
 
 Core 只保留入口元数据。接入层负责判断适用版本、读取正文并把它投递给 Agent。
+
+Specification 写跨能力的使用规则；Capability 描述可以独立发现和选择的能力；Knowledge 写执行某个已选能力时才需要的详细知识。把所有规则塞进 `description` 会让每次目录查询重复传输长正文。
 
 ## 2. 定义主能力
 
@@ -51,6 +98,14 @@ Core 只保留入口元数据。接入层负责判断适用版本、读取正文
   "distinction": "A static capability family, not registered runtime routes."
 }
 ```
+
+| 字段 | 必填 | 如何填写 |
+|---|---|---|
+| `capabilityId` | 是 | Provider 内稳定身份；`route` 表达路由能力族 |
+| `name` | 是 | 人类可读名称 |
+| `description` | 是 | 回答“这是什么能力、解决什么问题” |
+| `whenToUse` | 是 | 回答“什么任务下应该考虑它”，帮助 Agent 选择 |
+| `distinction` | 否 | 与容易混淆的能力或 Runtime 实例区分；存在歧义时应填写 |
 
 再添加一个细分能力：
 
@@ -74,12 +129,33 @@ Core 只保留入口元数据。接入层负责判断适用版本、读取正文
 
 关系端点必须位于同一 Provider。`parents` 和 `specializes` 分别无环；Core 不从命名层级推导关系。
 
+这里用 `parents: ["route"]` 表达 HTTP 路由属于路由能力族。`route.http` 中的点号只是命名约定，省略 `parents` 就没有父子关系。只有“保留另一能力核心语义的更具体变体”才使用 `specializes`；`related` 只提示显式关联。它们都可省略，不必为每个节点凑齐三类关系。
+
+| Knowledge 字段 | 必填 | 含义 |
+|---|---|---|
+| `knowledge` | 否 | 本能力关联的知识引用；没有知识时可省略 |
+| `kind` | 引用内是 | `document` 表示可精确读取的一篇文档；Collection 则需显式检索 |
+| `knowledgeId` | 引用内是 | 本例为 `routing-guide`；读取用 Provider、已选能力身份和知识 ID 定位，不能当作全局地址 |
+| `locator` | Document 内是 | 知识来源描述，不是正文 |
+| `locator.type` | 是 | `relative-file` 使用内置本地 Reader |
+| `locator.path` | 是 | 相对该文件 Authority 的 `rootDir`，不是相对 `process.cwd()` |
+
 同时创建 `knowledge/routing.md`。本地知识正文不进入 Static Revision；读取结果通过独立 `contentId` 标识。
+
+```md title="knowledge/routing.md"
+# HTTP Routing Guide
+
+Register the route in the host framework, then expose its static capability through the Provider-owned discovery API or MCP integration. Runtime route instances remain an Adapter concern.
+```
+
+修改绑定或 locator 会改变静态定义；只修改正文则用新的 `contentId` 区分内容，避免把整篇文档混进静态图哈希。
 
 ## 3. 打开 Provider
 
+以下配置片段展示各项含义；第 4 步给出包含初始化和关闭的完整 `discover.mjs`。
+
 ```ts
-import { CapabilityGraph } from '@devcodex-labs/capability-graph';
+import { CapabilityGraph } from '@devcodex/capability-graph';
 
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['acme.http'],
@@ -93,62 +169,104 @@ const graph = await CapabilityGraph.open({
 
 有效启用范围中的每个 Provider 必须恰有一个 Authority。缺少来源会得到 `CG_CONFIG_INCOMPLETE`，不会被解释为空目录。
 
+| 配置项 | 本例中的作用 |
+|---|---|
+| `hostAllowedProviders` | 宿主允许访问 `acme.http` |
+| `integrationEnabledProviders` | 本次集成启用 `acme.http`，不能越过宿主允许集合 |
+| `providers` | 为有效启用 Provider 配置唯一 Authority；允许集合不等于来源地址 |
+| `providers[].providerId` | 标识这条来源配置属于谁，须与 `provider.json` 相符 |
+| `authority.kind` | `file` 表示文件权威；数据库模式需要另配 Adapter |
+| `authority.rootDir` | Provider 根目录，包含上面的定义和知识文件 |
+
+有效范围为 `hostAllowedProviders ∩ integrationEnabledProviders ∩ requestProviderScope`，未提供请求范围时使用前两者的交集。这两个数组分别服务宿主策略与当前集成开关，不能用它们代替 `providers` 的加载配置。
+
 ## 4. 执行渐进查询
 
-查询从平坦目录开始，而不是一次暴露整张图。先列主能力，再依据用户意图读取详情、关系或知识：
+在项目根创建 `discover.mjs`。目录返回两个能力的摘要；本例的调用方随后明确选择 `route.http`，Core 不会自行判断用户意图。Provider 想首轮只展示主能力时，需在接入层定义入口策略，见下一页。
 
-```ts
-const provider = graph.forProvider('acme.http');
+```js title="discover.mjs"
+import { fileURLToPath } from 'node:url';
+import { CapabilityGraph } from '@devcodex/capability-graph';
 
-const catalog = await provider.listCatalog({ limit: 20 });
-const requiredStaticRevision = catalog.meta.staticRevision;
-
-const detail = await provider.getCapabilities(
-  ['route.http'],
-  { requiredStaticRevision }
-);
-
-const neighbors = await provider.getNeighbors(
-  'route.http',
-  { requiredStaticRevision }
-);
-
-const documents = await provider.readDocuments({
-  selected: ['route.http'],
-  knowledgeIds: ['routing-guide'],
-  requiredStaticRevision
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: {
+      kind: 'file',
+      rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
+    }
+  }]
 });
-```
 
-读取顺序是：
-
-1. `listCatalog()` 返回用途、使用时机和关键区别，用于第一轮选择。
-2. `getCapabilities()` 返回已选能力的完整静态定义。
-3. `getNeighbors()` 只展开请求的关系组，不递归遍历整张图。
-4. `readDocuments()` 只读取显式选中能力关联的 Document，不把知识选择扩大到其他能力。
-
-始终检查 `meta.completeness`、`warnings` 和 `nextCursor`。部分结果不是全集；已知 ID 也可以直接查询详情，无需强制先列目录。
-
-```ts
 try {
-  // 执行查询并把结果交给 Provider-owned 接入层。
+  const provider = graph.forProvider('acme.http');
+  const catalog = await provider.listCatalog({ limit: 20 });
+  const requiredStaticRevision = catalog.meta.staticRevision;
+  const detail = await provider.getCapabilities(['route.http'], { requiredStaticRevision });
+  const neighbors = await provider.getNeighbors('route.http', { requiredStaticRevision });
+  const documents = await provider.readDocuments({
+    selected: ['route.http'],
+    knowledgeIds: ['routing-guide'],
+    requiredStaticRevision
+  });
+
+  if (!detail.results[0]?.ok || !documents.results[0]?.ok) {
+    throw new Error(JSON.stringify({ detail, documents }));
+  }
+  console.log(JSON.stringify({
+    catalog: catalog.items.map(({ id }) => id.capabilityId),
+    detail: detail.results[0].value.id.capabilityId,
+    parents: neighbors.groups.parents.items.map(({ id }) => id.capabilityId),
+    document: documents.results[0].value.knowledgeId,
+    text: documents.results[0].value.text,
+    completeness: catalog.meta.completeness
+  }, null, 2));
 } finally {
   await graph.close();
 }
 ```
 
-`close()` 释放 Core 持有的权威视图句柄，不取消已经交给 Adapter 的底层任务。
-
-## 验证这套 Fixture
-
-仓库内 `website/fixtures/first-provider` 包含上述 Provider、Specification、两个能力和本地知识。运行：
-
 ```sh
-cd website
-npm run check:examples
+node discover.mjs
 ```
 
-验证器从公开入口打开 Fixture，核对目录顺序、详情、父关系、本地文档读取和资源关闭；页面中的 JSON 片段必须与 Fixture 完全一致。
+读取顺序是：
+
+1. `listCatalog()` 返回用途、使用时机和关键区别，用于第一轮选择。
+2. `getCapabilities()` 返回已选能力详情，关系摘要和知识引用有各自预算，不返回知识正文。
+3. `getNeighbors()` 只展开请求的关系组，不递归遍历整张图。
+4. `readDocuments()` 只读取显式选中能力关联的 Document，不把知识选择扩大到其他能力。
+
+始终检查 `meta.completeness`、`warnings` 和 `nextCursor`。部分结果不是全集；已知 ID 也可以直接查询详情，无需强制先列目录。
+
+`close()` 释放 Core 持有的权威视图句柄，不取消已经交给 Adapter 的底层任务。
+
+## 预期结果与排错
+
+终端输出的精简投影如下，`text` 字段还会包含上面知识文件的完整正文：
+
+```json
+{
+  "catalog": ["route", "route.http"],
+  "detail": "route.http",
+  "parents": ["route"],
+  "document": "routing-guide",
+  "completeness": "complete"
+}
+```
+
+这证明定义可加载、显式父关系可查询、本地知识可读取。`requiredStaticRevision` 来自本次 Catalog，后续查询沿用它，不能填写 Provider 的 `version`。知识选择必须显式非空，不会自动包含父节点或关联能力。
+
+| 失败 | 优先检查 |
+|---|---|
+| `CG_CONFIG_INCOMPLETE` | 有效启用的 Provider 是否有唯一来源配置 |
+| `CG_VALIDATION_FAILED` | JSON 必填字段、Provider 身份、关系端点是否完整 |
+| 文档逐项读取失败 | `knowledge/routing.md` 是否位于 Authority 根内且与 locator 一致 |
+| `CG_REVISION_MISMATCH` | 是否沿用了已退休修订；重新发现后再作选择 |
+
+批量详情和知识返回 `results`，每项检查 `ok`；目录返回 `items`。其他情况见[故障排查](../troubleshooting/index)。
 
 ## 下一步
 

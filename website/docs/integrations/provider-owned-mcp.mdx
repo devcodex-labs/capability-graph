@@ -9,13 +9,35 @@ description: 用少量 Provider-owned MCP 工具实现主能力、意图收窄�
 
 Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程中使用 Core，并把工具设计成渐进发现链：
 
-1. **列出主能力**：调用 `listCatalog()`，返回足以区分用途的摘要和修订。
+1. **列出主能力**：Provider 显式选择主入口并返回摘要和修订；也可以用 `listCatalog()` 暴露有界平坦目录，但它不会自动只返回根节点。
 2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`；可选 Retriever 只能召回已有身份。
 3. **进入能力详情**：调用 `getCapabilities()` 获取完整定义。
 4. **展开子能力或关联**：按需调用 `getNeighbors()`，不在首轮暴露整图。
-5. **读取已选知识/Runtime**：只对非空已选能力继续查询。
+5. **读取知识或 Runtime**：知识要求非空显式选择；Runtime 需要项目和环境，可选用 `instanceOf` 收窄，不要求先选择知识。
 
 工具名称、数量、输入 Schema、认证和规范投递由 Provider 决定。参考示例使用私有 MCP 包，避免把 SDK 变成主包运行时依赖。
+
+## Seed 调用示例
+
+以下是实际 Seed 工具参数示例，需先启动该示例并通过 MCP 客户端调用；这些 JSON 不是 Core 配置文件。SDK 依赖、启动入口和自动验证见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。
+
+先调用 `example_list_catalog`：
+
+```json
+{ "requestProviderScope": ["seed.http"], "limit": 20 }
+```
+
+得到五个 Seed 能力的平坦摘要，以及 `meta.staticRevision`。这是参考工具的真实行为；要只给 Agent 主入口，可采用[Provider 自有 API](../getting-started/provider-owned-api)的显式入口投影，再包装成自己的 MCP 工具。
+
+Agent 选择 `route` 后，调用 `example_get_neighbors` 的参数片段如下，`requiredStaticRevision` 需要添加为上次返回的真实值：
+
+```json
+{ "qualifiedId": "seed.http::route", "kinds": ["children"], "limitPerKind": 20 }
+```
+
+预期 `groups.children.items` 包含 `route.http` 和 `route.validation`。选择验证能力后，用 `example_get_capabilities` 传 `ids: [{ providerId: 'seed.http', capabilityId: 'route.validation' }]`；确认要读哪些能力的知识，再用 `example_read_documents` 传非空 `selected` 和同一修订。返回数据在 MCP 的 `content` 文本块中以 JSON 表达，先解析再检查 `results[].ok`、warnings 和游标。
+
+Seed 同时提供 `seed://provider/specification` Resource，由 MCP 集成层读取 `PROVIDER.md`。Core 只返回规范元数据，不负责 Resource 投递或执行其中指令。参考还暴露可选检索工具；未配置后端时调用它们会失败，这不影响目录与本地读取。
 
 ## 错误映射
 

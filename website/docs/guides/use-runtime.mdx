@@ -9,21 +9,43 @@ description: 配置 RuntimeAdapter，按 Provider、项目和环境查询真实�
 
 Runtime 接入从一个明确 Adapter 开始。Adapter 接收 Provider、项目、环境、可选静态能力过滤和分页游标，返回实例与观察证据。
 
+只有需要确认“当前项目实际注册了什么”时才接 Runtime；仅发现框架支持的能力，无需启动业务服务。
+
+下面是接入片段：先构建仓库示例并由应用启动 Seed HTTP 服务，取得它实际监听的地址。`runtimeAdapter` 使用仓库 `examples/seed-runtime/adapter.ts` 的 `HttpRuntimeAdapter`，不是主包内置导出；实例化方式和端点约束见[Runtime Adapter](../integrations/runtime-adapter)。`providers` 指向仓库的 `examples/seed-provider`，`project`/`environment` 必须与服务启动配置一致。完整自动执行路径见[真实 Runtime 示例](../examples/seed-provider#真实-runtime)。
+
 ```ts
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['seed.http'],
   integrationEnabledProviders: ['seed.http'],
-  providers,
+  providers: [{
+    providerId: 'seed.http',
+    authority: { kind: 'file', rootDir: '/absolute/path/to/examples/seed-provider' }
+  }],
   runtimeAdapters: [runtimeAdapter]
 });
 
-const page = await graph.forProvider('seed.http').queryRuntime({
-  project: 'demo-app',
-  environment: 'development',
-  instanceOf: { capabilityId: 'route.http' },
-  requiredStaticRevision
-});
+try {
+  const provider = graph.forProvider('seed.http');
+  const requiredStaticRevision = (await provider.listCatalog()).meta.staticRevision;
+  const page = await provider.queryRuntime({
+    project: 'demo-app',
+    environment: 'development',
+    instanceOf: { capabilityId: 'route.http' },
+    requiredStaticRevision
+  });
+  console.log(page.items, page.observation, page.meta);
+} finally {
+  await graph.close();
+}
 ```
+
+片段还需从主包导入 `CapabilityGraph`。不要直接复制未创建 `runtimeAdapter` 的片段运行；若只想验证查询链，请执行示例页的测试命令，它会启动并清理真实服务。
+
+## 预期结果
+
+服务已注册 `POST /users` 时，`items` 可包含 `instanceId: 'POST /users'`、`instanceOf: { providerId: 'seed.http', capabilityId: 'route.http' }` 以及 method/path facts。实际是否存在取决于该进程的注册表，静态能力存在不保证实例存在。
+
+成功空观察用 `availability: empty`；`stale` 是新鲜度字段，`partial` 表示覆盖不完整。未配置 Adapter 是 `CG_RUNTIME_DISABLED`，服务连接失败或等待超时是 `CG_RUNTIME_UNAVAILABLE`，不能都显示成“没有路由”。排错见[运行时与超时](../troubleshooting/runtime-states)。
 
 ## Adapter 必须保证
 

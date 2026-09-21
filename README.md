@@ -9,14 +9,18 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [查询与更新](#queries)
 - [支持边界](#boundaries)
 - [本地开发](#development)
-- [未发布变更](changelogs/unreleased.md)
+- [1.0.0 变更](changelogs/1.0.0.md)
 - [许可证](#license)
 
 <a id="status"></a>
 
 ## 当前状态
 
-仓库版本为 `0.0.0`，尚未发布 npm 包。主包只有 ESM 根入口，零运行时依赖；MCP 示例为独立私有包，不导出 `./mcp`。
+当前版本为 `1.0.0`。主包只有 ESM 根入口，零运行时依赖；MCP 示例为独立私有包，不导出 `./mcp`。完整文档见 [Capability Graph Documentation](https://devcodex-labs.github.io/capability-graph/)，文档源码位于 [website](website/)。
+
+```sh
+npm install @devcodex/capability-graph
+```
 
 已实现文件权威加载、校验、单 Provider 正式图、跨 Provider 联合目录、范围控制、修订快照、按需知识读取，以及可插拔的数据库、检索和 Runtime 合同。真实 Seed 同时提供普通 API 与 MCP 接入。
 
@@ -45,7 +49,7 @@ Provider 在独立目录提供 `provider.json`、`*.capability.json` 和可选�
 上述关系端点必须由同一 Provider 定义。`parents` 与 `specializes` 分别无环；`related` 有方向，不自动补正向对称边。能力 ID 不包含 Provider 前缀；完整身份为 `{ providerId, capabilityId }`，可逆显示形式为 `seed.http::route.validation`，不按点号猜边界。概念不兼容时由作者使用新 ID。
 
 ```ts
-import { CapabilityGraph } from "@devcodex-labs/capability-graph";
+import { CapabilityGraph } from "@devcodex/capability-graph";
 
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ["seed.http"],

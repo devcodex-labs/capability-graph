@@ -19,3 +19,9 @@ Runtime Adapter 显式采集：
 Runtime 观察不会写回静态图，也不形成通用 Runtime Graph。静态修订变化后，Adapter 可以确认兼容、要求刷新或标记未知；Core 不计算语义等价。
 
 `CG_RUNTIME_DISABLED` 表示没有配置 Adapter，不等于当前环境没有实例。真实参考见 [Seed 端到端示例](../examples/seed-provider#真实-runtime)。
+
+## 同一个能力，不同的项目实例
+
+在 Acme HTTP 扩展示例中，`route.http` 一直描述 HTTP 路由能力。开发项目 `demo-app` 的 `POST /users` 则是实例，其 `instanceOf` 为 `{ providerId: 'acme.http', capabilityId: 'route.http' }`。测试环境可能没有这条路由；查询必须同时指定项目和环境，不能从开发环境存在就推断生产环境也存在。
+
+“给已有接口加校验”的任务先确认这个实例，再读取验证能力知识。读取实例不等于执行它，Core 不会向 `POST /users` 发起业务请求或修改 handler。

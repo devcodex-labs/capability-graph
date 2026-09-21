@@ -1,5 +1,5 @@
 import { get } from "node:http";
-import type { RuntimeAdapter, RuntimeAdapterResult } from "@devcodex-labs/capability-graph";
+import type { RuntimeAdapter, RuntimeAdapterResult } from "@devcodex/capability-graph";
 import type { Snapshot } from "./service.js";
 
 /** Dedicated local example protocol, not a general remote KnowledgeReader. */

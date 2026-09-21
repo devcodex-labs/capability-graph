@@ -9,6 +9,8 @@ description: 为非本地 KnowledgeRef 实现受预算约束的精确读取，�
 
 内置本地 Reader 优先处理 `relative-file` Document。自定义 `KnowledgeReader` 只用于其他来源：
 
+下面为接口节选。Reader 按已有引用精确读取全文；Retriever 则根据查询在已选知识中返回片段。要读取一篇远程指南只需 Reader，不必引入索引或模型。
+
 ```ts
 interface KnowledgeReader {
   readonly id: string;
@@ -29,3 +31,40 @@ interface KnowledgeReader {
 `canRead()` 必须同步、稳定。Reader 返回的 `source` 要与声明 locator 一致，并严格遵守字节预算；网络连接和资源释放归 Reader 所有。
 
 `KnowledgeReadContext.sourceContext` 只用于本地读取，不能序列化进 Retriever 请求或公开响应。远程引用存在但无 Reader 时返回 `CG_READER_UNCONFIGURED`。
+
+## HTTP Reader 骨架
+
+下面的类型可编译，但 `readBounded` 是接入方必须提供的传输实现，不代表主包已有 HTTP 后端。它应在接收数据时累计字节、超限立即终止，并负责访问策略、认证、重定向和超时；不能先下载任意大小的正文再检查长度。
+
+```ts title="reader-skeleton.ts"
+import { createHash } from 'node:crypto';
+import type { KnowledgeReader } from '@devcodex/capability-graph';
+
+export function createHttpReader(
+  readBounded: (url: string, maxBytes: number) => Promise<Uint8Array>
+): KnowledgeReader {
+  return {
+    id: 'acme-http-reader',
+    canRead(ref) {
+      return ref.kind === 'document' && ref.locator.type === 'http';
+    },
+    async read(ref, _context, { maxBytes }) {
+      if (ref.locator.type !== 'http') throw new Error('Unsupported locator');
+      const bytes = await readBounded(ref.locator.url, maxBytes);
+      if (bytes.byteLength > maxBytes) throw new Error('Document exceeds byte budget');
+      return {
+        bytes,
+        contentType: 'text/plain; charset=utf-8',
+        contentId: `k:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}`,
+        source: ref.locator.url
+      };
+    }
+  };
+}
+```
+
+将对象放入 `OpenConfig.readers`；Core 对非本地引用选择首个 `canRead()` 匹配的 Reader。本例只处理 UTF-8 文本，若传输返回 HTML/二进制，应按你的知识来源合同拒绝或扩展 MIME 处理，而不是无条件当作指南。
+
+`bytes` 是正文原始字节，V1 的 `contentId` 为 `k:` 加 SHA-256 十六进制值的前 16 位；Core 会重新计算核验。`source` 必须等于声明的 URL，不能随意换成缓存路径或重定向地址。`maxBytes` 单位为字节，不能用字符串长度替代。
+
+成功时 `readDocuments()` 的成功槽位返回 `text`、`byteLength`、`contentId` 和原 `source`。伪造哈希/source 会得到 `CG_ADAPTER_CONTRACT_INVALID`，Reader 抛错投影为 `CG_READER_UNAVAILABLE`；批量读取中检查每项 `ok`。Reader 拥有网络资源，Core 不负责关掉它的连接池。
