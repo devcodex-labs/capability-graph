@@ -24,8 +24,14 @@ async function filesUnder(root, relative = '') {
 }
 
 function canonicalForHtml(file) {
-  const route = file.replaceAll('\\', '/').replace(/\.html$/, '').replace(/(^|\/)index$/, '$1').replace(/^\/+|\/+$/g, '');
-  return `${publicBase}${route ? `${route}/` : ''}`;
+  const normalized = file.replaceAll('\\', '/');
+  const isIndexRoute = normalized === 'index.html' || normalized.endsWith('/index.html');
+  const route = normalized.replace(/\.html$/, '').replace(/(^|\/)index$/, '$1').replace(/^\/+|\/+$/g, '');
+  return `${publicBase}${route}${isIndexRoute && route ? '/' : ''}`;
+}
+
+function cleanRedirectTarget(target) {
+  return target.replace(/\/(?=#|$)/, '');
 }
 
 const files = await filesUnder(outputRoot);
@@ -44,7 +50,7 @@ const expectedRedirectFiles = Object.keys(redirects)
   .sort();
 assert(JSON.stringify(redirectHtmlFiles) === JSON.stringify(expectedRedirectFiles), 'compatibility redirect files do not match route-redirects.json');
 for (const [source, target] of Object.entries(redirects)) {
-  const targetUrl = new URL(`/capability-graph/${target}`, 'https://devcodex-labs.github.io').href;
+  const targetUrl = new URL(`/capability-graph/${cleanRedirectTarget(target)}`, 'https://devcodex-labs.github.io').href;
   const [targetRoute, fragment] = target.split('#');
   const targetFile = `${targetRoute.replace(/\/$/, '')}.html`;
   const targetHtml = await readFile(path.join(outputRoot, targetFile), 'utf8');
@@ -75,6 +81,12 @@ for (const file of htmlFiles) {
 assert(new Set(canonicalUrls).size === canonicalUrls.length, 'canonical URLs are not unique');
 
 const normalizedFiles = new Set(files.map((file) => file.replaceAll('\\', '/')));
+for (const file of htmlFiles) {
+  const normalizedFile = file.replaceAll('\\', '/');
+  const pathname = new URL(canonicalForHtml(file)).pathname.slice('/capability-graph/'.length);
+  const deployedFile = pathname === '' ? 'index.html' : pathname.endsWith('/') ? `${pathname}index.html` : `${pathname}.html`;
+  assert(deployedFile === normalizedFile, `${file} canonical does not map to its deployed static file`);
+}
 const canonicalFileByPath = new Map(htmlFiles.map((file) => [
   new URL(canonicalForHtml(file)).pathname,
   file.replaceAll('\\', '/')
@@ -120,7 +132,7 @@ const expectedReleaseRedirects = {};
 for (const [source, target] of Object.entries(redirects)) {
   const url = `${publicBase}${source}/`;
   const html = await readFile(path.join(outputRoot, source, 'index.html'), 'utf8');
-  expectedReleaseRedirects[url] = { target: new URL(target, publicBase).href, sha256: hash(html) };
+  expectedReleaseRedirects[url] = { target: new URL(cleanRedirectTarget(target), publicBase).href, sha256: hash(html) };
 }
 assert(JSON.stringify(release.redirects) === JSON.stringify(Object.fromEntries(Object.entries(expectedReleaseRedirects).sort(([left], [right]) => left.localeCompare(right)))), 'public redirect hashes do not match the final build');
 

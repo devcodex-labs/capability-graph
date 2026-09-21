@@ -13,6 +13,10 @@ function assertRoute(value, field) {
   }
 }
 
+function cleanTarget(target) {
+  return target.replace(/\/(?=#|$)/, '');
+}
+
 function redirectHtml(target) {
   const relativeTarget = `${publicBase}${target}`;
   const absoluteTarget = new URL(relativeTarget, publicOrigin).href;
@@ -38,7 +42,7 @@ function redirectHtml(target) {
 for (const [source, target] of Object.entries(redirects)) {
   assertRoute(source, 'source');
   assertRoute(target, 'target');
-  const html = redirectHtml(target);
+  const html = redirectHtml(cleanTarget(target));
   const flatPath = path.join(outputRoot, `${source}.html`);
   const directoryPath = path.join(outputRoot, source, 'index.html');
   await mkdir(path.dirname(flatPath), { recursive: true });

@@ -23,6 +23,10 @@ function hash(text) {
   return createHash('sha256').update(text).digest('hex');
 }
 
+function cleanRedirectTarget(target) {
+  return target.replace(/\/(?=#|$)/, '');
+}
+
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
 const releaseTag = process.env.RELEASE_TAG ?? `v${manifest.version}`;
 const releaseCommit = process.env.RELEASE_COMMIT ?? execFileSync('git', ['rev-parse', 'HEAD'], {
@@ -49,7 +53,7 @@ const redirects = {};
 const redirectConfig = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'route-redirects.json'), 'utf8'));
 for (const [source, target] of Object.entries(redirectConfig)) {
   const url = `${publicBase}${source}/`;
-  const targetUrl = new URL(target, publicBase).href;
+  const targetUrl = new URL(cleanRedirectTarget(target), publicBase).href;
   const html = await readFile(path.join(outputRoot, source, 'index.html'), 'utf8');
   redirects[url] = { target: targetUrl, sha256: hash(html) };
 }

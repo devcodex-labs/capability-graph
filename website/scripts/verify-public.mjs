@@ -30,10 +30,16 @@ async function documentationUrls(root, relative = '') {
     const file = path.join(relative, entry.name);
     if (entry.isDirectory()) return documentationUrls(root, file);
     if (!/\.mdx?$/.test(entry.name)) return [];
-    const route = file.replaceAll('\\', '/').replace(/\.mdx?$/, '').replace(/(^|\/)index$/, '$1').replace(/^\/+|\/+$/g, '');
-    return [`${expectedBase}${route ? `${route}/` : ''}`];
+    const normalized = file.replaceAll('\\', '/').replace(/\.mdx?$/, '');
+    const isIndexRoute = normalized === 'index' || normalized.endsWith('/index');
+    const route = normalized.replace(/(^|\/)index$/, '$1').replace(/^\/+|\/+$/g, '');
+    return [`${expectedBase}${route}${isIndexRoute && route ? '/' : ''}`];
   }));
   return routes.flat();
+}
+
+function cleanRedirectTarget(target) {
+  return target.replace(/\/(?=#|$)/, '');
 }
 
 async function eventually(operation, attempts = verificationAttempts) {
@@ -113,7 +119,7 @@ const redirects = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'rout
 assert(Object.keys(publicRelease.redirects).length === Object.keys(redirects).length, 'public release redirect count mismatch');
 await forEachConcurrent(Object.entries(redirects), 8, async ([source, target]) => {
   const sourceUrl = `${expectedBase}${source}/`;
-  const targetUrl = new URL(`${expectedBase}${target}`).href;
+  const targetUrl = new URL(`${expectedBase}${cleanRedirectTarget(target)}`).href;
   const identity = publicRelease.redirects[sourceUrl];
   await eventually(async () => {
     const html = await (await fetchOnce(sourceUrl)).text();

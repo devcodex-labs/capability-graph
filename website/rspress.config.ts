@@ -1,6 +1,6 @@
 import { defineConfig } from '@rspress/core';
 import { pluginSitemap } from '@rspress/plugin-sitemap';
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const siteOrigin = 'https://devcodex-labs.github.io';
@@ -14,13 +14,18 @@ export function toPublicUrl(routePath: string): string {
     throw new Error(`routePath must not include deployment base: ${routePath}`);
   }
 
-  const route = rawRoute
+  const normalizedRoute = rawRoute
     .replace(/^\/+|\/+$/g, '')
-    .replace(/\.html$/, '')
+    .replace(/\.html$/, '');
+  const isIndexRoute = normalizedRoute === ''
+    || normalizedRoute === 'index'
+    || normalizedRoute.endsWith('/index')
+    || ['md', 'mdx'].some((extension) => existsSync(path.resolve('docs', normalizedRoute, `index.${extension}`)));
+  const route = normalizedRoute
     .replace(/(^|\/)index$/, '$1')
     .replace(/\/+$/g, '');
 
-  return new URL(`${base}${route ? `${route}/` : ''}`, siteOrigin).href;
+  return new URL(`${base}${route}${isIndexRoute && route ? '/' : ''}`, siteOrigin).href;
 }
 
 function documentationRoutes(root: string, relative = ''): string[] {
@@ -45,6 +50,10 @@ export default defineConfig({
   description: '面向 Provider 的能力建模、发现与知识导航基础设施',
   base,
   siteOrigin,
+  route: {
+    cleanUrls: true,
+    cleanUrlsRedirect: true
+  },
   lang: 'zh',
   i18nSource: {
     menuTitle: { zh: '文档导航', en: 'Documentation navigation' },
