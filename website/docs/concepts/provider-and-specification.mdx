@@ -1,9 +1,9 @@
 ---
-title: Provider 与 Specification
-description: 理解 Provider 身份、定义权威与 Provider Specification 的所有权和投递边界。
+title: Provider 与能力
+description: 理解 Provider 身份、定义权威、Specification 边界和静态能力建模原则。
 ---
 
-# Provider 与 Specification
+# Provider 与能力
 
 <span className="cg-status">可用</span>
 
@@ -21,4 +21,18 @@ Provider Specification 描述如何正确使用该 Provider，但正文不由 Co
 
 静态图需要确定、可哈希的数据合同；规范正文可能独立发布、按版本变化或由宿主选择投递。分开后，Core 可以稳定校验身份和适用性，而不冒充规范分发系统。
 
-下一步阅读 [Capability Identity](./capability-identity)。
+## 能力建模
+
+Static Capability 描述“Provider 能做什么以及何时应考虑它”，不是方法清单、运行实例或执行指令。一个可用节点至少要让第一轮发现回答：
+
+- `name`：人类可读名称；
+- `description`：能力解决什么问题；
+- `whenToUse`：什么意图或条件下应考虑它；
+- `distinction`：它与相邻能力的关键区别；
+- 关系、知识和示例：按需补充，不把所有细节塞进目录。
+
+粒度应稳定到可以独立选择，又不能细碎到每个函数或配置字段都是一个能力。静态图描述作者声明的领域结构，不从代码命名、目录或 Runtime 自动生成关系。
+
+Core 校验 Schema、值、关系端点和环，不判断业务语义是否优秀。概念质量由 Provider 作者和评审流程负责，实践步骤见 [建模 Provider](../guides/model-a-provider#选择能力粒度)。
+
+下一步阅读 [身份与关系](./capability-identity)。

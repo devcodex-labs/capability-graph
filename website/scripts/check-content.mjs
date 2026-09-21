@@ -64,8 +64,8 @@ if (JSON.stringify(rootSidebarShape) !== JSON.stringify(expectedRootSidebar)) {
 }
 for (const item of rootSidebar) assertChineseNavigationLabel(item.label, `root sidebar ${item.name}`);
 for (const item of rootSidebar.filter(({ type }) => type === 'dir')) {
-  if (item.collapsible !== false || item.collapsed !== false) {
-    fail(`global sidebar section ${item.name} must remain fully expanded`);
+  if (item.collapsible !== true || item.collapsed !== false) {
+    fail(`global sidebar section ${item.name} must be collapsible and initially expanded`);
   }
 }
 const expectedPageTitles = new Map();
@@ -144,6 +144,18 @@ if (!vext || vext.status !== 'Conceptual' || vext.source !== null || vext.verify
   fail('VextJS integration must remain Conceptual without runnable evidence');
 }
 
+const publicRoutes = new Set(publicPages.map((file) => path.relative(docsRoot, file)
+  .replaceAll('\\', '/')
+  .replace(/\.mdx?$/, '')
+  .replace(/(^|\/)index$/, '$1')
+  .replace(/\/$/, '')));
+const redirects = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'route-redirects.json'), 'utf8'));
+for (const [source, target] of Object.entries(redirects)) {
+  const targetRoute = target.split('#', 1)[0].replace(/\/$/, '');
+  if (publicRoutes.has(source)) fail(`redirect source ${source} still exists as a formal page`);
+  if (!publicRoutes.has(targetRoute)) fail(`redirect target ${targetRoute} is not a formal page`);
+}
+
 const config = await readFile(path.join(websiteRoot, 'rspress.config.ts'), 'utf8');
 if (/themeConfig\s*:\s*{[\s\S]*?\b(?:nav|sidebar)\s*:/m.test(config)) {
   fail('rspress.config.ts contains a second nav/sidebar truth source');
@@ -154,7 +166,9 @@ if (!publicApiSnippet.startsWith('## 生成的公开符号\n\n| 符号 | 类型 
   fail('generated public API navigation text must remain Chinese');
 }
 const errorSnippet = await readFile(path.join(websiteRoot, 'generated', 'snippets', 'errors.mdx'), 'utf8');
-if (!errorSnippet.includes('## 完整 ErrorCode 联合类型') || !errorSnippet.includes('## 完整 NextAction 联合类型')) {
+if (!errorSnippet.includes('## 完整错误语义') ||
+    !errorSnippet.includes('| ErrorCode | 含义 | 常见触发 | 典型 NextAction | 调用方处理 |') ||
+    !errorSnippet.includes('## 完整 NextAction 联合类型')) {
   fail('generated error reference headings must remain Chinese');
 }
 

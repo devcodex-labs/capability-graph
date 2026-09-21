@@ -3,6 +3,7 @@ import path from 'node:path';
 import { websiteRoot } from './lib/paths.mjs';
 
 const outputRoot = path.join(websiteRoot, 'doc_build');
+const docsRoot = path.join(websiteRoot, 'docs');
 const publicBase = 'https://devcodex-labs.github.io/capability-graph/';
 
 function assert(condition, message) {
@@ -23,8 +24,32 @@ function canonicalForHtml(file) {
 }
 
 const files = await filesUnder(outputRoot);
-const htmlFiles = files.filter((file) => file.endsWith('.html') && file !== '404.html');
-assert(htmlFiles.length === 74, `expected 74 rendered pages, received ${htmlFiles.length}`);
+const allHtmlFiles = files.filter((file) => file.endsWith('.html') && file !== '404.html');
+const htmlKinds = await Promise.all(allHtmlFiles.map(async (file) => [
+  file,
+  (await readFile(path.join(outputRoot, file), 'utf8')).includes('name="capability-graph-redirect"')
+]));
+const htmlFiles = htmlKinds.filter(([, redirect]) => !redirect).map(([file]) => file);
+const redirectHtmlFiles = htmlKinds.filter(([, redirect]) => redirect).map(([file]) => file.replaceAll('\\', '/')).sort();
+const expectedPages = (await filesUnder(docsRoot)).filter((file) => /\.mdx?$/.test(file)).length;
+assert(htmlFiles.length === expectedPages, `expected ${expectedPages} rendered pages from docs routes, received ${htmlFiles.length}`);
+const redirects = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'route-redirects.json'), 'utf8'));
+const expectedRedirectFiles = Object.keys(redirects)
+  .flatMap((source) => [`${source}.html`, `${source}/index.html`])
+  .sort();
+assert(JSON.stringify(redirectHtmlFiles) === JSON.stringify(expectedRedirectFiles), 'compatibility redirect files do not match route-redirects.json');
+for (const [source, target] of Object.entries(redirects)) {
+  const targetUrl = new URL(`/capability-graph/${target}`, 'https://devcodex-labs.github.io').href;
+  const [targetRoute, fragment] = target.split('#');
+  const targetFile = `${targetRoute.replace(/\/$/, '')}.html`;
+  const targetHtml = await readFile(path.join(outputRoot, targetFile), 'utf8');
+  if (fragment) assert(targetHtml.includes(`id="${fragment}"`), `${source} redirect fragment does not exist in ${targetFile}`);
+  for (const file of [`${source}.html`, `${source}/index.html`]) {
+    const html = await readFile(path.join(outputRoot, file), 'utf8');
+    assert(html.includes('<meta name="robots" content="noindex">'), `${file} redirect must be noindex`);
+    assert(html.includes(`<link rel="canonical" href="${targetUrl}">`), `${file} redirect target mismatch`);
+  }
+}
 const canonicalUrls = [];
 for (const file of htmlFiles) {
   const html = await readFile(path.join(outputRoot, file), 'utf8');

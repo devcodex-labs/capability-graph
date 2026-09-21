@@ -1,9 +1,9 @@
 ---
-title: 打开与配置
-description: 诊断 open 失败、缺失 Authority、双 Authority、来源不可读和定义校验错误。
+title: 配置与作用域
+description: 诊断 open、Authority、定义校验、Provider scope、身份与选择问题。
 ---
 
-# 打开与配置
+# 配置与作用域
 
 ## 症状
 
@@ -19,3 +19,13 @@ description: 诊断 open 失败、缺失 Authority、双 Authority、来源不�
 6. parents 与 specializes 分别无环。
 
 首次加载失败没有旧视图可回退。修复来源后重新 open，不要把缺 Authority 改成空目录成功。
+
+## 作用域与选择
+
+`CG_SCOPE_DENIED` 表示请求试图使用宿主或集成未允许的 Provider。打印三层范围并核对交集，不要通过扩大请求范围绕过宿主配置。
+
+`CG_IDENTITY_AMBIGUOUS` 表示未绑定调用只提供了 `{ capabilityId }`。改用完整 `{ providerId, capabilityId }`，或先 `forProvider(providerId)`。
+
+知识读取和检索要求非空 `selected`。Agent 没有选择能力时，应继续目录/详情流程，而不是用空选择探测全部知识。
+
+绑定 facade 禁止 `requestProviderScope`。如果 JavaScript 对象意外带入该字段，会得到 `CG_INPUT_INVALID`；请在协议层分别定义绑定和非绑定输入。

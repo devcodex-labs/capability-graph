@@ -30,12 +30,14 @@ assert(vextjs?.status === 'Conceptual', 'VextJS must remain Conceptual in V1');
 
 const fixtureRoot = path.join(websiteRoot, 'fixtures', 'first-provider');
 const fixtureFiles = ['provider.json', 'route.capability.json', 'route-http.capability.json'];
+const fixtureDocuments = ['PROVIDER.md', 'knowledge/routing.md'];
 const fixture = Object.fromEntries(await Promise.all(fixtureFiles.map(async (file) => [
   file,
   JSON.parse(await readFile(path.join(fixtureRoot, file), 'utf8'))
 ])));
 const snapshot = JSON.parse(await readFile(path.join(websiteRoot, 'generated', 'snippets', 'first-provider.json'), 'utf8'));
 assert(JSON.stringify(snapshot) === JSON.stringify(fixture), 'generated First Provider snapshot drifted from fixtures');
+await Promise.all(fixtureDocuments.map((file) => access(path.join(fixtureRoot, file))));
 
 const tutorial = await readFile(path.join(websiteRoot, 'docs', 'getting-started', 'first-provider.mdx'), 'utf8');
 const documented = new Map();
@@ -69,6 +71,15 @@ try {
   assert(neighbors.groups.parents.items.length === 1, 'route.http must expose one direct parent');
   assert(neighbors.groups.parents.items[0].id.capabilityId === 'route', 'route.http parent must be route');
   assert(neighbors.groups.children.items.length === 0, 'route.http must not invent children');
+
+  const documents = await provider.readDocuments({
+    selected: ['route.http'],
+    knowledgeIds: ['routing-guide'],
+    requiredStaticRevision: revision
+  });
+  assert(documents.results.length === 1 && documents.results[0].ok, 'routing-guide must be readable');
+  assert(documents.results[0].value.knowledgeId === 'routing-guide', 'readDocuments returned the wrong knowledge item');
+  assert(documents.results[0].value.text.includes('Register the route'), 'routing-guide content is incomplete');
 } finally {
   await graph.close();
 }

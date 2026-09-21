@@ -36,8 +36,19 @@ export async function listMainCapabilities(graph: CapabilityGraph) {
 
 ## Core 不负责
 
-Core 不监听端口、不启动业务服务、不执行能力，也不保证 Agent 采纳规范。可运行参考见 [Seed API](../examples/seed-api)。
+Core 不监听端口、不启动业务服务、不执行能力，也不保证 Agent 采纳规范。可运行参考见 [Seed 端到端示例](../examples/seed-provider#provider-owned-api)。
 
-## 下一步
+## 后续路径
 
-需要工具协议时，继续阅读 [Provider-owned MCP](../integrations/provider-owned-mcp)。
+| 目标 | 下一步 |
+|---|---|
+| 调整能力粒度 | [建模 Provider](../guides/model-a-provider#选择能力粒度) |
+| 设计父子、特化或相关关系 | [设计关系](../guides/design-relations) |
+| 让 Agent 按需读取本地文档 | [添加本地知识](../guides/add-local-knowledge) |
+| 暴露项目实际注册实例 | [使用运行时](../guides/use-runtime) |
+| 使用 MCP 渐进发现 | [Provider 自有 MCP](../integrations/provider-owned-mcp) |
+| 接入多个 Provider | [使用多个 Provider](../guides/multiple-providers) |
+| 查字段、错误和预算 | [API 参考](../reference/) |
+| 诊断失败 | [故障排查](../troubleshooting/) |
+
+数据库权威、能力召回、知识检索和远程 Reader 在 `0.1.0` 中提供公开合同，但不附带真实后端。只有 Provider 配置了对应 Adapter，相关原语才可用。

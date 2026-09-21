@@ -1,9 +1,9 @@
 ---
-title: 能力标识
-description: 使用 Provider 与 Provider 内 Capability 的二元身份，避免跨来源歧义和错误复用。
+title: 身份与关系
+description: 使用二元能力身份和显式关系，避免跨来源歧义、错误复用与隐式图边。
 ---
 
-# 能力标识
+# 身份与关系
 
 <span className="cg-status">可用</span>
 
@@ -23,4 +23,16 @@ description: 使用 Provider 与 Provider 内 Capability 的二元身份，避�
 
 辅助函数 `formatQualifiedId()` 和 `parseQualifiedId()` 用于可逆显示，不要自行拼接或拆分。
 
-下一步阅读 [Capability Modeling](./capability-modeling)。
+## 关系模型
+
+能力关系用于表达静态能力之间的明确语义。Capability Graph 有三种作者声明的正向关系和三种查询时生成的反向投影：
+
+| 正向 | 反向 | 含义 | 环规则 |
+|---|---|---|---|
+| `parents` | `children` | 分类或组成层级 | `parents` 图必须是 DAG |
+| `specializes` | `specializedBy` | 更具体的语义变体 | `specializes` 图无环 |
+| `related` | `relatedBy` | 有方向的显式关联 | 允许循环和双向声明 |
+
+`related` 不自动补反向边；`relatedBy` 只是查询投影。命名层级、共同前缀和 Runtime `instanceOf` 都不会生成静态边。
+
+关系端点必须属于同一 Provider。跨 Provider 组合发生在 Agent 任务层，而不是写入 V1 正式图。实践见 [设计关系](../guides/design-relations)。

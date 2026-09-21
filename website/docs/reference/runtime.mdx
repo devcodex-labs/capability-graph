@@ -21,4 +21,4 @@ description: QueryRuntimeQuery、RuntimeInstance、RuntimeObservation 和 QueryR
 
 ## QueryRuntimePage
 
-返回实例、观察、`ResultMeta` 和可选续页游标。`available + []` 可表示真实观察为空；`CG_RUNTIME_DISABLED` 或 `CG_RUNTIME_UNAVAILABLE` 是不同状态。
+返回实例、观察、`ResultMeta` 和可选续页游标。真实空观察必须使用 `availability: 'empty'` 且不带实例或续页游标；`available + []` 会被判为 `CG_ADAPTER_CONTRACT_INVALID`。`CG_RUNTIME_DISABLED` 表示未配置 Adapter，`CG_RUNTIME_UNAVAILABLE` 表示已配置来源当前不可用或 Core 等待超时，两者不能混用。

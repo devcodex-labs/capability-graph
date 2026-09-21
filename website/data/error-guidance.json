@@ -1,0 +1,212 @@
+[
+  {
+    "code": "CG_CONFIG_INCOMPLETE",
+    "meaning": "核心配置缺失或字段无效。",
+    "trigger": "Provider、预算或必需后端配置未满足启动条件。",
+    "action": "configure_backend",
+    "handling": "补齐配置并重新创建 CapabilityGraph 实例。"
+  },
+  {
+    "code": "CG_DUAL_AUTHORITY",
+    "meaning": "同一 Provider 配置了多个权威来源。",
+    "trigger": "Provider 配置重复，无法确定唯一静态定义来源。",
+    "action": "configure_backend",
+    "handling": "每个 providerId 只保留一个 authority 后重新初始化。"
+  },
+  {
+    "code": "CG_SCOPE_DENIED",
+    "meaning": "请求超出 Effective Provider Scope。",
+    "trigger": "查询、结果或 Provider 不在主机与集成共同允许的范围内。",
+    "action": "narrow_scope",
+    "handling": "收窄请求到已授权 Provider；不要绕过 Scope 校验。"
+  },
+  {
+    "code": "CG_IDENTITY_AMBIGUOUS",
+    "meaning": "能力身份缺少唯一 Provider 上下文。",
+    "trigger": "多 Provider 查询只提供 capabilityId，无法构成完整身份。",
+    "action": "fix_input",
+    "handling": "补充 providerId，使用完整 CapabilityRef 重试。"
+  },
+  {
+    "code": "CG_IDENTITY_INVALID",
+    "meaning": "Provider、Capability 或 Knowledge 身份格式无效。",
+    "trigger": "ID 不符合公开格式，或来源定义中出现非法身份。",
+    "action": "fix_input",
+    "handling": "调用方输入应修正后重试；若 details 指向来源定义，则修复来源。"
+  },
+  {
+    "code": "CG_NOT_FOUND",
+    "meaning": "请求的 Provider、Capability、Knowledge 或 Runtime 修订不存在。",
+    "trigger": "完整身份在当前可读视图中没有匹配项。",
+    "action": "fix_input",
+    "handling": "校正身份，或先调用列表/发现接口获取当前可用项。"
+  },
+  {
+    "code": "CG_VALIDATION_FAILED",
+    "meaning": "静态来源定义未通过验证。",
+    "trigger": "Schema、哈希、端点或其他图约束不成立。",
+    "action": "repair_source",
+    "handling": "根据有限 details 修复权威来源，再执行刷新。"
+  },
+  {
+    "code": "CG_RELATION_CROSS_PROVIDER",
+    "meaning": "图关系跨越了 Provider 边界。",
+    "trigger": "parents、specializes 或 related 指向其他 Provider。",
+    "action": "repair_source",
+    "handling": "把关系端点改为同一 Provider 内的能力身份。"
+  },
+  {
+    "code": "CG_RELATION_CYCLE",
+    "meaning": "分类或特化关系形成环。",
+    "trigger": "parents 或 specializes 的全图验证发现循环依赖。",
+    "action": "repair_source",
+    "handling": "调整关系方向或移除闭环边，再刷新来源。"
+  },
+  {
+    "code": "CG_LOAD_FAILED",
+    "meaning": "Provider 权威来源加载失败。",
+    "trigger": "文件、数据库扫描或视图清理无法完成。",
+    "action": "repair_source",
+    "handling": "检查来源可读性与后端状态；恢复后重新加载。"
+  },
+  {
+    "code": "CG_NO_ACTIVE_VIEW",
+    "meaning": "当前没有已验证且可读的 Provider 视图。",
+    "trigger": "实例已关闭，或刷新失败且不存在可继续服务的旧视图。",
+    "action": "refresh",
+    "handling": "恢复来源后刷新；实例已关闭时创建新实例。"
+  },
+  {
+    "code": "CG_REVISION_MISMATCH",
+    "meaning": "请求的修订或游标不再对应当前可读视图。",
+    "trigger": "分页、检索或 Runtime 请求携带了过期修订。",
+    "action": "refresh",
+    "handling": "放弃旧游标，从首个请求重新获取当前修订。"
+  },
+  {
+    "code": "CG_INDEX_STALE",
+    "meaning": "检索索引与当前来源身份不一致。",
+    "trigger": "Retriever 返回的来源修订或能力身份已过期。",
+    "action": "refresh",
+    "handling": "刷新或重建索引，再从新的发现请求开始。"
+  },
+  {
+    "code": "CG_INPUT_INVALID",
+    "meaning": "查询参数或参数组合无效。",
+    "trigger": "必需字段缺失、游标非法或互斥参数同时出现。",
+    "action": "fix_input",
+    "handling": "修正输入；以错误实例携带的 nextAction 为最终准则。"
+  },
+  {
+    "code": "CG_RUNTIME_CONTEXT_REQUIRED",
+    "meaning": "Runtime 查询缺少项目或环境上下文。",
+    "trigger": "未提供非空 project 与 environment。",
+    "action": "fix_input",
+    "handling": "同时补充项目和环境，再发起 Runtime 查询。"
+  },
+  {
+    "code": "CG_RUNTIME_DISABLED",
+    "meaning": "Provider 未启用 Runtime Adapter。",
+    "trigger": "对只有静态能力的 Provider 发起 Runtime 查询。",
+    "action": "configure_backend",
+    "handling": "配置 Runtime Adapter，或停止对该 Provider 请求运行态。"
+  },
+  {
+    "code": "CG_RUNTIME_UNAVAILABLE",
+    "meaning": "Runtime 来源当前不可用。",
+    "trigger": "Adapter 抛错、超时或无法取得运行态快照。",
+    "action": "repair_source",
+    "handling": "检查运行态服务与 Adapter；恢复后按策略重试。"
+  },
+  {
+    "code": "CG_RUNTIME_RESULT_MISMATCH",
+    "meaning": "Runtime 结果与请求上下文不匹配。",
+    "trigger": "实例的 project、environment 或关联身份不符合请求。",
+    "action": "fix_input",
+    "handling": "先核对请求上下文；若输入正确则修复 Adapter 映射。"
+  },
+  {
+    "code": "CG_ADAPTER_CONTRACT_INVALID",
+    "meaning": "Adapter 返回值违反公开合同。",
+    "trigger": "分页、身份、内容哈希或结果结构不满足约束。",
+    "action": "repair_source",
+    "handling": "修复 Adapter 实现；不要在调用方猜测或补造缺失字段。"
+  },
+  {
+    "code": "CG_KNOWLEDGE_NOT_ASSOCIATED",
+    "meaning": "所选能力没有关联知识。",
+    "trigger": "能力存在，但其知识引用集合为空或目标未关联。",
+    "action": "repair_source",
+    "handling": "为能力补充知识引用，或改选具有知识关联的能力。"
+  },
+  {
+    "code": "CG_KNOWLEDGE_TYPE_UNSUPPORTED",
+    "meaning": "该知识类型不支持直接读取。",
+    "trigger": "例如对 collection 类型调用 readDocuments。",
+    "action": "use_retrieval",
+    "handling": "切换到知识检索接口，再按返回目标读取具体文档。"
+  },
+  {
+    "code": "CG_READER_UNCONFIGURED",
+    "meaning": "没有匹配知识来源的 Reader。",
+    "trigger": "KnowledgeRef 的 locator 类型没有已配置读取器。",
+    "action": "configure_backend",
+    "handling": "注册匹配 Reader，或移除当前不受支持的来源类型。"
+  },
+  {
+    "code": "CG_READER_UNAVAILABLE",
+    "meaning": "已配置的 Reader 当前不可用。",
+    "trigger": "Reader 抛错、返回不可读结果或后端暂时故障。",
+    "action": "repair_source",
+    "handling": "检查 Reader 与后端健康状态，恢复后重试读取。"
+  },
+  {
+    "code": "CG_RETRIEVER_UNCONFIGURED",
+    "meaning": "当前检索操作没有配置 Retriever。",
+    "trigger": "调用能力或知识检索，但未注入相应 Retriever。",
+    "action": "configure_backend",
+    "handling": "配置对应 Retriever，或改用静态列表与详情查询。"
+  },
+  {
+    "code": "CG_RETRIEVER_UNAVAILABLE",
+    "meaning": "已配置的 Retriever 当前不可用。",
+    "trigger": "Retriever 抛错或其索引服务无法访问。",
+    "action": "repair_source",
+    "handling": "恢复 Retriever/索引服务，再重新检索。"
+  },
+  {
+    "code": "CG_SOURCE_UNREADABLE",
+    "meaning": "请求的知识或权威来源无法读取。",
+    "trigger": "文件不存在、内容不是有效 UTF-8 或来源权限/状态异常。",
+    "action": "repair_source",
+    "handling": "修复来源路径、编码或可读性后重试。"
+  },
+  {
+    "code": "CG_PATH_TRAVERSAL",
+    "meaning": "相对路径越过允许的知识根目录。",
+    "trigger": "规范化后的 locator 指向 Provider 根之外。",
+    "action": "repair_source",
+    "handling": "修复 KnowledgeRef，只使用根目录内的相对路径。"
+  },
+  {
+    "code": "CG_BUDGET_EXCEEDED",
+    "meaning": "操作超过响应、条目、分页或文档预算。",
+    "trigger": "结果数量、序列化字节或单文档大小超过配置上限。",
+    "action": "page_or_filter",
+    "handling": "按错误实例的 nextAction 分页、过滤或缩小文档；来源记录超限时修复来源。"
+  },
+  {
+    "code": "CG_TIMEOUT",
+    "meaning": "受限操作超过允许时间。",
+    "trigger": "通用超时合同；当前 Runtime Adapter 异常与超时会投影为 CG_RUNTIME_UNAVAILABLE。",
+    "action": "repair_source",
+    "handling": "检查后端任务状态后再重试，避免假定原操作已取消。"
+  },
+  {
+    "code": "CG_PARTIAL_ITEM",
+    "meaning": "批量请求中的条目无法完整返回。",
+    "trigger": "同一请求包含多类条目失败，无法用单一底层错误代表。",
+    "action": "fix_input",
+    "handling": "检查逐项结果与 warning，修正失败条目后单独重试。"
+  }
+]

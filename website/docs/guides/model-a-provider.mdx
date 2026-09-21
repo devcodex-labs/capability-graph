@@ -19,6 +19,19 @@ description: 从职责边界、身份、能力目录、关系、知识和验证�
 
 先为每个可独立选择的能力填写 `description`、`whenToUse` 和 `distinction`。用真实用户意图验证第一轮目录是否足以区分主能力。
 
+### 选择能力粒度
+
+把候选概念建模为独立能力前，回答四个问题：
+
+1. Agent 是否会在真实任务中单独选择它？
+2. 它是否有不同于相邻能力的 `whenToUse` 或限制？
+3. 它能否在不改变身份语义的情况下独立演进？
+4. 详情、关系或知识是否能帮助后续选择？
+
+如果答案多数为否，它更可能是字段、参数或实现细节。不要把每个函数、HTTP 路由实例或配置键建成 Static Capability。反过来，一个节点若同时包含多个互斥意图，目录会失去判别力。拆分时保留主能力，再用 `parents` 或 `specializes` 表达真实结构。
+
+用至少三个相邻能力做首轮目录评审：只看 `name`、`description`、`whenToUse` 和 `distinction`，评审者应能稳定选中目标。不能靠读详情猜出区别时，先修正文案或粒度。
+
 ## 4. 添加显式关系
 
 只声明能解释的 `parents`、`specializes` 和 `related`。端点必须存在于同一 Provider；不要从名称或文件夹推导边。
@@ -31,4 +44,4 @@ description: 从职责边界、身份、能力目录、关系、知识和验证�
 
 使用 `CapabilityGraph.open()` 加载真实目录，执行目录、详情、关系、知识和负向 Fixture。直接调用内部校验函数不足以证明接入可用。
 
-参考可运行定义：[Seed Provider](../examples/seed-provider)。
+参考可运行定义：[Seed 端到端示例](../examples/seed-provider)。

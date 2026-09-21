@@ -1,9 +1,9 @@
 ---
-title: Seed Provider 示例
-description: 查看包含 Provider、关系和本地知识的可运行文件权威样本。
+title: Seed 端到端示例
+description: 查看共享 Seed Provider 如何串联 Provider-owned API、MCP 和真实 Runtime 采集。
 ---
 
-# Seed Provider 示例
+# Seed 端到端示例
 
 <span className="cg-status">可运行</span>
 
@@ -18,3 +18,39 @@ npm test
 测试从公开 `CapabilityGraph.open()` 入口加载该目录，验证目录、详情、六种关系、Document 读取、修订和负向定义。
 
 [查看源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-provider)
+
+## Provider-owned API
+
+`examples/seed-api` 依次执行 Provider 列表、目录、详情、邻居、本地知识和可选 Runtime 查询，并在 `finally` 中关闭图实例。它证明普通 Node.js API 可以直接复用 Core，不需要 MCP SDK。
+
+```sh
+npm test
+```
+
+输出中的选择列表由调用方明确提供，关系不会自动选择知识。[查看 API 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-api)
+
+## Provider-owned MCP
+
+`examples/seed-mcp` 是独立私有包。它安装 MCP SDK 和 Zod，这些依赖不会进入 Capability Graph 主包。
+
+```sh
+cd examples/seed-mcp
+npm ci --ignore-scripts
+npm test
+```
+
+协议测试验证工具发现和调用。工具只是 Provider 接入参考，不冻结所有 Provider 都必须使用相同名称或数量。[查看 MCP 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-mcp)
+
+## 真实 Runtime
+
+`examples/seed-runtime` 启动独立 HTTP 服务，实际注册和变更路由，再由 `RuntimeAdapter` 采集实例。测试覆盖项目/环境隔离、实时变化、旧构建兼容和失败恢复。
+
+```sh
+npm test
+```
+
+该参考不是通用框架扫描器，也不代表 Core 会启动业务服务。服务生命周期由示例测试管理并在结束时验证端口释放。[查看 Runtime 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-runtime)
+
+## 文档入门 Fixture
+
+文档中的 [创建第一个 Provider](../getting-started/first-provider) 使用更小的 `website/fixtures/first-provider`：`acme.http` Provider、`route`、`route.http` 和本地 Routing Guide。运行 `cd website && npm run check:examples` 会从公开入口验证目录、详情、关系和文档读取，并核对文档 JSON 与 Fixture 不漂移。

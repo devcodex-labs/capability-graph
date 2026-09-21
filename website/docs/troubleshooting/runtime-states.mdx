@@ -1,9 +1,9 @@
 ---
-title: 运行时状态
-description: 区分 Runtime 未启用、不可用、观察为空、过期、部分和结果不匹配。
+title: 运行时与超时
+description: 区分 Runtime 未启用、不可用、观察为空、过期、部分、结果不匹配和等待超时。
 ---
 
-# 运行时状态
+# 运行时与超时
 
 | 状态 | 识别方式 | 处理 |
 |---|---|---|
@@ -11,8 +11,20 @@ description: 区分 Runtime 未启用、不可用、观察为空、过期、部�
 | 上下文缺失 | `CG_RUNTIME_CONTEXT_REQUIRED` | 提供非空 project 和 environment |
 | 来源不可用 | `CG_RUNTIME_UNAVAILABLE` | 检查 Adapter 服务、认证和网络 |
 | 观察为空 | 成功结果，`availability: empty`，items 为空 | 这是有效观察，不要改成错误 |
-| 部分 | `availability: partial` 或 `meta.partial` | 检查覆盖说明和 warning |
+| 部分 | `availability: partial` 或 `meta.completeness === 'partial'` | 检查覆盖说明和 warning |
 | 过期 | `freshness: stale` | 刷新 Adapter 来源或按限制使用 |
 | 不匹配 | `CG_RUNTIME_RESULT_MISMATCH` | 修正 Provider、项目、环境或 instanceOf |
 
-Core 超时只停止等待。确认 Adapter 是否仍在运行、是否会消费迟到拒绝，再决定重试；不要假设底层任务已经取消。
+Core 超时只停止等待。当前 Runtime 查询会把 Adapter 抛错和等待超时统一投影为 `CG_RUNTIME_UNAVAILABLE`，不会对外返回 `CG_TIMEOUT`。确认 Adapter 是否仍在运行、是否会消费迟到拒绝，再决定重试；不要假设底层任务已经取消。
+
+## 超时边界
+
+V1 的 Adapter 合同没有统一 `AbortSignal`。实现方需要：
+
+- 在 Adapter 内设置自己的网络或数据库超时；
+- 消费迟到 resolve/reject，避免未处理拒绝；
+- 让重复请求具备幂等或明确去重语义；
+- 在 `close()` 或 Adapter 生命周期中回收资源；
+- 记录任务是否仍在运行，而不是把 `Promise.race` 写成取消。
+
+Capability Graph 查询本身只读取，但 Provider-owned 接入层可能连接有状态后端。调用方重试前先判断底层操作是否仍可能产生副作用。

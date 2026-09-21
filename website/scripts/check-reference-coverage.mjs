@@ -9,6 +9,7 @@ const contracts = await readJson(path.join(websiteRoot, 'generated', 'contracts'
 const unions = await readJson(path.join(websiteRoot, 'generated', 'contracts', 'literal-unions.json'));
 const coverage = await readJson(path.join(websiteRoot, 'data', 'reference-coverage.json'));
 const definitionCases = await readJson(path.join(websiteRoot, 'data', 'definition-cases.json'));
+const errorGuidance = await readJson(path.join(websiteRoot, 'data', 'error-guidance.json'));
 const docsRoot = path.join(websiteRoot, 'docs');
 const allowedStatuses = new Set(['Available', 'Contract-only', 'Conceptual']);
 const statusLabels = new Map([
@@ -43,6 +44,13 @@ for (const entry of coverage.entries) {
 for (const name of ['ErrorCode', 'NextAction', 'KnowledgeKind', 'NeighborKind', 'RuntimeCompatibility']) {
   assert(Array.isArray(unions[name]) && unions[name].length > 0, `${name} literal union was not extracted`);
   assert(new Set(unions[name]).size === unions[name].length, `${name} contains duplicate literals`);
+}
+assertExactMembers('error guidance', errorGuidance.map(({ code }) => code), unions.ErrorCode);
+for (const entry of errorGuidance) {
+  assert(typeof entry.meaning === 'string' && entry.meaning.length > 0, `${entry.code} needs a meaning`);
+  assert(typeof entry.trigger === 'string' && entry.trigger.length > 0, `${entry.code} needs a trigger`);
+  assert(unions.NextAction.includes(entry.action), `${entry.code} has invalid action ${entry.action}`);
+  assert(typeof entry.handling === 'string' && entry.handling.length > 0, `${entry.code} needs caller handling`);
 }
 const capabilityGraphPage = await readFile(path.join(docsRoot, 'reference', 'capability-graph.mdx'), 'utf8');
 const errorsPage = await readFile(path.join(docsRoot, 'reference', 'errors.mdx'), 'utf8');
@@ -137,7 +145,7 @@ assertExactMembers(
   ]
 );
 const providerPage = await readFile(path.join(docsRoot, 'reference', 'provider-definition.mdx'), 'utf8');
-const capabilityPage = await readFile(path.join(docsRoot, 'reference', 'capability-definition.mdx'), 'utf8');
+const capabilityPage = providerPage;
 for (const testCase of definitionCases.cases) {
   const page = testCase.target === 'provider' ? providerPage : capabilityPage;
   assert(page.includes(`\`${testCase.id}\``), `${testCase.id} is not documented`);

@@ -1,11 +1,11 @@
 ---
-title: CapabilityGraph 类
-description: CapabilityGraph 顶层类的生命周期、跨 Provider 查询和可选扩展方法参考。
+title: Core 与生命周期
+description: CapabilityGraph、BoundProviderGraph、打开配置、Authority 和重新加载合同参考。
 ---
 
 import PublicApi from '../../generated/snippets/public-api.mdx';
 
-# CapabilityGraph 类
+# Core 与生命周期
 
 <span className="cg-status">可用</span>
 
@@ -30,3 +30,43 @@ import PublicApi from '../../generated/snippets/public-api.mdx';
 方法的准确类型由包内 `dist/index.d.ts` 提供；本页的公共符号覆盖由生成器校验。
 
 <PublicApi />
+
+## BoundProviderGraph
+
+通过 `graph.forProvider(providerId)` 获得。绑定对象把查询限制在一个 Provider，并允许使用 Provider 内 `capabilityId` 字符串。
+
+| 方法 | 与顶层方法的差异 |
+|---|---|
+| `getProvider()` | 不再传 providerId |
+| `listCatalog()` | `parent` 可省略 providerId |
+| `getCapabilities(ids)` | `ids` 是 Provider 内字符串数组 |
+| `getNeighbors(capabilityId)` | 只接受 Provider 内字符串 ID |
+| `readDocuments({ selected })` | `selected` 是字符串数组 |
+| `retrieveCapabilities()` | 召回限制在绑定 Provider |
+| `queryKnowledge()` | 缺省 Provider 身份由绑定补全 |
+| `queryRuntime()` | Runtime 来源固定为绑定 Provider |
+
+绑定查询禁止传 `requestProviderScope`，即使 JavaScript 调用方绕过 TypeScript 也会得到 `CG_INPUT_INVALID`。Facade 不拥有 Authority 句柄，也没有独立 `close()`；生命周期仍由原 `CapabilityGraph` 管理。
+
+## OpenConfig 与 Authority
+
+```ts
+interface OpenConfig {
+  hostAllowedProviders: readonly string[];
+  integrationEnabledProviders: readonly string[];
+  providers: readonly ProviderLoadSpec[];
+  budgets?: BudgetOverrides;
+  runtimeAdapters?: readonly RuntimeAdapter[];
+  readers?: readonly KnowledgeReader[];
+  knowledgeRetriever?: KnowledgeRetriever;
+  capabilityRetriever?: CapabilityRetriever;
+}
+
+type AuthoritySpec =
+  | { kind: 'file'; rootDir: string }
+  | { kind: 'database'; adapter: DatabaseAuthorityAdapter };
+```
+
+每个有效启用 Provider 必须恰有一个 Authority。文件根在 `open()` 时解析并固定；数据库 read view 在交给 Core 后成为稳定逻辑快照。
+
+`reload({ providerId? })` 返回每个 Provider 的 `servedFrom`、修订、刷新状态和可选错误。一个刷新失败不回滚其他 Provider 已成功发布的新视图，也不删除仍可读取的旧 current。

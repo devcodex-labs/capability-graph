@@ -1,9 +1,5 @@
 [
-  { "type": "file", "name": "seed-provider", "label": "Seed Provider 示例" },
-  { "type": "file", "name": "seed-api", "label": "Seed API 示例" },
-  { "type": "file", "name": "seed-mcp", "label": "Seed MCP 示例" },
-  { "type": "file", "name": "seed-runtime", "label": "Seed Runtime 示例" },
-  { "type": "file", "name": "first-provider-tutorial", "label": "第一个 Provider 教程" },
+  { "type": "file", "name": "seed-provider", "label": "Seed 端到端示例" },
   { "type": "file", "name": "multi-provider", "label": "多 Provider 示例" },
   { "type": "file", "name": "vextjs-integration", "label": "VextJS 集成", "tag": "概念示例" }
 ]

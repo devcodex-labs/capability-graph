@@ -1,6 +1,5 @@
 [
   { "type": "file", "name": "model-a-provider", "label": "建模 Provider" },
-  { "type": "file", "name": "choose-capability-granularity", "label": "选择能力粒度" },
   { "type": "file", "name": "design-relations", "label": "设计关系" },
   { "type": "file", "name": "add-local-knowledge", "label": "添加本地知识" },
   { "type": "file", "name": "use-runtime", "label": "使用运行时" },

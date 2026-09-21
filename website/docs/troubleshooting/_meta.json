@@ -1,10 +1,6 @@
 [
-  { "type": "file", "name": "open-and-configuration", "label": "打开与配置" },
-  { "type": "file", "name": "scope-and-selection", "label": "作用域与选择" },
-  { "type": "file", "name": "revision-and-reload", "label": "修订与重新加载" },
-  { "type": "file", "name": "runtime-states", "label": "运行时状态" },
-  { "type": "file", "name": "knowledge-read", "label": "知识读取" },
-  { "type": "file", "name": "retrieval-and-adapter", "label": "检索与 Adapter" },
-  { "type": "file", "name": "budget-and-pagination", "label": "预算与分页" },
-  { "type": "file", "name": "timeout-semantics", "label": "超时语义" }
+  { "type": "file", "name": "open-and-configuration", "label": "配置与作用域" },
+  { "type": "file", "name": "revision-and-reload", "label": "修订、预算与分页" },
+  { "type": "file", "name": "runtime-states", "label": "运行时与超时" },
+  { "type": "file", "name": "knowledge-read", "label": "知识与 Adapter" }
 ]

@@ -1,3 +1,7 @@
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { websiteRoot } from './lib/paths.mjs';
+
 const expectedOrigin = 'https://devcodex-labs.github.io';
 const expectedBase = `${expectedOrigin}/capability-graph/`;
 const packageName = '@devcodex-labs/capability-graph';
@@ -5,6 +9,16 @@ const packageVersion = process.env.PACKAGE_VERSION ?? '0.1.0';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+async function documentationPageCount(root, relative = '') {
+  const entries = await readdir(path.join(root, relative), { withFileTypes: true });
+  const counts = await Promise.all(entries.map((entry) => {
+    const file = path.join(relative, entry.name);
+    if (entry.isDirectory()) return documentationPageCount(root, file);
+    return /\.mdx?$/.test(entry.name) ? 1 : 0;
+  }));
+  return counts.reduce((sum, count) => sum + count, 0);
 }
 
 async function fetchWithRetry(url, attempts = 12) {
@@ -36,8 +50,17 @@ for (const route of ['', 'getting-started/', 'reference/', 'troubleshooting/']) 
 
 const sitemap = await (await fetchWithRetry(`${expectedBase}sitemap.xml`)).text();
 const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-assert(locations.length === 74 && new Set(locations).size === 74, 'public sitemap must contain 74 unique pages');
+const expectedPages = await documentationPageCount(path.join(websiteRoot, 'docs'));
+assert(locations.length === expectedPages && new Set(locations).size === expectedPages, `public sitemap must contain ${expectedPages} unique documentation pages`);
 assert(locations.every((url) => url.startsWith(expectedBase) && url.endsWith('/')), 'public sitemap URLs must use directory form');
+const redirects = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'route-redirects.json'), 'utf8'));
+for (const [source, target] of Object.entries(redirects)) {
+  const response = await fetchWithRetry(`${expectedBase}${source}/`);
+  const html = await response.text();
+  const targetUrl = new URL(`${expectedBase}${target}`).href;
+  assert(html.includes('name="capability-graph-redirect"'), `${source} is not a compatibility redirect`);
+  assert(html.includes(`<link rel="canonical" href="${targetUrl}">`), `${source} redirect target mismatch`);
+}
 const robots = await (await fetchWithRetry(`${expectedBase}robots.txt`)).text();
 assert(robots.includes('Allow: /') && robots.includes(`${expectedBase}sitemap.xml`), 'public robots.txt mismatch');
 

@@ -1,9 +1,9 @@
 ---
-title: 知识读取
-description: 诊断知识未关联、类型不支持、Reader 缺失、来源不可读和路径越界。
+title: 知识与 Adapter
+description: 诊断知识关联、Reader、路径、Retriever、索引证据和 Adapter 合同问题。
 ---
 
-# 知识读取
+# 知识与 Adapter
 
 - `CG_KNOWLEDGE_NOT_ASSOCIATED`：已选能力没有匹配的 knowledgeId；核对选择和过滤。
 - `CG_KNOWLEDGE_TYPE_UNSUPPORTED`：对 Collection 使用了直接读取；改用 `queryKnowledge()`。
@@ -13,3 +13,13 @@ description: 诊断知识未关联、类型不支持、Reader 缺失、来源不
 - `CG_PATH_TRAVERSAL`：相对路径或真实路径逃离 Provider 根；修正定义和符号链接。
 
 批量读取逐项返回错误。保留成功文档，不要把混合结果统一改成 `not found`。知识正文不在 Static Revision 中，每次读取使用新的 contentId。
+
+## 检索与 Adapter
+
+`CG_RETRIEVER_UNCONFIGURED` 表示调用了可选召回或检索，但没有配置对应 Retriever。继续使用 Flat Catalog 或配置真实后端。
+
+`CG_RETRIEVER_UNAVAILABLE` 表示后端执行失败。检查网络、索引和资源限制，不要返回成功空数组掩盖故障。
+
+`CG_INDEX_STALE` 表示证据中的 Static Revision、mapping/config revision 或内容身份与当前 targets 不一致。重建受影响映射并重新查询；不要沿用旧向量或缓存。
+
+`CG_ADAPTER_CONTRACT_INVALID` 表示 Adapter 返回的身份、范围、排序、证据、偏移、预算或状态违反合同。先记录原返回的有界摘要，再对照 [Adapter 接口](../reference/runtime-adapter) 修复。

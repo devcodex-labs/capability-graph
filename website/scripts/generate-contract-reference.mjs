@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
-import { generatedRoot, repositoryRoot } from './lib/paths.mjs';
+import { generatedRoot, repositoryRoot, websiteRoot } from './lib/paths.mjs';
 
 const declarationPath = path.join(repositoryRoot, 'dist', 'index.d.ts');
 
@@ -98,11 +98,28 @@ const table = [
 ].join('\n');
 await writeFile(path.join(generatedRoot, 'snippets', 'public-api.mdx'), table, 'utf8');
 
-const errorRows = (unionContracts.ErrorCode ?? []).map((code) => `| \`${code}\` |`).join('\n');
+const errorGuidance = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'error-guidance.json'), 'utf8'));
+const errorCodes = unionContracts.ErrorCode ?? [];
+const nextActions = new Set(unionContracts.NextAction ?? []);
+const guidanceCodes = errorGuidance.map(({ code }) => code);
+const missingGuidance = errorCodes.filter((code) => !guidanceCodes.includes(code));
+const staleGuidance = guidanceCodes.filter((code) => !errorCodes.includes(code));
+if (new Set(guidanceCodes).size !== guidanceCodes.length || missingGuidance.length || staleGuidance.length) {
+  throw new Error(`error guidance mismatch; missing=${missingGuidance.join(',')} stale=${staleGuidance.join(',')}`);
+}
+for (const entry of errorGuidance) {
+  if (!entry.meaning || !entry.trigger || !entry.handling || !nextActions.has(entry.action)) {
+    throw new Error(`invalid error guidance for ${entry.code}`);
+  }
+}
+
+const errorRows = errorGuidance.map(({ code, meaning, trigger, action, handling }) =>
+  `| \`${code}\` | ${meaning} | ${trigger} | \`${action}\` | ${handling} |`
+).join('\n');
 const actionRows = (unionContracts.NextAction ?? []).map((action) => `| \`${action}\` |`).join('\n');
 await writeFile(
   path.join(generatedRoot, 'snippets', 'errors.mdx'),
-  `## 完整 ErrorCode 联合类型\n\n| ErrorCode |\n|---|\n${errorRows}\n\n## 完整 NextAction 联合类型\n\n| NextAction |\n|---|\n${actionRows}\n`,
+  `## 完整错误语义\n\n下表覆盖公开 \`ErrorCode\` 全集。典型动作帮助调用方选路，具体处理始终以错误实例的 \`nextAction\` 为准。\n\n| ErrorCode | 含义 | 常见触发 | 典型 NextAction | 调用方处理 |\n|---|---|---|---|---|\n${errorRows}\n\n## 完整 NextAction 联合类型\n\n| NextAction |\n|---|\n${actionRows}\n`,
   'utf8'
 );
 

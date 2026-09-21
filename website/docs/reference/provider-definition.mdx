@@ -1,9 +1,9 @@
 ---
-title: Provider 定义
-description: provider.json 的字段、Specification metadata、默认行为和验证约束参考。
+title: 定义与身份
+description: Provider、Capability 定义字段、验证矩阵和二元身份合同参考。
 ---
 
-# Provider 定义
+# 定义与身份
 
 <span className="cg-status">可用</span>
 
@@ -32,3 +32,56 @@ Specification 可含 `specificationId`、`version`、`appliesTo.software`、`ver
 | `DEF-PROVIDER-08` | 有效 Specification 与相对入口 | 打开成功 |
 
 这些用例由 Reference 校验器通过公开 `CapabilityGraph.open()` 执行，不依赖内部校验函数。
+
+## Capability 定义
+
+| 字段 | 必填 | 默认 | 说明 |
+|---|---:|---|---|
+| `capabilityId` | 是 | - | Provider 内稳定唯一 ID |
+| `name` | 是 | - | 人类可读名称 |
+| `description` | 是 | - | 能力解决的问题 |
+| `whenToUse` | 是 | - | 适用意图或条件 |
+| `distinction` | 否 | 省略 | 与相邻能力的关键区别 |
+| `examples` | 否 | `[]` | 简短用例 |
+| `parents` | 否 | `[]` | 同 Provider 直接父节点 |
+| `specializes` | 否 | `[]` | 同 Provider 特化目标 |
+| `related` | 否 | `[]` | 有方向的显式关联 |
+| `knowledge` | 否 | `[]` | Document 或 Collection 引用 |
+
+跨字段约束：关系端点必须存在于同一 Provider；完整收集全部能力后，再分别检查 `parents` 和 `specializes` 无环；`knowledgeId` 唯一且 locator 合法；单个定义文件最大 262,144 UTF-8 字节。
+
+### Capability 可执行验证用例
+
+| Case ID | 字段/场景 | 预期 |
+|---|---|---|
+| `DEF-CAP-01` | 最小完整记录 | 打开成功 |
+| `DEF-CAP-02` | 缺少 `capabilityId` | 拒绝 |
+| `DEF-CAP-03` | 非法 `capabilityId` | 拒绝 |
+| `DEF-CAP-04` | Provider 内重复 ID | 拒绝 |
+| `DEF-CAP-05` | 缺少 `name` | 拒绝 |
+| `DEF-CAP-06` | 缺少 `description` | 拒绝 |
+| `DEF-CAP-07` | 缺少 `whenToUse` | 拒绝 |
+| `DEF-CAP-08` | 省略可选集合 | 使用空集合默认值 |
+| `DEF-CAP-09` | 关系端点不存在 | 拒绝 |
+| `DEF-CAP-10` | `parents` 成环 | 拒绝 |
+| `DEF-CAP-11` | `specializes` 成环 | 拒绝 |
+| `DEF-CAP-12` | 跨 Provider 关系表示 | 拒绝 |
+| `DEF-CAP-13` | 不完整知识引用 | 拒绝 |
+| `DEF-CAP-14` | 重复 `knowledgeId` | 拒绝 |
+| `DEF-CAP-15` | 相对路径越出 Provider 根目录 | 拒绝 |
+| `DEF-CAP-16` | 定义文件超过 262,144 UTF-8 字节 | 拒绝 |
+
+这些用例同样通过公开 `CapabilityGraph.open()` 执行。
+
+## 身份模型
+
+```ts
+interface CanonicalCapabilityId {
+  providerId: string;
+  capabilityId: string;
+}
+```
+
+`QualifiedCapabilityId` 是显示字符串，正式分隔符 `QUALIFIED_SEPARATOR` 为 `::`。导出的身份辅助函数包括 `isId()`、`isKnowledgeId()`、`formatQualifiedId()`、`parseQualifiedId()`、`equalId()` 和 `idKey()`。
+
+不绑定 Provider 的查询必须使用完整二元身份。`{ capabilityId }` 短形式只在 `BoundProviderGraph` 中合法。Provider 版本不是身份的一部分。

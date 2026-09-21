@@ -1,9 +1,9 @@
 ---
-title: CapabilityRetriever 接入
-description: 接入可选能力召回后端，同时由 Core 校验身份、范围、修订和原始排名。
+title: 检索 Adapter 接入
+description: 接入能力召回与知识检索后端，并由 Core 校验身份、范围、修订、证据和排名。
 ---
 
-# CapabilityRetriever 接入
+# 检索 Adapter 接入
 
 <span className="cg-status">仅合同</span>
 
@@ -30,3 +30,19 @@ interface CapabilityRetriever {
 Retriever 只能返回已有身份，不能创建新能力或图边。Core 会重新检查 Provider scope、身份存在性和来源修订；拒绝项留下排名间隙，合法候选不因其他失败重新排序。
 
 目录查询始终可用，Retriever 不会静默替换 Flat Catalog。未配置时调用召回返回 `CG_RETRIEVER_UNCONFIGURED`。
+
+## KnowledgeRetriever
+
+`KnowledgeRetriever` 只搜索由非空已选能力展开出的 Document 或 Collection targets。`0.1.0` 不附带向量数据库或 RAG 后端。
+
+Adapter 必须返回：
+
+- UTF-8 字节偏移的 `KnowledgeHit`；
+- 每个 target 的内容身份；
+- 仅覆盖最终 targets Provider 的 `staticRevisionByProvider`；
+- `mappingRevision`、配置修订、观察时间和新鲜度；
+- 零命中时仍完整的索引证据。
+
+传给 Retriever 的 `KnowledgeSearchTarget` 只包含能力身份、`knowledgeId`、声明 locator 和 Collection 路径，不包含本机知识根或 `readContext`。需要读取原文时，Adapter 只能使用查询级 `KnowledgeRetrievalAccess`；它只允许读取本次请求列出的身份与 `knowledgeId`，不能替换 locator 或沿关系扩大，且在 `retrieve()` 结束后失效。
+
+证据过期、内容身份不一致或后端失败不会降级为本地全文读取，也不能伪装成成功零命中。

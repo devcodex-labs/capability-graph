@@ -1,37 +1,39 @@
-## 完整 ErrorCode 联合类型
+## 完整错误语义
 
-| ErrorCode |
-|---|
-| `CG_CONFIG_INCOMPLETE` |
-| `CG_DUAL_AUTHORITY` |
-| `CG_SCOPE_DENIED` |
-| `CG_IDENTITY_AMBIGUOUS` |
-| `CG_IDENTITY_INVALID` |
-| `CG_NOT_FOUND` |
-| `CG_VALIDATION_FAILED` |
-| `CG_RELATION_CROSS_PROVIDER` |
-| `CG_RELATION_CYCLE` |
-| `CG_LOAD_FAILED` |
-| `CG_NO_ACTIVE_VIEW` |
-| `CG_REVISION_MISMATCH` |
-| `CG_INDEX_STALE` |
-| `CG_INPUT_INVALID` |
-| `CG_RUNTIME_CONTEXT_REQUIRED` |
-| `CG_RUNTIME_DISABLED` |
-| `CG_RUNTIME_UNAVAILABLE` |
-| `CG_RUNTIME_RESULT_MISMATCH` |
-| `CG_ADAPTER_CONTRACT_INVALID` |
-| `CG_KNOWLEDGE_NOT_ASSOCIATED` |
-| `CG_KNOWLEDGE_TYPE_UNSUPPORTED` |
-| `CG_READER_UNCONFIGURED` |
-| `CG_READER_UNAVAILABLE` |
-| `CG_RETRIEVER_UNCONFIGURED` |
-| `CG_RETRIEVER_UNAVAILABLE` |
-| `CG_SOURCE_UNREADABLE` |
-| `CG_PATH_TRAVERSAL` |
-| `CG_BUDGET_EXCEEDED` |
-| `CG_TIMEOUT` |
-| `CG_PARTIAL_ITEM` |
+下表覆盖公开 `ErrorCode` 全集。典型动作帮助调用方选路，具体处理始终以错误实例的 `nextAction` 为准。
+
+| ErrorCode | 含义 | 常见触发 | 典型 NextAction | 调用方处理 |
+|---|---|---|---|---|
+| `CG_CONFIG_INCOMPLETE` | 核心配置缺失或字段无效。 | Provider、预算或必需后端配置未满足启动条件。 | `configure_backend` | 补齐配置并重新创建 CapabilityGraph 实例。 |
+| `CG_DUAL_AUTHORITY` | 同一 Provider 配置了多个权威来源。 | Provider 配置重复，无法确定唯一静态定义来源。 | `configure_backend` | 每个 providerId 只保留一个 authority 后重新初始化。 |
+| `CG_SCOPE_DENIED` | 请求超出 Effective Provider Scope。 | 查询、结果或 Provider 不在主机与集成共同允许的范围内。 | `narrow_scope` | 收窄请求到已授权 Provider；不要绕过 Scope 校验。 |
+| `CG_IDENTITY_AMBIGUOUS` | 能力身份缺少唯一 Provider 上下文。 | 多 Provider 查询只提供 capabilityId，无法构成完整身份。 | `fix_input` | 补充 providerId，使用完整 CapabilityRef 重试。 |
+| `CG_IDENTITY_INVALID` | Provider、Capability 或 Knowledge 身份格式无效。 | ID 不符合公开格式，或来源定义中出现非法身份。 | `fix_input` | 调用方输入应修正后重试；若 details 指向来源定义，则修复来源。 |
+| `CG_NOT_FOUND` | 请求的 Provider、Capability、Knowledge 或 Runtime 修订不存在。 | 完整身份在当前可读视图中没有匹配项。 | `fix_input` | 校正身份，或先调用列表/发现接口获取当前可用项。 |
+| `CG_VALIDATION_FAILED` | 静态来源定义未通过验证。 | Schema、哈希、端点或其他图约束不成立。 | `repair_source` | 根据有限 details 修复权威来源，再执行刷新。 |
+| `CG_RELATION_CROSS_PROVIDER` | 图关系跨越了 Provider 边界。 | parents、specializes 或 related 指向其他 Provider。 | `repair_source` | 把关系端点改为同一 Provider 内的能力身份。 |
+| `CG_RELATION_CYCLE` | 分类或特化关系形成环。 | parents 或 specializes 的全图验证发现循环依赖。 | `repair_source` | 调整关系方向或移除闭环边，再刷新来源。 |
+| `CG_LOAD_FAILED` | Provider 权威来源加载失败。 | 文件、数据库扫描或视图清理无法完成。 | `repair_source` | 检查来源可读性与后端状态；恢复后重新加载。 |
+| `CG_NO_ACTIVE_VIEW` | 当前没有已验证且可读的 Provider 视图。 | 实例已关闭，或刷新失败且不存在可继续服务的旧视图。 | `refresh` | 恢复来源后刷新；实例已关闭时创建新实例。 |
+| `CG_REVISION_MISMATCH` | 请求的修订或游标不再对应当前可读视图。 | 分页、检索或 Runtime 请求携带了过期修订。 | `refresh` | 放弃旧游标，从首个请求重新获取当前修订。 |
+| `CG_INDEX_STALE` | 检索索引与当前来源身份不一致。 | Retriever 返回的来源修订或能力身份已过期。 | `refresh` | 刷新或重建索引，再从新的发现请求开始。 |
+| `CG_INPUT_INVALID` | 查询参数或参数组合无效。 | 必需字段缺失、游标非法或互斥参数同时出现。 | `fix_input` | 修正输入；以错误实例携带的 nextAction 为最终准则。 |
+| `CG_RUNTIME_CONTEXT_REQUIRED` | Runtime 查询缺少项目或环境上下文。 | 未提供非空 project 与 environment。 | `fix_input` | 同时补充项目和环境，再发起 Runtime 查询。 |
+| `CG_RUNTIME_DISABLED` | Provider 未启用 Runtime Adapter。 | 对只有静态能力的 Provider 发起 Runtime 查询。 | `configure_backend` | 配置 Runtime Adapter，或停止对该 Provider 请求运行态。 |
+| `CG_RUNTIME_UNAVAILABLE` | Runtime 来源当前不可用。 | Adapter 抛错、超时或无法取得运行态快照。 | `repair_source` | 检查运行态服务与 Adapter；恢复后按策略重试。 |
+| `CG_RUNTIME_RESULT_MISMATCH` | Runtime 结果与请求上下文不匹配。 | 实例的 project、environment 或关联身份不符合请求。 | `fix_input` | 先核对请求上下文；若输入正确则修复 Adapter 映射。 |
+| `CG_ADAPTER_CONTRACT_INVALID` | Adapter 返回值违反公开合同。 | 分页、身份、内容哈希或结果结构不满足约束。 | `repair_source` | 修复 Adapter 实现；不要在调用方猜测或补造缺失字段。 |
+| `CG_KNOWLEDGE_NOT_ASSOCIATED` | 所选能力没有关联知识。 | 能力存在，但其知识引用集合为空或目标未关联。 | `repair_source` | 为能力补充知识引用，或改选具有知识关联的能力。 |
+| `CG_KNOWLEDGE_TYPE_UNSUPPORTED` | 该知识类型不支持直接读取。 | 例如对 collection 类型调用 readDocuments。 | `use_retrieval` | 切换到知识检索接口，再按返回目标读取具体文档。 |
+| `CG_READER_UNCONFIGURED` | 没有匹配知识来源的 Reader。 | KnowledgeRef 的 locator 类型没有已配置读取器。 | `configure_backend` | 注册匹配 Reader，或移除当前不受支持的来源类型。 |
+| `CG_READER_UNAVAILABLE` | 已配置的 Reader 当前不可用。 | Reader 抛错、返回不可读结果或后端暂时故障。 | `repair_source` | 检查 Reader 与后端健康状态，恢复后重试读取。 |
+| `CG_RETRIEVER_UNCONFIGURED` | 当前检索操作没有配置 Retriever。 | 调用能力或知识检索，但未注入相应 Retriever。 | `configure_backend` | 配置对应 Retriever，或改用静态列表与详情查询。 |
+| `CG_RETRIEVER_UNAVAILABLE` | 已配置的 Retriever 当前不可用。 | Retriever 抛错或其索引服务无法访问。 | `repair_source` | 恢复 Retriever/索引服务，再重新检索。 |
+| `CG_SOURCE_UNREADABLE` | 请求的知识或权威来源无法读取。 | 文件不存在、内容不是有效 UTF-8 或来源权限/状态异常。 | `repair_source` | 修复来源路径、编码或可读性后重试。 |
+| `CG_PATH_TRAVERSAL` | 相对路径越过允许的知识根目录。 | 规范化后的 locator 指向 Provider 根之外。 | `repair_source` | 修复 KnowledgeRef，只使用根目录内的相对路径。 |
+| `CG_BUDGET_EXCEEDED` | 操作超过响应、条目、分页或文档预算。 | 结果数量、序列化字节或单文档大小超过配置上限。 | `page_or_filter` | 按错误实例的 nextAction 分页、过滤或缩小文档；来源记录超限时修复来源。 |
+| `CG_TIMEOUT` | 受限操作超过允许时间。 | 通用超时合同；当前 Runtime Adapter 异常与超时会投影为 CG_RUNTIME_UNAVAILABLE。 | `repair_source` | 检查后端任务状态后再重试，避免假定原操作已取消。 |
+| `CG_PARTIAL_ITEM` | 批量请求中的条目无法完整返回。 | 同一请求包含多类条目失败，无法用单一底层错误代表。 | `fix_input` | 检查逐项结果与 warning，修正失败条目后单独重试。 |
 
 ## 完整 NextAction 联合类型
 

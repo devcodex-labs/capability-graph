@@ -1,9 +1,9 @@
 ---
-title: Provider 作用域
-description: 通过宿主允许、集成启用和请求范围的交集计算 Effective Provider Scope。
+title: 作用域、修订与完整性
+description: 理解 Effective Provider Scope、静态与运行时修订，以及完整、截断和部分结果。
 ---
 
-# Provider 作用域
+# 作用域、修订与完整性
 
 <span className="cg-status">可用</span>
 
@@ -21,4 +21,33 @@ hostAllowedProviders
 
 Adapter 与 Core 在同一进程中运行，Provider scope 不是进程沙箱。接入层仍需负责用户、租户和项目授权。
 
-故障排查见 [Scope and Selection](../troubleshooting/scope-and-selection)。
+故障排查见 [配置与作用域](../troubleshooting/open-and-configuration#作用域与选择)。
+
+## 修订模型
+
+Static Revision 是经过完整校验的 Provider 静态快照身份。Runtime Revision 是 Adapter 对运行观察的身份，两者不能互换。
+
+目录查询返回 `meta.staticRevision`。后续详情、关系、知识或 Runtime 查询可以传 `requiredStaticRevision`，保证一次任务继续使用同一静态视图。
+
+`reload()` 只有在新候选完整校验成功后才替换 current。Core 保留 current 和 previous：
+
+- 刷新失败时，仍可读取的旧 current 保留，并通过 `refreshFailed` 暴露失败；
+- 指定 previous 修订时可读取前一视图；
+- 更旧或已不可读的指定修订返回 `CG_REVISION_MISMATCH`；
+- 首次加载失败没有旧视图可回退。
+
+Runtime 观察会记录依据的静态修订。仅身份相同但修订变化，不自动等于兼容。
+
+## 结果完整性
+
+查询成功不代表返回全集。消费结果时同时查看数据、`meta.completeness`、`warnings` 和游标。
+
+| 状态 | 含义 | 调用方动作 |
+|---|---|---|
+| `complete` | 当前请求范围内完整 | 可继续业务选择 |
+| `truncated` | 命中数量或页预算上限 | 使用 `nextCursor` 续页或收窄过滤 |
+| `partial` | 某些来源、分组或条目失败 | 保留正常项，检查 warning 和逐项错误 |
+
+批量查询保留输入槽位，每个 `BatchItem` 都要检查 `ok`。单个 Provider 离线不应清空其他来源的合法结果；指定权威修订不可读则是查询级失败。
+
+预算不会通过静默删除 `whenToUse` 或 `distinction` 制造“成功”。无法取得任何进展时返回 `CG_BUDGET_EXCEEDED`。实践见 [处理错误与部分结果](../guides/errors-and-partial-results)。

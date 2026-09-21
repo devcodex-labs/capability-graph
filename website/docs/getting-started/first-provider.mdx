@@ -30,6 +30,16 @@ description: 创建 provider.json 和第一组能力定义，并用真实文件�
 
 `entryRef` 只是 Provider Specification 的引用。正文由 Provider 维护和投递，Core 不读取正文来改变图行为。
 
+创建引用的 `PROVIDER.md`：
+
+```md title="PROVIDER.md"
+# Acme HTTP Provider
+
+This file is the Provider-owned specification entry used by the documentation fixture. Capability Graph associates the entry but does not manage or enforce this text.
+```
+
+Core 只保留入口元数据。接入层负责判断适用版本、读取正文并把它投递给 Agent。
+
 ## 2. 定义主能力
 
 ```json title="route.capability.json"
@@ -51,11 +61,20 @@ description: 创建 provider.json 和第一组能力定义，并用真实文件�
   "description": "Expose a request handler through an HTTP route.",
   "whenToUse": "The application accepts HTTP requests.",
   "distinction": "Describes an HTTP routing capability, not a live route instance.",
-  "parents": ["route"]
+  "parents": ["route"],
+  "knowledge": [
+    {
+      "kind": "document",
+      "knowledgeId": "routing-guide",
+      "locator": { "type": "relative-file", "path": "knowledge/routing.md" }
+    }
+  ]
 }
 ```
 
 关系端点必须位于同一 Provider。`parents` 和 `specializes` 分别无环；Core 不从命名层级推导关系。
+
+同时创建 `knowledge/routing.md`。本地知识正文不进入 Static Revision；读取结果通过独立 `contentId` 标识。
 
 ## 3. 打开 Provider
 
@@ -74,6 +93,63 @@ const graph = await CapabilityGraph.open({
 
 有效启用范围中的每个 Provider 必须恰有一个 Authority。缺少来源会得到 `CG_CONFIG_INCOMPLETE`，不会被解释为空目录。
 
+## 4. 执行渐进查询
+
+查询从平坦目录开始，而不是一次暴露整张图。先列主能力，再依据用户意图读取详情、关系或知识：
+
+```ts
+const provider = graph.forProvider('acme.http');
+
+const catalog = await provider.listCatalog({ limit: 20 });
+const requiredStaticRevision = catalog.meta.staticRevision;
+
+const detail = await provider.getCapabilities(
+  ['route.http'],
+  { requiredStaticRevision }
+);
+
+const neighbors = await provider.getNeighbors(
+  'route.http',
+  { requiredStaticRevision }
+);
+
+const documents = await provider.readDocuments({
+  selected: ['route.http'],
+  knowledgeIds: ['routing-guide'],
+  requiredStaticRevision
+});
+```
+
+读取顺序是：
+
+1. `listCatalog()` 返回用途、使用时机和关键区别，用于第一轮选择。
+2. `getCapabilities()` 返回已选能力的完整静态定义。
+3. `getNeighbors()` 只展开请求的关系组，不递归遍历整张图。
+4. `readDocuments()` 只读取显式选中能力关联的 Document，不把知识选择扩大到其他能力。
+
+始终检查 `meta.completeness`、`warnings` 和 `nextCursor`。部分结果不是全集；已知 ID 也可以直接查询详情，无需强制先列目录。
+
+```ts
+try {
+  // 执行查询并把结果交给 Provider-owned 接入层。
+} finally {
+  await graph.close();
+}
+```
+
+`close()` 释放 Core 持有的权威视图句柄，不取消已经交给 Adapter 的底层任务。
+
+## 验证这套 Fixture
+
+仓库内 `website/fixtures/first-provider` 包含上述 Provider、Specification、两个能力和本地知识。运行：
+
+```sh
+cd website
+npm run check:examples
+```
+
+验证器从公开入口打开 Fixture，核对目录顺序、详情、父关系、本地文档读取和资源关闭；页面中的 JSON 片段必须与 Fixture 完全一致。
+
 ## 下一步
 
-在 [First Query](./first-query) 中先列出主能力，再按用户意图读取所需详情和子能力。
+把这组查询原语接入 [Provider 自有 API](./provider-owned-api)，或直接查看 [Provider 自有 MCP](../integrations/provider-owned-mcp) 的渐进发现流程。

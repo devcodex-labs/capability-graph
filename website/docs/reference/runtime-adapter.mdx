@@ -1,11 +1,13 @@
 ---
-title: RuntimeAdapter 接口
-description: RuntimeAdapter 输入、输出、证据、预算、超时和生命周期合同参考。
+title: Adapter 接口
+description: Runtime、能力检索、知识检索、Reader 与数据库 Authority Adapter 的统一合同参考。
 ---
 
-# RuntimeAdapter 接口
+# Adapter 接口
 
-<span className="cg-status">可用</span>
+<span className="cg-status">可用</span> <span className="cg-status">仅合同</span>
+
+## RuntimeAdapter
 
 一个 Provider 最多配置一个 Runtime Adapter。`query()` 输入项目、环境、可选实例过滤、当前静态修订、limit 和 cursor；输出实例、观察和可选续页游标。
 
@@ -18,3 +20,41 @@ Core 验证：
 - `requiredRuntimeRevision` 不被静默切换。
 
 Adapter 自己管理连接、取消、重试和清理。Core 的 5 秒默认超时只停止等待；迟到拒绝必须由 Adapter 消费，不能形成未处理 Promise rejection。
+
+## CapabilityRetriever
+
+<span className="cg-status">仅合同</span>
+
+输入查询文本、允许的 Provider IDs、每个 Provider 的当前 Static Revision 和候选上限；输出候选身份、可选 score 与 `sourceStaticRevision`。
+
+Core 按 Adapter 原始顺序生成一基 `rank`。候选被拒绝时保留排名间隙，合法项不重排。Core 拒绝范围外 Provider、不存在的能力、不可读来源修订、超预算候选和其他违反合同的返回。
+
+未指定修订时，一个来源不可读不应清空其他 Provider 的合法候选；指定修订不可读时查询级失败。
+
+## KnowledgeRetriever
+
+<span className="cg-status">仅合同</span>
+
+`retrieve(input, access)` 只处理 Core 展开的最终 targets。每个 target 含能力身份、`knowledgeId`、声明 locator 和经过的 Collection IDs，不含绝对知识根或 `readContext`。
+
+命中必须提供能力身份、`knowledgeId`、`contentId`、source、UTF-8 `startOffset`/`endOffset`、snippet 和可选 score。索引证据必须精确覆盖最终 targets Provider，证明每个文档的 source/indexed contentId、mapping/config revision、观察时间和 freshness；零命中也必须返回证据和明确 `knowledgeState`。
+
+Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期证据不会降级为成功空结果。
+
+## KnowledgeReader
+
+<span className="cg-status">可用</span> <span className="cg-status">仅合同</span>
+
+`canRead(ref)` 同步决定是否支持非本地来源。Core 选择第一个匹配的自定义 Reader；内置本地 Reader 优先处理 `relative-file`。
+
+`read(ref, context, { maxBytes })` 返回精确 bytes、contentType、contentId 和 source。Reader 不得替换声明 locator，必须遵守最大字节并保证 `contentId` 对应真实 bytes；`sourceContext.knowledgeRootDir` 不能进入公共响应。无匹配 Reader 使用 `CG_READER_UNCONFIGURED`，执行失败使用 `CG_READER_UNAVAILABLE` 或 Core 投影的读取错误。
+
+## DatabaseAuthorityAdapter
+
+<span className="cg-status">仅合同</span>
+
+`openView(providerId)` 返回稳定 `DatabaseReadView`，暴露 Provider metadata、sourceRevision、可选知识根，以及 `getCapability()`、`scanCapabilities()`、`neighbors()` 和 `close()`。
+
+同一 view 的 Provider、知识根、sourceRevision 和记录必须稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。Core 先完整扫描和收集 ID，再进行端点检查和 `parents`/`specializes` 两类无环检查，不能边扫边判不存在。Static Revision 使用与文件模式相同的规范序列化算法。
+
+Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有查询 pin 时延迟关闭。Adapter 不提供通用写入、CRUD 或迁移能力。

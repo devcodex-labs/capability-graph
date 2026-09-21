@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const base = 'https://devcodex-labs.github.io/capability-graph/';
 
-test('top navigation is compact and the global sidebar is complete', async ({ page }) => {
+test('top navigation is compact and all sidebar sections are expanded by default', async ({ page }) => {
   await page.goto('./');
   const labels = await page.locator('.rp-nav-menu--right > li > a').allTextContents();
   expect(labels).toEqual(['v1', 'GitHub']);
@@ -16,14 +16,19 @@ test('top navigation is compact and the global sidebar is complete', async ({ pa
   for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
     await expect(sidebar.getByRole('link', { name: section, exact: true })).toBeVisible();
   }
-  await expect(sidebar.getByRole('link')).toHaveCount(74);
-  await expect(sidebar.getByRole('link', { name: '安装', exact: true })).toBeVisible();
-  await expect(sidebar.getByRole('link', { name: '超时语义', exact: true })).toBeVisible();
+  const sectionBody = (name: string) => sidebar.getByRole('link', { name, exact: true })
+    .locator('xpath=following-sibling::div[1]');
+  for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
+    await expect.poll(() => sectionBody(section).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
+  }
   const sidebarLabels = await sidebar.getByRole('link').allTextContents();
   expect(sidebarLabels.every((label) => /[\u3400-\u9fff]/u.test(label))).toBe(true);
 
-  await page.goto('getting-started/');
-  await expect(page.locator('h1')).toContainText('快速开始');
+  await page.goto('getting-started/first-provider/');
+  await expect(page.locator('h1')).toContainText('创建第一个 Provider');
+  for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
+    await expect.poll(() => sectionBody(section).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
+  }
 });
 
 for (const [route, canonical] of [

@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "npm run generate && rspress dev",
-    "build": "npm run generate && npm run check:content && npm run check:reference && npm run check:examples && rspress build",
-    "build:site": "rspress build",
+    "build": "npm run generate && npm run check:content && npm run check:reference && npm run check:examples && rspress build && node scripts/write-route-redirects.mjs",
+    "build:site": "rspress build && node scripts/write-route-redirects.mjs",
     "prebuild:ai": "npm run generate",
     "build:ai": "node scripts/build-ai.mjs",
     "preview": "rspress preview",

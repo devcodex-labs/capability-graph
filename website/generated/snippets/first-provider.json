@@ -31,6 +31,16 @@
     "distinction": "Describes an HTTP routing capability, not a live route instance.",
     "parents": [
       "route"
+    ],
+    "knowledge": [
+      {
+        "kind": "document",
+        "knowledgeId": "routing-guide",
+        "locator": {
+          "type": "relative-file",
+          "path": "knowledge/routing.md"
+        }
+      }
     ]
   }
 }

@@ -1,9 +1,9 @@
 ---
-title: ResultMeta 元数据
-description: 解释完整性、来源修订、范围、视图、warning 和预算元数据。
+title: 结果与控制元数据
+description: 解释 ResultMeta、批量槽位、作用域、修订、分页、预算与完整性合同。
 ---
 
-# ResultMeta 元数据
+# 结果与控制元数据
 
 <span className="cg-status">可用</span>
 
@@ -22,3 +22,48 @@ description: 解释完整性、来源修订、范围、视图、warning 和预�
 | `budgets` | 实际相关的预算值 |
 
 `CurrentCapabilityView` 是查询证据，不是需持久化的合并实体，也不承诺跨来源事务。
+
+## 批量结果
+
+```ts
+type BatchItem<T> =
+  | { inputIndex: number; ok: true; value: T }
+  | { inputIndex: number; ok: false; error: ErrorShape };
+
+interface BatchResult<T> {
+  results: readonly BatchItem<T>[];
+  meta: ResultMeta;
+}
+```
+
+失败项不会从数组消失，调用方应按 `inputIndex` 对齐原请求。页级 `meta.completeness` 描述整个操作，逐项错误描述特定槽位；指定修订不可读等全局承诺失败会直接抛出查询级错误。
+
+## Provider 作用域
+
+Open 阶段的 Effective Provider Scope 是 `hostAllowedProviders ∩ integrationEnabledProviders`，查询提供 `requestProviderScope` 时再求一次交集。请求范围只能收窄；包含未允许 Provider 时返回 `CG_SCOPE_DENIED`。`BoundProviderGraph` 固定单 Provider并拒绝 `requestProviderScope`；ID 前缀、parent 和类型过滤都不是授权。
+
+## 静态与运行时修订
+
+Static Revision 来自规范化 Provider metadata、能力记录、关系和知识映射，知识正文使用独立 contentId。Core 每个 Provider 保留 current 和 previous；`requiredStaticRevision` 匹配 previous 时 `servedFrom` 为 `previous`，更旧或不可读修订返回 `CG_REVISION_MISMATCH`。
+
+Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticRevision`。兼容状态只有 `compatible`、`unknown` 和 `refresh_required`；Core 不因 ID 相同自动判断兼容。
+
+## 分页与游标
+
+游标绑定原请求的范围、过滤、limit 和修订。续页必须保留这些条件。最终公开游标编码后最多 32,768 个 base64url 字符；输入超限为 `CG_INPUT_INVALID`，输出超限为 `CG_BUDGET_EXCEEDED`。
+
+邻居六个关系组各自分页。续页只提交仍有 `nextCursor` 的 `kinds` 和对应 `cursors`。页大小和总字节预算同时生效，提高响应字节预算不会放宽游标长度上限。
+
+## 预算与完整性
+
+| 操作 | 关键默认预算 |
+|---|---|
+| Catalog | 24,576 页字节、200 项、2,048 单项字节 |
+| Neighbors | 50 默认页、100 最大页、24,576 页字节、2,048 单项字节 |
+| Detail | 20 能力、16,384 单项字节、131,072 总字节 |
+| Document read | 32,768 字节、每次 8 文档 |
+| Capability retrieval | 20 候选、512 单候选字节 |
+| Knowledge query | 8 命中、2,048 snippet 字节 |
+| Runtime | 50 默认页、100 最大页、5,000 ms 等待、4,096 facts 字节 |
+
+字节预算使用 UTF-8 或原始 bytes，不是 JavaScript 字符数。`truncated` 表示继续分页，`partial` 表示检查 warning 或逐项失败。单项过大不会被截断成看似合法的数据；无法取得进展时返回 `CG_BUDGET_EXCEEDED`。
