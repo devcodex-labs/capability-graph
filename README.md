@@ -141,7 +141,7 @@ npm run test:package
 npm run evaluate
 ```
 
-`npm test` 先构建和核对独立 TypeScript 消费者，再清理 `dist-test`、重新编译并发现测试；删除或重命名源码后不会继续执行旧测试输出。`test:package` 在无 dist 的源码副本中执行标准打包，并核对旧产物清理、预构建一致性、独立项目离线安装与类型，结束后清理临时文件，不执行发布。
+`npm test` 先构建和核对独立 TypeScript 消费者，再清理 `dist-test`、重新编译并发现测试；删除或重命名源码后不会继续执行旧测试输出。`test:package` 在无 dist 的源码副本中离线执行标准打包，并核对旧产物清理、预构建一致性、独立项目的真实安装与类型，结束后清理临时文件，不执行发布。
 
 只构建使用 `npm run build`，会清理仓库内 dist 后重新编译；标准 `npm pack` 的 prepack 自动执行同一构建，不能跳过脚本后假定产物仍然有效。构建产物位于 `dist/`，测试编译产物位于 `dist-test/`。CI 配置覆盖 Windows/Linux 与 Node 20.19.0、22.12.0，远端运行结果以实际 CI 为准。
 

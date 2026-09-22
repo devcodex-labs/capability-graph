@@ -41,7 +41,7 @@ try {
   assert.ok(packed.files.some((file) => file.path === "dist/index.d.ts"));
   assert.ok(packed.files.some((file) => file.path === "dist/index.js"));
   await writeFile(path.join(temporary, "package.json"), JSON.stringify({ name: "isolated-consumer", private: true, type: "module" }));
-  command([npm, "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--package-lock=false",
+  command([npm, "install", "--prefer-offline", "--ignore-scripts", "--no-audit", "--no-fund", "--package-lock=false",
     path.join(temporary, packed.filename)], temporary);
   const installed = path.join(temporary, "node_modules", "@devcodex", "capability-graph");
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
