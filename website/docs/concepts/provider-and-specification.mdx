@@ -9,13 +9,13 @@ description: 理解 Provider 身份、定义权威、Specification 边界和静�
 
 Provider 是一组能力及其接入规则的所有者。每个 Provider 在有效启用范围内必须恰有一个权威来源，文件或数据库二选一。
 
-Provider Specification 描述如何正确使用该 Provider，但正文不由 Core 管理。`provider.json` 只关联以下元数据：
+Provider Specification 描述如何正确使用该 Provider；正文归 Provider 所有，Core 只提供显式读取。`provider.json` 声明：
 
 - `specificationId` 和版本；
 - 适用软件、版本范围和可选条件；
-- Provider 自己提供的 `entryRef`。
+- 一篇或多篇 `role: specification` 的 Document 映射，可带语言、标题与来源。
 
-接入方负责首次可发现入口、正文读取、适用版本判断、冲突处理和向 Agent 投递。Specification 不能覆盖用户指令、宿主 Policy、权限或执行授权。
+接入方负责首次可发现入口、适用版本判断、是否调用 `readSpecification()` 以及如何向 Agent 投递。普通浏览、Selection 和 `readDocuments()` 都不自动读取规范。Specification 不能覆盖用户指令、宿主 Policy、权限或执行授权。
 
 ## 为什么分开
 

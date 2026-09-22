@@ -41,7 +41,8 @@ export async function listMainCapabilities(graph: CapabilityGraph) {
 | `GET /capabilities/main` | 上面的 `listMainCapabilities(graph)` | 返回 `route` 摘要及修订，Agent 根据意图选路由能力 |
 | `POST /capabilities/children`，输入能力 `route` 与上一步修订 | `getNeighbors('route', { kinds: ['children'], requiredStaticRevision })` | `groups.children.items` 包含 `route.http`，有游标时继续该组 |
 | `POST /capabilities/detail`，输入 `route.http` 与同一修订 | `getCapabilities(['route.http'], { requiredStaticRevision })` | `results[0]` 为能力详情，先检查 `ok` |
-| `POST /capabilities/documents`，显式选择 `route.http` | `readDocuments({ selected: ['route.http'], requiredStaticRevision })` | 返回该能力知识的逐项内容/错误 |
+| `POST /capabilities/selection`，显式选择 `route.http` | `resolveSelection({ selected: ['route.http'], requiredStaticRevision })` | 返回必要的 `requires` 闭包和每个加入项的原因 |
+| `POST /capabilities/documents`，传入 Selection 结果 | `readDocuments({ selected: resolved.map((id) => id.capabilityId), requiredStaticRevision })` | 返回已选能力知识的逐项内容/错误 |
 
 请求体中的 `requiredStaticRevision` 取首个响应的真实值，不填写版本号。Handler 应验证输入，先按用户/租户解析允许的 Provider，再取得绑定对象；`forProvider()` 本身不做用户认证。服务关闭时等待在途请求完成，再关闭共享 `graph`，不要在每次 handler 结束时关闭它。
 
@@ -73,4 +74,4 @@ Core 不监听端口、不启动业务服务、不执行能力，也不保证 Ag
 | 查字段、错误和预算 | [API 参考](../reference/index) |
 | 诊断失败 | [故障排查](../troubleshooting/index) |
 
-数据库权威、能力召回、知识检索和远程 Reader 在 `1.0.0` 中提供公开合同，但不附带真实后端。只有 Provider 配置了对应 Adapter，相关原语才可用。
+数据库权威、能力召回、知识检索和远程 Reader 提供公开合同，但不附带真实后端。只有 Provider 配置了对应 Adapter，相关原语才可用。

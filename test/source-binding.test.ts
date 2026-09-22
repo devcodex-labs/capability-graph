@@ -7,7 +7,7 @@ import { CapabilityGraph, type OpenConfig } from "../src/index.js";
 import { FakeDatabase, record } from "./contract/fake-database.js";
 
 const selected = [{ providerId: "seed", capabilityId: "a" }];
-const knowledge = [{ kind: "document", knowledgeId: "doc", locator: { type: "relative-file", path: "doc.md" } }];
+const knowledge = [{ kind: "document", knowledgeId: "doc", role: "guide", locator: { type: "relative-file", path: "doc.md" } }];
 const databaseConfig = (openView: () => Promise<FakeDatabase>): OpenConfig => ({
   hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
   providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView } } }],

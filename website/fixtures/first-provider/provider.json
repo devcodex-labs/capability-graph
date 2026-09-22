@@ -6,6 +6,7 @@
     "specificationId": "acme.http.conventions",
     "version": "1",
     "appliesTo": { "software": "acme-http", "versionRange": ">=0.1.0 <1.0.0" },
-    "entryRef": { "type": "relative-file", "path": "PROVIDER.md" }
+    "documents": [{ "kind": "document", "knowledgeId": "SPEC-01", "role": "specification", "locale": "en",
+      "locator": { "type": "relative-file", "path": "PROVIDER.md" } }]
   }
 }

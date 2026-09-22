@@ -71,7 +71,7 @@ for (const operation of ["catalog", "neighbors"] as const) {
 }
 
 test("deep A: detail zero-neighbor summary and normal public cursor continuations remain supported", async () => {
-  const knowledge = ["one", "two"].map((knowledgeId) => ({ kind: "document", knowledgeId, locator: { type: "http", url: `https://example.test/${knowledgeId}` } }));
+  const knowledge = ["one", "two"].map((knowledgeId) => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "http", url: `https://example.test/${knowledgeId}` } }));
   const graph = await CapabilityGraph.open(config(new FakeDatabase([record("a", { related: ["b", "c"], knowledge }), record("b"), record("c")])));
   try {
     const bound = graph.forProvider("seed");

@@ -7,7 +7,7 @@ description: 接入能力召回与知识检索后端，并由 Core 校验身份�
 
 <span className="cg-status">仅合同</span>
 
-`CapabilityRetriever` 是可选候选召回合同。`1.0.0` 不附带向量或模型后端。
+`CapabilityRetriever` 是可选候选召回合同；主包不附带向量或模型后端。
 
 当能力多到仅靠分类浏览不易找到目标时，可以按用户文字召回候选；规模较小时先用 Catalog 和关系查询即可。Flat Catalog 是可确定分页的静态摘要接口，Retriever 是另一个显式调用，不会替换目录或自动判断最终选择。
 
@@ -60,7 +60,7 @@ Core 保留后端顺序，`rank` 是原始的一基序号，不会按 `score` �
 
 ## KnowledgeRetriever
 
-`KnowledgeRetriever` 只搜索由非空已选能力展开出的 Document 或 Collection targets。`1.0.0` 不附带向量数据库或 RAG 后端。
+`KnowledgeRetriever` 只搜索由非空已选能力展开出的 Document 或 Collection targets；主包不附带向量数据库或 RAG 后端。
 
 Adapter 必须返回：
 
@@ -70,16 +70,16 @@ Adapter 必须返回：
 - `mappingRevision`、配置修订、观察时间和新鲜度；
 - 零命中时仍完整的索引证据。
 
-传给 Retriever 的 `KnowledgeSearchTarget` 只包含能力身份、`knowledgeId`、声明 locator 和 Collection 路径，不包含本机知识根或 `readContext`。需要读取原文时，Adapter 只能使用查询级 `KnowledgeRetrievalAccess`；它只允许读取本次请求列出的身份与 `knowledgeId`，不能替换 locator 或沿关系扩大，且在 `retrieve()` 结束后失效。
+传给 Retriever 的 `KnowledgeSearchTarget` 包含能力身份、`knowledgeId`、声明 locator、Collection 路径及正式路由元数据，不包含本机知识根或 `readContext`。需要读取原文时，Adapter 只能使用查询级 `KnowledgeRetrievalAccess`；它只允许读取本次请求列出的身份与 `knowledgeId`，不能替换 locator 或沿关系扩大，且在 `retrieve()` 结束后失效。
 
 证据过期、内容身份不一致或后端失败不会降级为本地全文读取，也不能伪装成成功零命中。
 
 ## 知识检索的实现顺序
 
-1. Core 根据 `selected` 和可选 `knowledgeIds` 展开本次 targets，并计算 `mappingRevision`。
+1. Core 根据 `selected` 和可选 `knowledgeIds/roles/locales` 展开与过滤本次 targets；原始数组和最终目标数量/字节数都过预算后才计算 `mappingRevision` 与调用后端。
 2. Adapter 只在这些 targets 中查询索引。需要原文时通过本次 `access.read()` 获取真实字节与 `contentId`。
 3. 对每个 target 核对索引内容与来源内容身份、配置修订及映射；先完成核对，再返回命中或合法零命中。
-4. Core 检查 evidence 后校验各命中的身份、来源、UTF-8 字节区间与 snippet，返回结果和诊断。
+4. Core 检查 evidence 后校验各命中的身份、来源、UTF-8 字节区间与 snippet，并从正式映射回填用途、语言、标题和出处；不信任命中对象给出的路由信息。
 
 以下骨架可编译，具体 `searchIndex` 由接入项目实现。传入查询级 access，而非本地根路径，是为了把读取限定在已选知识中。
 

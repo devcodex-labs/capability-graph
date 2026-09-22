@@ -2,13 +2,14 @@ import { CapabilityGraphError } from "../errors.js";
 import { isId } from "../identity.js";
 import type { UnvalidatedProviderRecord, UnvalidatedCapabilityRecord } from "../store/types.js";
 import type { KnowledgeRef } from "../types.js";
-import { knowledgeRefs, locator } from "./knowledge-ref.js";
+import { knowledgeRefs, specificationDocuments } from "./knowledge-ref.js";
 import { array, freeze, invalid, jsonRecord, object, text } from "./values.js";
 
 export interface CapabilityRecord extends UnvalidatedCapabilityRecord {
   readonly parents: readonly string[];
   readonly specializes: readonly string[];
   readonly related: readonly string[];
+  readonly requires: readonly string[];
   readonly examples: readonly string[];
   readonly knowledge: readonly KnowledgeRef[];
 }
@@ -20,21 +21,24 @@ function identity(value: unknown): string {
 }
 
 function relations(value: unknown, relation: string): readonly string[] {
+  const seen = new Set<string>();
   return array(value).map((endpoint) => {
     if ((typeof endpoint === "string" && endpoint.includes("::")) ||
         (endpoint !== null && typeof endpoint === "object" && !Array.isArray(endpoint))) {
       throw new CapabilityGraphError("CG_RELATION_CROSS_PROVIDER", { nextAction: "repair_source", details: { endpoint, relation } });
     }
     if (typeof endpoint !== "string" || !isId(endpoint)) invalid({ endpoint, relation });
+    if (seen.has(endpoint)) invalid({ endpoint, relation, reason: "duplicate_endpoint" });
+    seen.add(endpoint);
     return endpoint as string;
-  });
+  }).sort();
 }
 
 export async function validateProvider(value: unknown, root?: string): Promise<UnvalidatedProviderRecord> {
   const raw = object(jsonRecord(value), ["providerId", "name", "version", "specification"], ["providerId", "name", "version"]);
   let specification: UnvalidatedProviderRecord["specification"];
   if (raw.specification !== undefined) {
-    const spec = object(raw.specification, ["specificationId", "version", "appliesTo", "entryRef"], ["specificationId", "version"]);
+    const spec = object(raw.specification, ["specificationId", "version", "appliesTo", "documents"], ["specificationId", "version", "documents"]);
     let appliesTo: NonNullable<typeof specification>["appliesTo"];
     if (spec.appliesTo !== undefined) {
       const source = object(spec.appliesTo, ["software", "versionRange", "conditions"]);
@@ -42,14 +46,14 @@ export async function validateProvider(value: unknown, root?: string): Promise<U
     }
     specification = { specificationId: text(spec.specificationId), version: text(spec.version),
       ...(appliesTo === undefined ? {} : { appliesTo }),
-      ...(spec.entryRef === undefined ? {} : { entryRef: await locator(spec.entryRef, root) }) };
+      documents: await specificationDocuments(spec.documents, root) };
   }
   return freeze({ providerId: identity(raw.providerId), name: text(raw.name), version: text(raw.version),
     ...(specification === undefined ? {} : { specification }) });
 }
 
 export async function validateCapability(value: unknown, root?: string, checkExistingPaths = true): Promise<CapabilityRecord> {
-  const raw = object(jsonRecord(value), ["capabilityId", "name", "description", "whenToUse", "distinction", "examples", "parents", "specializes", "related", "knowledge"],
+  const raw = object(jsonRecord(value), ["capabilityId", "name", "description", "whenToUse", "distinction", "examples", "parents", "specializes", "related", "requires", "knowledge"],
     ["capabilityId", "name", "description", "whenToUse"]);
   return freeze({ capabilityId: identity(raw.capabilityId), name: text(raw.name), description: text(raw.description),
     whenToUse: text(raw.whenToUse), ...(raw.distinction === undefined ? {} : { distinction: text(raw.distinction) }),
@@ -57,5 +61,6 @@ export async function validateCapability(value: unknown, root?: string, checkExi
     parents: relations(raw.parents === undefined ? [] : raw.parents, "parents"),
     specializes: relations(raw.specializes === undefined ? [] : raw.specializes, "specializes"),
     related: relations(raw.related === undefined ? [] : raw.related, "related"),
+    requires: relations(raw.requires === undefined ? [] : raw.requires, "requires"),
     knowledge: await knowledgeRefs(raw.knowledge === undefined ? [] : raw.knowledge, root, checkExistingPaths) });
 }

@@ -46,7 +46,7 @@ try {
   const installed = path.join(temporary, "node_modules", "@devcodex", "capability-graph");
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.deepEqual(Object.keys(metadata.exports), ["."]);
-  assert.deepEqual(metadata.dependencies ?? {}, {});
+  assert.deepEqual(metadata.dependencies, { "bcp-47": "2.1.1", "language-subtag-registry": "0.4.2" });
   for (const file of packed.files.filter((item) => item.path.endsWith(".js"))) {
     assert.doesNotMatch(await readFile(path.join(installed, file.path), "utf8"), /@modelcontextprotocol|fixture-runtime-adapter|fake-.*retriever/);
   }

@@ -6,7 +6,7 @@ import { FakeDatabase, record } from "./contract/fake-database.js";
 import { fakeKnowledgeRetriever } from "./contract/fake-knowledge-retriever.js";
 
 const id = (capabilityId = "a", providerId = "seed") => ({ providerId, capabilityId });
-const document = (knowledgeId: string) => ({ kind: "document", knowledgeId, locator: { type: "http", url: `https://example.test/${knowledgeId}` } });
+const document = (knowledgeId: string) => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "http", url: `https://example.test/${knowledgeId}` } });
 const code = (expected: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === expected;
 const reader: KnowledgeReader = { id: "fake-reader", canRead: () => true, read: async (ref) => {
   const bytes = new TextEncoder().encode(`text:${ref.knowledgeId}`);
@@ -114,7 +114,7 @@ test("retrieval unavailable differs from no knowledge, empty collection, filtere
   const disabled = await CapabilityGraph.open(config());
   try {
     await assert.rejects(disabled.queryKnowledge({ text: "find", selected: [id("b")] }), code("CG_KNOWLEDGE_NOT_ASSOCIATED"));
-    await assert.rejects(disabled.queryKnowledge({ text: "find", selected: [id("empty")] }), code("CG_RETRIEVER_UNCONFIGURED"));
+    assert.equal((await disabled.queryKnowledge({ text: "find", selected: [id("empty")] })).knowledgeState, "empty_collection");
     await assert.rejects(disabled.retrieveCapabilities({ text: "find" }), code("CG_RETRIEVER_UNCONFIGURED"));
   } finally { await disabled.close(); }
 });

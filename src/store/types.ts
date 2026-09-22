@@ -1,4 +1,4 @@
-import type { CanonicalCapabilityId, KnowledgeLocator, NeighborKind, ProviderRecord, StaticCapability, StaticRevision } from "../types.js";
+import type { CanonicalCapabilityId, KnowledgeDocumentRef, NeighborKind, ProviderRecord, StaticCapability, StaticRevision } from "../types.js";
 
 export interface UnvalidatedProviderRecord {
   readonly providerId: string;
@@ -12,7 +12,7 @@ export interface UnvalidatedProviderRecord {
       readonly versionRange?: string;
       readonly conditions?: string;
     };
-    readonly entryRef?: KnowledgeLocator;
+    readonly documents: readonly KnowledgeDocumentRef[];
   };
 }
 
@@ -27,6 +27,7 @@ export interface UnvalidatedCapabilityRecord {
   readonly parents?: readonly unknown[];
   readonly specializes?: readonly unknown[];
   readonly related?: readonly unknown[];
+  readonly requires?: readonly unknown[];
   readonly knowledge?: readonly unknown[];
 }
 

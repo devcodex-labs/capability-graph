@@ -6,6 +6,7 @@
     "specificationId": "seed.http.conventions",
     "version": "1",
     "appliesTo": { "software": "seed-http", "versionRange": ">=0.1.0 <1.0.0", "conditions": "HTTP route definitions owned by this reference provider" },
-    "entryRef": { "type": "relative-file", "path": "PROVIDER.md" }
+    "documents": [{ "kind": "document", "knowledgeId": "SPEC-01", "role": "specification", "locale": "en",
+      "title": "Seed HTTP conventions", "locator": { "type": "relative-file", "path": "PROVIDER.md" } }]
   }
 }

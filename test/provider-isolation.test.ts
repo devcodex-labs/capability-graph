@@ -23,11 +23,12 @@ test("R1: unrelated offline authority does not block local discovery or knowledg
       await graph.readDocuments({ selected: [local] })]) assert.equal(result.results[0]?.ok, true);
     assert.equal((await graph.queryKnowledge({ text: "find", selected: [local] })).items.length, 1);
     assert.equal(failedReads, 0);
-    for (const result of [await graph.getCapabilities([local, remote, local]), await graph.readDocuments({ selected: [local, remote, local] })]) {
-      assert.deepEqual(result.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["ok", "CG_NO_ACTIVE_VIEW", "ok"]);
-      assert.deepEqual(result.results.map((slot) => slot.inputIndex), [0, 1, 2]);
-      assert.equal(result.meta.completeness, "partial");
-    }
+    const details = await graph.getCapabilities([local, remote, local]);
+    assert.deepEqual(details.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["ok", "CG_NO_ACTIVE_VIEW", "ok"]);
+    const reads = await graph.readDocuments({ selected: [local, remote, local] });
+    assert.deepEqual(reads.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["ok", "CG_NO_ACTIVE_VIEW"]);
+    assert.deepEqual(reads.results.map((slot) => slot.inputIndex), [0, 1]);
+    assert.equal(details.meta.completeness, "partial"); assert.equal(reads.meta.completeness, "partial");
     const knowledge = await graph.queryKnowledge({ text: "find", selected: [local, remote] });
     assert.equal(knowledge.items.length, 1); assert.equal(knowledge.meta.warnings[0]?.code, "CG_NO_ACTIVE_VIEW");
     const denied = await graph.getCapabilities([{ providerId: "outside", capabilityId: "a" }]);

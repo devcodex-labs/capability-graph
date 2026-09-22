@@ -7,8 +7,8 @@ import { CapabilityGraph, CapabilityGraphError, type KnowledgeDocumentRef, type 
 import { contentId } from "../src/knowledge/local-file-reader.js";
 import { FakeDatabase, record } from "./contract/fake-database.js";
 
-const doc = (knowledgeId: string, file = `${knowledgeId}.md`): KnowledgeDocumentRef => ({ kind: "document", knowledgeId, locator: { type: "relative-file", path: file } });
-const http: KnowledgeDocumentRef = { kind: "document", knowledgeId: "remote", locator: { type: "http", url: "https://example.test/doc" } };
+const doc = (knowledgeId: string, file = `${knowledgeId}.md`): KnowledgeDocumentRef => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "relative-file", path: file } });
+const http: KnowledgeDocumentRef = { kind: "document", knowledgeId: "remote", role: "guide", locator: { type: "http", url: "https://example.test/doc" } };
 const id = (capabilityId: string, providerId = "seed") => ({ providerId, capabilityId });
 const code = (expected: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === expected;
 async function fixture(run: (root: string) => Promise<void>) {
@@ -40,18 +40,18 @@ test("local bytes are read on demand; body updates change contentId, not static 
   } finally { await graph.close(); }
 }));
 
-test("slot expansion distinguishes missing association, missing body, collection and absent reader", async () => fixture(async (root) => {
+test("direct reads skip Collections unless explicitly named and retain per-item failures", async () => fixture(async (root) => {
   let retrievalCalls = 0;
   const graph = await CapabilityGraph.open(config(root, [record("a", { knowledge: [doc("missing"), { kind: "collection", knowledgeId: "manual", members: [] }, http] }), record("b")], {
     knowledgeRetriever: { id: "fake", retrieve: async () => { retrievalCalls++; throw new Error("must not run"); } },
   }));
   try {
     const page = await graph.readDocuments({ selected: [id("a"), id("b")] });
-    assert.deepEqual(page.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["CG_SOURCE_UNREADABLE", "CG_KNOWLEDGE_TYPE_UNSUPPORTED", "CG_READER_UNCONFIGURED", "CG_KNOWLEDGE_NOT_ASSOCIATED"]);
-    assert.deepEqual(page.results.map((slot) => slot.inputIndex), [0, 1, 2, 3]);
+    assert.deepEqual(page.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["CG_SOURCE_UNREADABLE", "CG_READER_UNCONFIGURED", "CG_KNOWLEDGE_NOT_ASSOCIATED"]);
+    assert.deepEqual(page.results.map((slot) => slot.inputIndex), [0, 1, 2]);
     assert.equal(page.meta.completeness, "partial"); assert.equal(retrievalCalls, 0);
-    const collection = page.results[1]!; assert.ok(!collection.ok);
-    assert.deepEqual(collection.error.details?.retrieval, { code: "configured", nextAction: "use_retrieval" });
+    const collection = (await graph.readDocuments({ selected: [id("a")], knowledgeIds: ["manual"] })).results[0]!;
+    assert.ok(!collection.ok); assert.equal(collection.error.code, "CG_KNOWLEDGE_TYPE_UNSUPPORTED");
     assert.equal(JSON.stringify(page).includes(root), false);
   } finally { await graph.close(); }
 }));

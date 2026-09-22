@@ -13,7 +13,8 @@ Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程�
 2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`；可选 Retriever 只能召回已有身份。
 3. **进入能力详情**：调用 `getCapabilities()` 获取完整定义。
 4. **展开子能力或关联**：按需调用 `getNeighbors()`，不在首轮暴露整图。
-5. **读取知识或 Runtime**：知识要求非空显式选择；Runtime 需要项目和环境，可选用 `instanceOf` 收窄，不要求先选择知识。
+5. **解析 Selection**：把明确选中的能力交给 `resolveSelection()`，仅沿 `requires` 补齐必要上下文并展示原因。
+6. **读取知识或 Runtime**：可先分页发现文档元数据，再按需读取正文；Runtime 需要项目和环境，可选用 `instanceOf` 收窄，不要求先选择知识。
 
 工具名称、数量、输入 Schema、认证和规范投递由 Provider 决定。参考示例使用私有 MCP 包，避免把 SDK 变成主包运行时依赖。
 
@@ -35,9 +36,9 @@ Agent 选择 `route` 后，调用 `example_get_neighbors` 的参数片段如下�
 { "qualifiedId": "seed.http::route", "kinds": ["children"], "limitPerKind": 20 }
 ```
 
-预期 `groups.children.items` 包含 `route.http` 和 `route.validation`。选择验证能力后，用 `example_get_capabilities` 传 `ids: [{ providerId: 'seed.http', capabilityId: 'route.validation' }]`；确认要读哪些能力的知识，再用 `example_read_documents` 传非空 `selected` 和同一修订。返回数据在 MCP 的 `content` 文本块中以 JSON 表达，先解析再检查 `results[].ok`、warnings 和游标。
+预期 `groups.children.items` 包含 `route.http` 和 `route.validation`。选择验证能力后，用 `example_get_capabilities` 传 `ids: [{ providerId: 'seed.http', capabilityId: 'route.validation' }]`；再用 `example_resolve_selection` 传显式 `selected` 和同一修订，检查 `resolved`、`added` 与 `reasons`。需要 Collection 成员时先用 `example_list_knowledge_members` 列元数据，确认目标后用 `example_read_documents` 传非空 `selected` 与可选 `knowledgeIds/roles/locales`。返回数据在 MCP 的 `content` 文本块中以 JSON 表达，先解析再检查 `results[].ok`、warnings 和游标。
 
-Seed 同时提供 `seed://provider/specification` Resource，由 MCP 集成层读取 `PROVIDER.md`。Core 只返回规范元数据，不负责 Resource 投递或执行其中指令。参考还暴露可选检索工具；未配置后端时调用它们会失败，这不影响目录与本地读取。
+Seed 同时提供 `seed://provider/specification` Resource，由 MCP 集成层读取 `PROVIDER.md`。Core 提供 `example_list_specification_documents` 与 `example_read_specification` 对应的分页元数据和显式正文读取，不负责 Resource 投递或执行其中指令。参考还暴露可选检索工具；未配置后端时调用它们会失败，这不影响目录与本地读取。
 
 ## 错误映射
 

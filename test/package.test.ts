@@ -7,10 +7,10 @@ test("T-F09: the built ESM package imports through its public entry", () => {
   assert.equal(typeof library, "object");
 });
 
-test("T-F09: package metadata keeps the root-only, dependency-free boundary", async () => {
+test("T-F09: package metadata keeps a single public entry and pinned language dependencies", async () => {
   const metadata = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
   assert.deepEqual(Object.keys(metadata.exports), ["."]);
-  assert.deepEqual(metadata.dependencies ?? {}, {});
+  assert.deepEqual(metadata.dependencies, { "bcp-47": "2.1.1", "language-subtag-registry": "0.4.2" });
   assert.equal(metadata.license, "Apache-2.0");
   assert.deepEqual(metadata.files, ["dist", "README.md", "LICENSE"]);
 });

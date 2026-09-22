@@ -1,6 +1,6 @@
 {
   "name": "@devcodex/capability-graph",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Framework-agnostic capability graph engine for AI coding systems and developer tooling.",
   "license": "Apache-2.0",
   "type": "module",
@@ -47,5 +47,9 @@
     "dist",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "dependencies": {
+    "bcp-47": "2.1.1",
+    "language-subtag-registry": "0.4.2"
+  }
 }

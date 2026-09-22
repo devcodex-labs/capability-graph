@@ -33,8 +33,8 @@ export class FakeDatabase implements DatabaseReadView {
   }
   async neighbors(id: string, kind: NeighborKind, page: StorePageRequest): Promise<StorePage<CanonicalCapabilityId>> {
     const source = this.records.find((item) => item.capabilityId === id);
-    const reverse = { children: "parents", specializedBy: "specializes", relatedBy: "related" } as const;
-    const ids = kind === "parents" || kind === "specializes" || kind === "related" ? (source?.[kind] ?? []) as string[] :
+    const reverse = { children: "parents", specializedBy: "specializes", relatedBy: "related", requiredBy: "requires" } as const;
+    const ids = kind === "parents" || kind === "specializes" || kind === "related" || kind === "requires" ? (source?.[kind] ?? []) as string[] :
       this.records.filter((item) => item[reverse[kind]]?.includes(id)).map((item) => item.capabilityId);
     return this.page([...new Set(ids)].sort().map((capabilityId) => ({ providerId: this.provider.providerId, capabilityId })), page);
   }

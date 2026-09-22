@@ -6,14 +6,95 @@ import type { BatchItem, BatchResult, NeighborKind, ResultMeta } from "../types.
 import { bytes, capability, catalogRecord, identity, inputInvalid, KINDS, limit } from "./common.js";
 import { decodeCursor, encodeCursor, position, walk, type CursorBinding, type Position } from "./cursor.js";
 import type { CapabilityDetail, CapabilityDetailQuery, CapabilityRef, CatalogPage, CatalogQuery, CatalogRecord,
-  KnowledgeSummary, NeighborGroup, NeighborPage, NeighborQuery, NeighborSummaryGroup, ProviderSummary } from "./types.js";
+  DocumentPageQuery, KnowledgeMembersPage, KnowledgeMembersQuery, KnowledgeSummary, NeighborGroup, NeighborPage,
+  NeighborQuery, NeighborSummaryGroup, ProviderResult, ProviderSummary, SpecificationDocumentsPage } from "./types.js";
+import type { KnowledgeDocumentRef } from "../types.js";
 
 export async function provider(context: QueryContext, id: string): Promise<ProviderSummary> {
   if (!context.scope.has(id)) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
   const data = context.graph.getProvider(id);
   if (!data) throw new CapabilityGraphError("CG_NOT_FOUND", { nextAction: "fix_input" });
   await context.graph.getView(id)!.assertReadable?.();
-  return { ...data, staticRevision: context.graph.staticRevision(id)! };
+  const { specification, ...fields } = data;
+  return { ...fields, ...(specification === undefined ? {} : { specification: {
+    specificationId: specification.specificationId, version: specification.version,
+    ...(specification.appliesTo === undefined ? {} : { appliesTo: specification.appliesTo }),
+    documentCount: specification.documents.length } }), staticRevision: context.graph.staticRevision(id)! };
+}
+
+function documentPage(documents: readonly KnowledgeDocumentRef[], query: DocumentPageQuery,
+  binding: CursorBinding, pageSize: number, maxPageSize: number, maxItemBytes: number, maxBytes: number,
+  wrap: (page: { items: readonly KnowledgeDocumentRef[]; completeness: "complete" | "truncated"; nextCursor?: string }) => unknown) {
+  const count = limit(query.limit, pageSize, maxPageSize);
+  const bound = { ...binding, filter: { ...binding.filter as object, limit: count } };
+  const cursor = decodeCursor(query.cursor, bound);
+  const ordered = [...documents].sort((a, b) => a.knowledgeId < b.knowledgeId ? -1 : a.knowledgeId > b.knowledgeId ? 1 : 0);
+  const start = cursor === undefined ? 0 : ordered.findIndex((item) => item.knowledgeId === cursor.after) + 1;
+  if (cursor && start === 0) inputInvalid();
+  const pageFor = (items: readonly KnowledgeDocumentRef[]) => {
+    const nextCursor = start + items.length < ordered.length && items.length ? encodeCursor(bound, items.at(-1)!.knowledgeId) : undefined;
+    return { items, completeness: nextCursor ? "truncated" as const : "complete" as const,
+      ...(nextCursor === undefined ? {} : { nextCursor }) };
+  };
+  const items: KnowledgeDocumentRef[] = [];
+  for (const item of ordered.slice(start, start + count)) {
+    if (bytes(item) > maxItemBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+    const candidate = pageFor([...items, item]);
+    if (bytes(wrap(candidate)) > maxBytes) {
+      if (!items.length) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+      break;
+    }
+    items.push(item);
+  }
+  const page = pageFor(items);
+  if (bytes(wrap(page)) > maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  return page;
+}
+
+export async function providerResult(context: QueryContext, id: string, budgets: BudgetConfig): Promise<ProviderResult> {
+  const summary = await provider(context, id);
+  const specification = context.graph.getProvider(id)!.specification;
+  const result: ProviderResult = { ...summary, ...(specification === undefined ? {} : { specificationDocuments: documentPage(
+    specification.documents, {}, { kind: "specification-documents", staticRevision: context.graph.staticRevision(id)!, filter: { providerId: id } },
+    budgets.specification.defaultPageSize, budgets.specification.maxPageSize, budgets.specification.maxItemBytes, budgets.specification.maxBytes,
+    (page) => ({ ...summary, specificationDocuments: page, meta: context.meta })) }), meta: context.meta };
+  if (bytes(result) > budgets.specification.maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  return result;
+}
+
+export async function specificationDocuments(context: QueryContext, id: string, query: DocumentPageQuery,
+  budgets: BudgetConfig): Promise<SpecificationDocumentsPage> {
+  await provider(context, id);
+  const documents = context.graph.getProvider(id)!.specification?.documents ?? [];
+  const page = documentPage(documents, query,
+    { kind: "specification-documents", staticRevision: context.graph.staticRevision(id)!, filter: { providerId: id } },
+    budgets.specification.defaultPageSize, budgets.specification.maxPageSize, budgets.specification.maxItemBytes, budgets.specification.maxBytes,
+    (page) => ({ providerId: id, ...page, meta: { ...context.meta, completeness: page.completeness,
+      budgets: { "specification.maxBytes": budgets.specification.maxBytes, "specification.maxItemBytes": budgets.specification.maxItemBytes } } }));
+  const result: SpecificationDocumentsPage = { providerId: id, ...page, meta: { ...context.meta, completeness: page.completeness,
+    budgets: { "specification.maxBytes": budgets.specification.maxBytes, "specification.maxItemBytes": budgets.specification.maxItemBytes } } };
+  if (bytes(result) > budgets.specification.maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  return result;
+}
+
+export async function knowledgeMembers(context: QueryContext, query: KnowledgeMembersQuery, budgets: BudgetConfig,
+  bound?: string): Promise<KnowledgeMembersPage> {
+  const node = await capability(context, query.capability, bound);
+  const collection = node.knowledge.find((ref) => ref.knowledgeId === query.collectionId);
+  if (!collection) throw new CapabilityGraphError("CG_NOT_FOUND", { nextAction: "fix_input" });
+  if (collection.kind !== "collection") throw new CapabilityGraphError("CG_KNOWLEDGE_TYPE_UNSUPPORTED", { nextAction: "fix_input" });
+  const page = documentPage(collection.members, query,
+    { kind: "knowledge-members", staticRevision: node.staticRevision,
+      filter: { id: node.id, collectionId: collection.knowledgeId } },
+    budgets.detail.defaultKnowledgePageSize, budgets.detail.maxKnowledgePageSize, budgets.detail.maxItemBytes, budgets.detail.maxBytes,
+    (page) => ({ id: node.id, collectionId: collection.knowledgeId, ...page,
+      meta: { ...context.meta, completeness: page.completeness, budgets: { "detail.maxBytes": budgets.detail.maxBytes,
+        "detail.maxItemBytes": budgets.detail.maxItemBytes }, view: { capabilities: [{ id: node.id, staticRevision: node.staticRevision }] } } }));
+  const result: KnowledgeMembersPage = { id: node.id, collectionId: collection.knowledgeId, ...page,
+    meta: { ...context.meta, completeness: page.completeness, budgets: { "detail.maxBytes": budgets.detail.maxBytes,
+      "detail.maxItemBytes": budgets.detail.maxItemBytes }, view: { capabilities: [{ id: node.id, staticRevision: node.staticRevision }] } } };
+  if (bytes(result) > budgets.detail.maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  return result;
 }
 
 export async function catalog(context: QueryContext, query: CatalogQuery, budgets: BudgetConfig, bound?: string): Promise<CatalogPage> {
@@ -144,7 +225,8 @@ export async function details(context: QueryContext, refs: readonly CapabilityRe
       const remaining = cursor ? all.filter((entry) => entry.knowledgeId > cursor.after) : all;
       const selected = remaining.slice(0, knowledgeLimit);
       const knowledgeItems: KnowledgeSummary[] = selected.map((entry) => entry.kind === "document" ? entry :
-        { kind: "collection", knowledgeId: entry.knowledgeId, memberCount: entry.members.length });
+        { kind: "collection", knowledgeId: entry.knowledgeId, ...(entry.title === undefined ? {} : { title: entry.title }),
+          ...(entry.summary === undefined ? {} : { summary: entry.summary }), memberCount: entry.members.length });
       const nextCursor = remaining.length > selected.length ? encodeCursor(binding, selected.at(-1)!.knowledgeId) : undefined;
       const neighborSummaries = {} as Record<NeighborKind, NeighborSummaryGroup>;
       for (const kind of KINDS) {

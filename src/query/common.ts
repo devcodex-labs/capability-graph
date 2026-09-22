@@ -4,7 +4,7 @@ import type { QueryContext } from "../core-host.js";
 import type { CanonicalCapabilityId, NeighborKind, StaticCapability } from "../types.js";
 import type { CapabilityRef, CatalogRecord } from "./types.js";
 
-export const KINDS: readonly NeighborKind[] = ["parents", "children", "specializes", "specializedBy", "related", "relatedBy"];
+export const KINDS: readonly NeighborKind[] = ["parents", "children", "specializes", "specializedBy", "related", "relatedBy", "requires", "requiredBy"];
 export const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value), "utf8");
 export function inputInvalid(): never { throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" }); }
 export function limit(value: number | undefined, fallback: number, maximum: number, zero = false): number {

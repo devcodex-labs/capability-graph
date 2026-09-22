@@ -45,7 +45,7 @@ export function canonicalJson(value: unknown, ancestors = new Set<object>()): st
 /**
  * Hash a prevalidated, strictly ordered record stream with constant cross-record state.
  * This yields a candidate revision only; graph/source validation must finish before publication.
- * File and database authorities share these exact JSON bytes and defaults; source order is not normalized here.
+ * File and database authorities share these exact normalized JSON bytes and defaults.
  */
 export async function computeStaticRevision(
   provider: UnvalidatedProviderRecord,
@@ -71,6 +71,7 @@ export async function computeStaticRevision(
       parents: capability.parents ?? [],
       specializes: capability.specializes ?? [],
       related: capability.related ?? [],
+      requires: capability.requires ?? [],
       knowledge: capability.knowledge ?? [],
     }), "utf8");
     previousId = capability.capabilityId;

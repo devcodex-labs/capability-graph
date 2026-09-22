@@ -21,7 +21,7 @@ function orderedJson(value: unknown): unknown {
 function referenceHash(records: readonly UnvalidatedCapabilityRecord[], source = provider): string {
   const document = { capabilities: records.map((item) => ({ ...item, distinction: item.distinction ?? null,
     examples: item.examples ?? [], parents: item.parents ?? [], specializes: item.specializes ?? [],
-    related: item.related ?? [], knowledge: item.knowledge ?? [] })),
+    related: item.related ?? [], requires: item.requires ?? [], knowledge: item.knowledge ?? [] })),
   provider: { providerId: source.providerId, name: source.name, version: source.version, specification: source.specification } };
   return `s:${createHash("sha256").update(JSON.stringify(orderedJson(document)), "utf8").digest("hex").slice(0, 16)}`;
 }
@@ -51,7 +51,7 @@ test("T-F12: Unicode, escaping, object order and omitted defaults are determinis
   const shuffled = Object.fromEntries(Object.entries(special).reverse()) as unknown as UnvalidatedCapabilityRecord;
   assert.equal(await computeStaticRevision(provider, [shuffled]), await computeStaticRevision(provider, [special]));
   assert.equal(await computeStaticRevision(provider, [row("route")]),
-    await computeStaticRevision(provider, [{ ...row("route"), examples: [], parents: [], related: [], specializes: [], knowledge: [] }]));
+    await computeStaticRevision(provider, [{ ...row("route"), examples: [], parents: [], related: [], specializes: [], requires: [], knowledge: [] }]));
   assert.notEqual(canonicalJson("\u00e9"), canonicalJson("e\u0301"));
   assert.notEqual(canonicalJson(["a", "b"]), canonicalJson(["b", "a"]));
 });
@@ -60,13 +60,14 @@ test("T-F12: each formal field changes the revision", async () => {
   const base = row("route");
   const baseline = await computeStaticRevision(provider, [base]);
   for (const change of [{ providerId: "other" }, { name: "Other" }, { version: "2" },
-    { specification: { specificationId: "rules", version: "1", appliesTo: { conditions: "HTTP" } } }]) {
+    { specification: { specificationId: "rules", version: "1", appliesTo: { conditions: "HTTP" },
+      documents: [{ kind: "document" as const, knowledgeId: "SPEC-01", role: "specification", locator: { type: "http" as const, url: "https://example.test/spec" } }] } }]) {
     assert.notEqual(await computeStaticRevision({ ...provider, ...change }, [base]), baseline);
   }
   for (const change of [{ capabilityId: "other" }, { name: "Other" }, { description: "Other" },
     { whenToUse: "Other" }, { distinction: "Other" }, { examples: ["Other"] },
-    { parents: ["parent"] }, { specializes: ["parent"] }, { related: ["other"] },
-    { knowledge: [{ kind: "document", knowledgeId: "D-02", locator: { type: "relative-file", path: "knowledge/a.md" } }] }]) {
+    { parents: ["parent"] }, { specializes: ["parent"] }, { related: ["other"] }, { requires: ["other"] },
+    { knowledge: [{ kind: "document", knowledgeId: "D-02", role: "guide", locator: { type: "relative-file", path: "knowledge/a.md" } }] }]) {
     assert.notEqual(await computeStaticRevision(provider, [{ ...base, ...change }]), baseline);
   }
 });

@@ -30,18 +30,37 @@ export function createSeedServer(graph: CapabilityGraph, providerRoot: string): 
   } }, ({ ids, ...query }) => call(() => graph.getCapabilities(ids, query)));
   server.registerTool("example_get_neighbors", { description: "Browse declared graph relations without implicitly selecting them.", inputSchema: {
     qualifiedId: z.string(), requiredStaticRevision: z.string().optional(), limitPerKind: z.number().int().positive().optional(),
-    kinds: z.array(z.enum(["parents", "children", "specializes", "specializedBy", "related", "relatedBy"])).optional(),
+    kinds: z.array(z.enum(["parents", "children", "specializes", "specializedBy", "related", "relatedBy", "requires", "requiredBy"])).optional(),
     cursors: z.object({ parents: z.string().optional(), children: z.string().optional(), specializes: z.string().optional(),
-      specializedBy: z.string().optional(), related: z.string().optional(), relatedBy: z.string().optional() }).optional(),
+      specializedBy: z.string().optional(), related: z.string().optional(), relatedBy: z.string().optional(),
+      requires: z.string().optional(), requiredBy: z.string().optional() }).optional(),
   } }, ({ qualifiedId, ...query }) => call(() => graph.getNeighbors(parseQualifiedId(qualifiedId), query)));
+  server.registerTool("example_resolve_selection", { description: "Resolve explicitly selected capabilities and their required context.", inputSchema: {
+    selected: z.array(id), requestProviderScope: z.array(z.string()).optional(),
+    requiredStaticRevisionByProvider: z.record(z.string()).optional(),
+  } }, (query) => call(() => graph.resolveSelection(query)));
+  server.registerTool("example_list_knowledge_members", { description: "Page a declared Collection's document members.", inputSchema: {
+    qualifiedId: z.string(), collectionId: z.string(), cursor: z.string().optional(), limit: z.number().int().positive().optional(),
+    requiredStaticRevision: z.string().optional(),
+  } }, ({ qualifiedId, ...query }) => call(() => graph.listKnowledgeMembers({ ...query, capability: parseQualifiedId(qualifiedId) })));
+  server.registerTool("example_list_specification_documents", { description: "Page one Provider's Specification document metadata.", inputSchema: {
+    providerId: z.string(), cursor: z.string().optional(), limit: z.number().int().positive().optional(),
+    requiredStaticRevision: z.string().optional(),
+  } }, (query) => call(() => graph.listSpecificationDocuments(query)));
   server.registerTool("example_read_documents", { description: "Read documents declared by the selected capabilities.", inputSchema: {
-    ...scope, selected: z.array(id), knowledgeIds: z.array(z.string()).optional(),
+    ...scope, selected: z.array(id), knowledgeIds: z.array(z.string()).optional(), roles: z.array(z.string()).optional(),
+    locales: z.array(z.string()).optional(),
   } }, (query) => call(() => graph.readDocuments(query)));
+  server.registerTool("example_read_specification", { description: "Explicitly read selected Specification documents from one Provider.", inputSchema: {
+    providerId: z.string(), knowledgeIds: z.array(z.string()).optional(), locales: z.array(z.string()).optional(),
+    requiredStaticRevision: z.string().optional(),
+  } }, (query) => call(() => graph.readSpecification(query)));
   server.registerTool("example_retrieve_capabilities", { description: "Explicitly invoke the configured capability retriever.", inputSchema: {
     ...scope, text: z.string(), limit: z.number().int().positive().optional(),
   } }, (query) => call(() => graph.retrieveCapabilities(query)));
   server.registerTool("example_query_knowledge", { description: "Search only the selected capability knowledge with a configured backend.", inputSchema: {
-    ...scope, selected: z.array(id), text: z.string(), knowledgeIds: z.array(z.string()).optional(), limit: z.number().int().positive().optional(),
+    ...scope, selected: z.array(id), text: z.string(), knowledgeIds: z.array(z.string()).optional(), roles: z.array(z.string()).optional(),
+    locales: z.array(z.string()).optional(), limit: z.number().int().positive().optional(),
   } }, (query) => call(() => graph.queryKnowledge(query)));
   server.registerTool("example_query_runtime", { description: "Query observed instances in one project, environment and Provider.", inputSchema: {
     ...scope, project: z.string(), environment: z.string(), instanceOf: id.optional(), instanceId: z.string().optional(),

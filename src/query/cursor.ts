@@ -5,7 +5,7 @@ import { inputInvalid } from "./common.js";
 import type { StorePage, StorePageRequest } from "../store/types.js";
 
 export interface CursorBinding {
-  readonly kind: "catalog" | "neighbors" | "detail-knowledge" | "runtime";
+  readonly kind: "catalog" | "neighbors" | "detail-knowledge" | "knowledge-members" | "specification-documents" | "runtime";
   readonly staticRevision: string;
   readonly filter: unknown;
 }

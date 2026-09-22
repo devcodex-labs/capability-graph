@@ -21,10 +21,17 @@ export interface KnowledgeDocumentRef {
   readonly kind: "document";
   readonly knowledgeId: string;
   readonly locator: KnowledgeLocator;
+  readonly role: string;
+  readonly locale?: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly canonicalUrl?: string;
 }
 export interface KnowledgeCollectionRef {
   readonly kind: "collection";
   readonly knowledgeId: string;
+  readonly title?: string;
+  readonly summary?: string;
   readonly members: readonly KnowledgeDocumentRef[];
 }
 export type KnowledgeRef = KnowledgeDocumentRef | KnowledgeCollectionRef;
@@ -33,7 +40,7 @@ export interface SpecificationMetadata {
   readonly specificationId: string;
   readonly version: string;
   readonly appliesTo?: { readonly software?: string; readonly versionRange?: string; readonly conditions?: string };
-  readonly entryRef?: KnowledgeLocator;
+  readonly documents: readonly KnowledgeDocumentRef[];
 }
 export interface ProviderRecord {
   readonly providerId: string;
@@ -42,7 +49,7 @@ export interface ProviderRecord {
   readonly specification?: SpecificationMetadata;
   readonly authorityKind: "file" | "database";
 }
-export type NeighborKind = "parents" | "children" | "specializes" | "specializedBy" | "related" | "relatedBy";
+export type NeighborKind = "parents" | "children" | "specializes" | "specializedBy" | "related" | "relatedBy" | "requires" | "requiredBy";
 export interface StaticCapability {
   readonly id: CanonicalCapabilityId;
   readonly name: string;
@@ -53,6 +60,7 @@ export interface StaticCapability {
   readonly parents: readonly CanonicalCapabilityId[];
   readonly specializes: readonly CanonicalCapabilityId[];
   readonly related: readonly CanonicalCapabilityId[];
+  readonly requires: readonly CanonicalCapabilityId[];
   readonly knowledge: readonly KnowledgeRef[];
   readonly staticRevision: StaticRevision;
 }
@@ -83,7 +91,8 @@ export interface ResultMeta {
   readonly compositeStaticRevision: string;
   readonly staticRevision?: StaticRevision;
   readonly staticRevisionByProvider?: Readonly<Record<string, StaticRevision>>;
-  readonly servedFrom: "current" | "previous";
+  readonly servedFrom: "current" | "previous" | "mixed";
+  readonly servedFromByProvider?: Readonly<Record<string, "current" | "previous">>;
   /** A refresh failed; this response still comes from the named readable view, not an unmarked fallback. */
   readonly refreshFailed?: boolean;
   readonly scope: readonly string[];

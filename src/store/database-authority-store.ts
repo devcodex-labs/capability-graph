@@ -1,17 +1,24 @@
-import { createHash } from "node:crypto";
+import { createHash, type Hash } from "node:crypto";
 import path from "node:path";
 import { CapabilityGraphError } from "../errors.js";
 import { canonicalJson, computeStaticRevision } from "../hash.js";
 import { isId } from "../identity.js";
+import { createKnowledgeMappingValidator } from "../validate/knowledge-ref.js";
 import { validateCycles, validateEndpoints } from "../validate/cycles.js";
 import { staticCapability } from "../validate/index.js";
 import { validateCapability, validateProvider, type CapabilityRecord } from "../validate/schema.js";
 import { freeze, RECORD_MAX_BYTES } from "../validate/values.js";
-import type { CanonicalCapabilityId } from "../types.js";
+import type { CanonicalCapabilityId, NeighborKind } from "../types.js";
 import type { DatabaseReadView, StorePage, StorePageRequest, ValidatedProviderView } from "./types.js";
 
 const PAGE: StorePageRequest = { limit: 100, maxBytes: RECORD_MAX_BYTES };
 const digest = (value: unknown) => createHash("sha256").update(canonicalJson(value)).digest("hex");
+function edgeHash(hash: Hash, sourceId: string): void {
+  const bytes = Buffer.from(sourceId, "utf8");
+  const length = Buffer.allocUnsafe(4);
+  length.writeUInt32BE(bytes.length);
+  hash.update(length).update(bytes);
+}
 
 /** Core-owned wrapper keeps the last verified identity beside the adapter's opaque page cursor. */
 interface QueryContinuation {
@@ -58,7 +65,8 @@ function pageShape<T>(page: StorePage<T>, request: StorePageRequest): StorePage<
 }
 
 /**
- * A-D must all succeed before publication: ordered scan/hash, endpoints, two DAG checks, final readability.
+ * A-E must all succeed before publication: ordered scan/hash, endpoints, three DAG checks,
+ * complete dependency neighbor verification, then final readability.
  * Retain O(V) IDs/digests, not full definitions; the adapter must supply stable repeated point reads.
  * On failure, close the candidate without masking the original validation error.
  */
@@ -76,6 +84,8 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
     const providerDigest = digest(view.provider);
     const ids = new Set<string>();
     const hashes = new Map<string, string>();
+    const acceptMappings = createKnowledgeMappingValidator();
+    if (provider.specification) acceptMappings(provider.specification.documents);
     const stable = () => {
       if (closed || view.sourceRevision !== sourceRevision) {
         throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh" });
@@ -96,6 +106,7 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
           previous = record.capabilityId;
           ids.add(record.capabilityId);
           hashes.set(record.capabilityId, digest(record));
+          acceptMappings(record.knowledge);
           yield record;
         }
         cursor = page.nextCursor;
@@ -112,10 +123,64 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
       return record;
     };
     // B waits for all IDs: a valid a -> z edge would look dangling while scanning a before z.
-    for (const id of ids) validateEndpoints(await checked(id), ids);
-    await validateCycles(ids, checked); // C: independent parents/specializes traversals.
+    const incoming = new Map<string, { count: number; hash: Hash }>([...ids].map((id) => [id, { count: 0, hash: createHash("sha256") }]));
+    for (const id of ids) {
+      const record = await checked(id);
+      validateEndpoints(record, ids);
+      for (const target of record.requires) {
+        const state = incoming.get(target)!;
+        state.count++;
+        edgeHash(state.hash, id);
+      }
+    }
+    const expectedIncoming = new Map([...incoming].map(([id, state]) => [id, { count: state.count, digest: state.hash.digest("hex") }]));
+    await validateCycles(ids, checked); // C: independent parents/specializes/requires traversals.
+    async function drain(id: string, kind: "requires" | "requiredBy", options: {
+      expected?: readonly string[]; start?: number; limit?: number; maxBytes?: number;
+    } = {}): Promise<{ items: CanonicalCapabilityId[]; count: number; digest: string }> {
+      const seenCursors = new Set<string>();
+      const sourceHash = createHash("sha256");
+      const items: CanonicalCapabilityId[] = [];
+      let count = 0;
+      let capped = false;
+      let cursor: string | undefined;
+      let previous: string | undefined;
+      let pages = 0;
+      do {
+        const request = { ...PAGE, ...(cursor === undefined ? {} : { cursor }) };
+        const page = pageShape(await call(() => view.neighbors(id, kind, request)), request);
+        if (++pages > ids.size + 1) contract("neighbor_stream_unbounded");
+        for (const endpoint of page.items) {
+          if (!endpoint || endpoint.providerId !== provider.providerId || !isId(endpoint.capabilityId) || !ids.has(endpoint.capabilityId) ||
+              (previous !== undefined && endpoint.capabilityId <= previous)) contract("neighbor_identity_invalid");
+          previous = endpoint.capabilityId;
+          if (options.expected && options.expected[count] !== previous) contract("requires_stream_mismatch");
+          if (!capped && count >= (options.start ?? 0) && items.length < (options.limit ?? 0)) {
+            const candidate = [...items, { providerId: provider.providerId, capabilityId: previous }];
+            if (Buffer.byteLength(canonicalJson({ items: candidate, nextCursor: String(count + 1) }), "utf8") <= (options.maxBytes ?? 0)) {
+              items.push(candidate.at(-1)!);
+            } else capped = true;
+          }
+          count++;
+          if (count > ids.size) contract("neighbor_stream_unbounded");
+          edgeHash(sourceHash, previous);
+        }
+        cursor = page.nextCursor;
+        if (cursor !== undefined) { if (seenCursors.has(cursor)) contract("repeated_store_cursor"); seenCursors.add(cursor); }
+      } while (cursor !== undefined);
+      if (options.expected && count !== options.expected.length) contract("requires_stream_mismatch");
+      return { items, count, digest: sourceHash.digest("hex") };
+    }
+    // D compares complete streams, including the empty reverse stream, before publication.
+    for (const id of ids) {
+      const source = await checked(id);
+      await drain(id, "requires", { expected: source.requires });
+      const reverse = await drain(id, "requiredBy");
+      const expected = expectedIncoming.get(id)!;
+      if (reverse.count !== expected.count || reverse.digest !== expected.digest) contract("required_by_stream_mismatch");
+    }
     stable();
-    // D rechecks a real source operation; an empty graph must also prove its handle is still readable.
+    // E rechecks a real source operation; an empty graph must also prove its handle is still readable.
     const first = ids.values().next().value as string | undefined;
     if (first !== undefined) await checked(first);
     else {
@@ -158,6 +223,37 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
       },
       neighbors: async (id, kind, request) => {
         const bounded = { ...request, limit: Math.min(request.limit, 100), maxBytes: Math.min(request.maxBytes, RECORD_MAX_BYTES) };
+        if (kind === "requires" || kind === "requiredBy") {
+          if (!ids.has(id)) return { items: [] };
+          const source = await checked(id);
+          let all: readonly string[] = source.requires;
+          if (kind === "requiredBy") {
+            const start = bounded.cursor === undefined ? 0 : Number(bounded.cursor);
+            if (!Number.isSafeInteger(start) || start < 0) throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
+            const reverse = await drain(id, "requiredBy", { start, limit: bounded.limit, maxBytes: bounded.maxBytes });
+            const expected = expectedIncoming.get(id)!;
+            if (reverse.count !== expected.count || reverse.digest !== expected.digest) contract("required_by_stream_mismatch");
+            if (start > reverse.count) throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
+            if (start < reverse.count && !reverse.items.length) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+            const next = start + reverse.items.length;
+            return { items: reverse.items, ...(next < reverse.count ? { nextCursor: String(next) } : {}) };
+          }
+          const start = bounded.cursor === undefined ? 0 : Number(bounded.cursor);
+          if (!Number.isSafeInteger(start) || start < 0 || start > all.length) {
+            throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
+          }
+          const items: CanonicalCapabilityId[] = [];
+          let next = start;
+          while (next < all.length && items.length < bounded.limit) {
+            const candidate = [...items, { providerId: provider.providerId, capabilityId: all[next]! }];
+            if (Buffer.byteLength(canonicalJson({ items: candidate, nextCursor: String(next + 1) }), "utf8") > bounded.maxBytes) {
+              if (!items.length) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+              break;
+            }
+            items.push(candidate.at(-1)!); next++;
+          }
+          return { items, ...(next < all.length ? { nextCursor: String(next) } : {}) };
+        }
         const stream = canonicalJson([id, kind]);
         const continuation = queryContinuation(bounded.cursor, stream);
         const sourceRequest = sourcePageRequest(bounded, continuation);

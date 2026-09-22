@@ -25,7 +25,7 @@ async function connected(run: (client: Client, graph: CapabilityGraph) => Promis
 }
 test("MCP: initialize and enumerate query tools, not one tool per capability", async () => connected(async (client) => {
   const list = await client.listTools();
-  assert.equal(list.tools.length, 8);
+  assert.equal(list.tools.length, 12);
   assert.ok(list.tools.every((tool) => tool.name.startsWith("example_")));
   assert.equal(JSON.stringify(list).includes("D-02"), false);
 }));
@@ -35,6 +35,11 @@ test("MCP: static and document queries exactly match the same Core API", async (
     ["example_list_catalog", { limit: 2 }, await graph.listCatalog({ limit: 2 })],
     ["example_get_capabilities", { ids: [canonical("route.validation")] }, await graph.getCapabilities([canonical("route.validation")])],
     ["example_get_neighbors", { qualifiedId: "seed.http::route.validation" }, await graph.getNeighbors(canonical("route.validation"))],
+    ["example_resolve_selection", { selected: [canonical("route.validation")] },
+      await graph.resolveSelection({ selected: [canonical("route.validation")] })],
+    ["example_list_specification_documents", { providerId: "seed.http" }, await graph.listSpecificationDocuments({ providerId: "seed.http" })],
+    ["example_read_specification", { providerId: "seed.http", knowledgeIds: ["SPEC-01"] },
+      await graph.readSpecification({ providerId: "seed.http", knowledgeIds: ["SPEC-01"] })],
     ["example_read_documents", { selected: [canonical("route.validation"), canonical("schema.request")] },
       await graph.readDocuments({ selected: [canonical("route.validation"), canonical("schema.request")] })],
   ];
@@ -100,7 +105,7 @@ test("MCP: actual stdio child serves requests and exits on close", async (contex
   let pid: number | null = null;
   try {
     await client.connect(transport); pid = transport.pid; assert.ok(pid);
-    assert.equal((await client.listTools()).tools.length, 8);
+    assert.equal((await client.listTools()).tools.length, 12);
     const result = payload(await client.callTool({ name: "example_list_catalog", arguments: {} }));
     assert.equal((result.items as unknown[]).length, 5);
   } finally { await client.close(); await transport.close(); }

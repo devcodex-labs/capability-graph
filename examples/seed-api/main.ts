@@ -19,11 +19,13 @@ export async function runSeedTask(options: {
     const revision = catalog.meta.staticRevision!;
     const detail = await provider.getCapabilities(["route.validation"], { requiredStaticRevision: revision });
     const neighbors = await provider.getNeighbors("route.validation", { requiredStaticRevision: revision });
-    const selected = ["route.validation", "schema.request"];
+    const selection = await provider.resolveSelection({ selected: ["route.validation"], requiredStaticRevision: revision });
+    const selected = selection.resolved.map((id) => id.capabilityId);
     const runtime = options.runtime ? await provider.queryRuntime({ project: options.runtime.project,
       environment: options.runtime.environment, instanceOf: { capabilityId: "route.http" }, requiredStaticRevision: revision }) : undefined;
-    const documents = await provider.readDocuments({ selected, requiredStaticRevision: revision });
-    return { providers, catalog, detail, neighbors, selected, ...(runtime === undefined ? {} : { runtime }), documents };
+    const documents = await provider.readDocuments({ selected, roles: ["guide", "reference"], locales: ["en"], requiredStaticRevision: revision });
+    const specification = await provider.readSpecification({ knowledgeIds: ["SPEC-01"], locales: ["en"], requiredStaticRevision: revision });
+    return { providers, catalog, detail, neighbors, selection, selected, ...(runtime === undefined ? {} : { runtime }), documents, specification };
   } finally { await graph.close(); }
 }
 

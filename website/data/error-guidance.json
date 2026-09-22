@@ -58,7 +58,7 @@
   {
     "code": "CG_RELATION_CYCLE",
     "meaning": "分类或特化关系形成环。",
-    "trigger": "parents 或 specializes 的全图验证发现循环依赖。",
+    "trigger": "parents、specializes 或 requires 的独立全图验证发现环。",
     "action": "repair_source",
     "handling": "调整关系方向或移除闭环边，再刷新来源。"
   },

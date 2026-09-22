@@ -88,8 +88,16 @@
       "kind": "type"
     },
     {
+      "name": "DocumentPageQuery",
+      "kind": "interface"
+    },
+    {
       "name": "DocumentRead",
       "kind": "interface"
+    },
+    {
+      "name": "DocumentReadBatch",
+      "kind": "type"
     },
     {
       "name": "equalId",
@@ -192,6 +200,14 @@
       "kind": "type"
     },
     {
+      "name": "KnowledgeMembersPage",
+      "kind": "interface"
+    },
+    {
+      "name": "KnowledgeMembersQuery",
+      "kind": "interface"
+    },
+    {
       "name": "KnowledgeReadContext",
       "kind": "interface"
     },
@@ -202,6 +218,10 @@
     {
       "name": "KnowledgeRef",
       "kind": "type"
+    },
+    {
+      "name": "KnowledgeResultHit",
+      "kind": "interface"
     },
     {
       "name": "KnowledgeRetrievalAccess",
@@ -232,7 +252,9 @@
         "specializes",
         "specializedBy",
         "related",
-        "relatedBy"
+        "relatedBy",
+        "requires",
+        "requiredBy"
       ]
     },
     {
@@ -319,7 +341,15 @@
       "kind": "interface"
     },
     {
+      "name": "ReadSpecificationQuery",
+      "kind": "interface"
+    },
+    {
       "name": "ReloadResult",
+      "kind": "interface"
+    },
+    {
+      "name": "ResolveSelectionQuery",
       "kind": "interface"
     },
     {
@@ -368,12 +398,32 @@
       "kind": "type"
     },
     {
+      "name": "SelectionReason",
+      "kind": "interface"
+    },
+    {
+      "name": "SelectionResult",
+      "kind": "interface"
+    },
+    {
       "name": "SourceChange",
+      "kind": "interface"
+    },
+    {
+      "name": "SpecificationDocumentRead",
+      "kind": "type"
+    },
+    {
+      "name": "SpecificationDocumentsPage",
       "kind": "interface"
     },
     {
       "name": "SpecificationMetadata",
       "kind": "interface"
+    },
+    {
+      "name": "SpecificationReadBatch",
+      "kind": "type"
     },
     {
       "name": "StaticRevision",

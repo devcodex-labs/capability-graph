@@ -14,7 +14,7 @@ description: Provider、Capability 定义字段、验证矩阵和二元身份合
 | `version` | 是 | Provider 定义版本，不属于能力身份 |
 | `specification` | 否 | Provider-owned Specification metadata |
 
-`specification` 可整体省略；提供时必须包含非空 `specificationId` 和 `version`。`appliesTo` 及其 `software`、`versionRange`、`conditions` 均可选，`entryRef` 也可选。Core 只关联这些元数据，不读取正文来执行策略，也不判断当前项目版本。
+`specification` 可整体省略；提供时必须包含非空 `specificationId`、`version` 和非空 `documents`。每篇 Document 的 `role` 固定为 `specification`；`appliesTo` 及其 `software`、`versionRange`、`conditions` 均可选。Core 仅在显式 `readSpecification()` 时读取正文，不把正文当作执行规则，也不判断当前项目版本。
 
 文件 Authority 的 `provider.json` 必须与配置中的 `providerId` 一致。每个有效启用 Provider 必须恰有一个 Authority。
 
@@ -29,7 +29,7 @@ description: Provider、Capability 定义字段、验证矩阵和二元身份合
 | `DEF-PROVIDER-05` | 空 `version` | 拒绝 |
 | `DEF-PROVIDER-06` | 不完整 `specification` | 拒绝 |
 | `DEF-PROVIDER-07` | 定义与配置的 Provider ID 不一致 | 拒绝 |
-| `DEF-PROVIDER-08` | 有效 Specification 与相对入口 | 打开成功 |
+| `DEF-PROVIDER-08` | 有效多文档 Specification 映射 | 打开成功 |
 
 这些用例由 Reference 校验器通过公开 `CapabilityGraph.open()` 执行，不依赖内部校验函数。
 
@@ -46,9 +46,10 @@ description: Provider、Capability 定义字段、验证矩阵和二元身份合
 | `parents` | 否 | `[]` | 同 Provider 直接父节点 |
 | `specializes` | 否 | `[]` | 同 Provider 特化目标 |
 | `related` | 否 | `[]` | 有方向的显式关联 |
+| `requires` | 否 | `[]` | 必要上下文，参与 Selection 闭包；`requiredBy` 只派生，不可写在定义中 |
 | `knowledge` | 否 | `[]` | Document 或 Collection 引用 |
 
-跨字段约束：关系端点必须存在于同一 Provider；完整收集全部能力后，再分别检查 `parents` 和 `specializes` 无环；`knowledgeId` 唯一且 locator 合法；单个定义文件最大 262,144 UTF-8 字节。
+跨字段约束：关系端点必须存在于同一 Provider，重复端点拒绝；完整收集全部能力后，分别检查 `parents`、`specializes` 和 `requires` 无环；同一 Provider 的 `knowledgeId` 映射身份必须完全一致，Collection 内重复成员拒绝，合法成员排序后判等；单个定义文件最大 262,144 UTF-8 字节。
 
 ### Capability 可执行验证用例
 

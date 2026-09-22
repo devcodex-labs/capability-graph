@@ -25,8 +25,8 @@ function paginate<T>(items: readonly T[], request: StorePageRequest): StorePage<
 export function memoryGraphStore(snapshot: ValidatedProviderSnapshot): ValidatedProviderView {
   const records = [...snapshot.capabilities.values()];
   const indexes = new Map<NeighborKind, Map<string, CanonicalCapabilityId[]>>();
-  for (const kind of ["parents", "children", "specializes", "specializedBy", "related", "relatedBy"] as const) indexes.set(kind, new Map());
-  for (const node of records) for (const [forward, reverse] of [["parents", "children"], ["specializes", "specializedBy"], ["related", "relatedBy"]] as const) {
+  for (const kind of ["parents", "children", "specializes", "specializedBy", "related", "relatedBy", "requires", "requiredBy"] as const) indexes.set(kind, new Map());
+  for (const node of records) for (const [forward, reverse] of [["parents", "children"], ["specializes", "specializedBy"], ["related", "relatedBy"], ["requires", "requiredBy"]] as const) {
     indexes.get(forward)!.set(node.id.capabilityId, [...new Map(node[forward].map((id) => [id.capabilityId, id])).values()]);
     for (const id of new Set(node[forward].map((id) => id.capabilityId))) {
       const back = indexes.get(reverse)!;

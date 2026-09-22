@@ -2,7 +2,7 @@
 
 从仓库根目录运行 `npm test`，然后运行 `node dist-test/examples/seed-api/main.js`。
 
-本例通过主包公开入口加载 `examples/seed-provider`，取得 Provider 元数据和目录，再选择路由校验、检查关系、显式补选请求 Schema，读取 D-02 与 D-03。不会自动读取 D-01 或 `PROVIDER.md`，也不会启动业务服务。
+本例通过主包公开入口加载 `examples/seed-provider`，取得 Provider 元数据和目录，再选择路由校验、检查关系、用 `resolveSelection()` 展开必要上下文、按角色与语言读取已选文档，并以 `readSpecification()` 单独读取 `SPEC-01`。不会自动读取其他知识，也不会启动业务服务。
 
 `runSeedTask` 可由接入方传入 Runtime Adapter、项目和环境；不传时只执行真实静态/本地知识流程，不将缺 Runtime 解释为“没有实例”。测试 Fixture 仅位于 `test/contract`，不作为此示例的生产依赖。
 

@@ -18,7 +18,8 @@ const runNpm = (args) => execFileSync(process.execPath, [npm, ...args], {
 
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
 assert(manifest.name === '@devcodex/capability-graph', 'unexpected package name');
-assert(Object.keys(manifest.dependencies ?? {}).length === 0, 'public package must keep zero runtime dependencies');
+assert(JSON.stringify(manifest.dependencies) === JSON.stringify({ 'bcp-47': '2.1.1', 'language-subtag-registry': '0.4.2' }),
+  'public package runtime dependencies must match the reviewed BCP 47 validator pair');
 const [dryRun] = JSON.parse(runNpm(['pack', '--dry-run', '--json', '--ignore-scripts']));
 const paths = dryRun.files.map(({ path: file }) => file);
 assert(paths.includes('dist/index.js') && paths.includes('dist/index.d.ts'), 'tarball is missing public entry files');

@@ -10,12 +10,14 @@ import { seedRuntimeFixture } from "./contract/fixture-runtime-adapter.js";
 test("Seed: real definitions and public API select only the two required documents", async () => {
   const result = await runSeedTask();
   assert.equal(result.catalog.items.length, 5); assert.equal(result.runtime, undefined);
-  assert.equal(result.providers.items[0]?.specification?.entryRef?.type, "relative-file");
+  assert.equal(result.providers.items[0]?.specification?.documentCount, 1);
   assert.deepEqual(result.neighbors.groups.parents.items.map((entry) => entry.id.capabilityId), ["request", "route"]);
   assert.equal(result.neighbors.groups.specializes.items[0]?.id.capabilityId, "route.http");
   assert.equal(result.neighbors.groups.related.items[0]?.id.capabilityId, "schema.request");
   assert.deepEqual(result.documents.results.map((entry) => entry.ok ? entry.value.knowledgeId : entry.error.code), ["D-02", "D-03"]);
   assert.ok(result.documents.results.every((entry) => entry.ok && entry.value.text.length > 100));
+  assert.deepEqual(result.selection.added.map((entry) => entry.capabilityId), ["schema.request"]);
+  assert.equal(result.specification.results[0]?.ok, true);
   assert.equal(JSON.stringify(result).includes(seedProviderRoot), false);
 });
 

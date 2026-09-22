@@ -13,7 +13,8 @@ description: 解释 ResultMeta、批量槽位、作用域、修订、分页、�
 | `compositeStaticRevision` | 本次实际 Provider 修订集合的组合身份 |
 | `staticRevision` | 单 Provider 查询的修订 |
 | `staticRevisionByProvider` | 多 Provider 查询的修订映射 |
-| `servedFrom` | `current` 或 `previous` |
+| `servedFrom` | `current`、`previous` 或 `mixed`；多 Provider 查询可混合修订来源 |
+| `servedFromByProvider` | 多 Provider 查询中每个 Provider 对应 `current` 或 `previous` |
 | `refreshFailed` | 最近刷新失败，但当前返回视图仍可读 |
 | `scope` | 本次有效 Provider 范围 |
 | `filter` | 实际应用的查询过滤 |
@@ -52,7 +53,7 @@ Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticR
 
 游标绑定原请求的范围、过滤、limit 和修订。续页必须保留这些条件。最终公开游标编码后最多 32,768 个 base64url 字符；输入超限为 `CG_INPUT_INVALID`，输出超限为 `CG_BUDGET_EXCEEDED`。
 
-邻居六个关系组各自分页。续页只提交仍有 `nextCursor` 的 `kinds` 和对应 `cursors`。页大小和总字节预算同时生效，提高响应字节预算不会放宽游标长度上限。
+邻居八个关系组各自分页。续页只提交仍有 `nextCursor` 的 `kinds` 和对应 `cursors`。页大小和总字节预算同时生效，提高响应字节预算不会放宽游标长度上限。
 
 ## 预算与完整性
 
@@ -61,9 +62,11 @@ Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticR
 | Catalog | 24,576 页字节、200 项、2,048 单项字节 |
 | Neighbors | 50 默认页、100 最大页、24,576 页字节、2,048 单项字节 |
 | Detail | 20 能力、16,384 单项字节、131,072 总字节 |
+| Selection | 32 个显式能力、128 个闭包能力、131,072 总字节 |
 | Document read | 32,768 字节、每次 8 文档 |
+| Specification documents | 每页 20 项、131,072 页字节；正文仍受 Document read 预算约束 |
 | Capability retrieval | 20 候选、512 单候选字节 |
-| Knowledge query | 8 命中、2,048 snippet 字节 |
+| Knowledge query | 128 个原始 targets、128 个最终 targets、8 命中、2,048 snippet 字节 |
 | Runtime | 50 默认页、100 最大页、5,000 ms 等待、4,096 facts 字节 |
 
 字节预算使用 UTF-8 或原始 bytes，不是 JavaScript 字符数。`truncated` 表示继续分页，`partial` 表示检查 warning 或逐项失败。单项过大不会被截断成看似合法的数据；无法取得进展时返回 `CG_BUDGET_EXCEEDED`。

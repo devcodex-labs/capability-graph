@@ -7,6 +7,8 @@
   "parents": ["route", "request"],
   "specializes": ["route.http"],
   "related": ["schema.request"],
+  "requires": ["schema.request"],
   "examples": ["Add required-field validation to POST /users while preserving its route identity."],
-  "knowledge": [{ "kind": "document", "knowledgeId": "D-02", "locator": { "type": "relative-file", "path": "knowledge/route-validation.md" } }]
+  "knowledge": [{ "kind": "document", "knowledgeId": "D-02", "role": "guide", "locale": "en",
+    "locator": { "type": "relative-file", "path": "knowledge/route-validation.md" } }]
 }

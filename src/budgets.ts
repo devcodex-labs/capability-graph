@@ -11,9 +11,12 @@ export interface BudgetConfig {
     readonly defaultKnowledgePageSize: number;
     readonly maxKnowledgePageSize: number;
   };
+  readonly specification: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number };
+  readonly selection: { readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number };
   readonly read: { readonly maxBytes: number; readonly maxDocumentsPerCall: number };
   readonly retrieveCapabilities: { readonly maxCandidates: number; readonly maxCandidateBytes: number };
-  readonly queryKnowledge: { readonly maxHits: number; readonly maxSnippetBytes: number };
+  readonly queryKnowledge: { readonly maxHits: number; readonly maxSnippetBytes: number; readonly maxSelected: number;
+    readonly maxFilterValuesPerDimension: number; readonly maxTargets: number; readonly maxTargetBytes: number };
   readonly runtime: {
     readonly defaultPageSize: number;
     readonly maxPageSize: number;
@@ -31,9 +34,12 @@ export const DEFAULT_BUDGETS: BudgetConfig = Object.freeze({
   neighbors: Object.freeze({ defaultPageSize: 50, maxPageSize: 100, maxBytes: 24_576, maxItemBytes: 2_048 }),
   detail: Object.freeze({ maxCapabilities: 20, maxItemBytes: 16_384, maxBytes: 131_072,
     defaultKnowledgePageSize: 20, maxKnowledgePageSize: 100 }),
+  specification: Object.freeze({ defaultPageSize: 20, maxPageSize: 100, maxBytes: 131_072, maxItemBytes: 16_384 }),
+  selection: Object.freeze({ maxSelected: 32, maxNodes: 128, maxEdges: 256 }),
   read: Object.freeze({ maxBytes: 32_768, maxDocumentsPerCall: 8 }),
   retrieveCapabilities: Object.freeze({ maxCandidates: 20, maxCandidateBytes: 512 }),
-  queryKnowledge: Object.freeze({ maxHits: 8, maxSnippetBytes: 2_048 }),
+  queryKnowledge: Object.freeze({ maxHits: 8, maxSnippetBytes: 2_048, maxSelected: 32,
+    maxFilterValuesPerDimension: 128, maxTargets: 128, maxTargetBytes: 131_072 }),
   runtime: Object.freeze({ defaultPageSize: 50, maxPageSize: 100, timeoutMs: 5_000,
     maxFactsBytes: 4_096, maxAssociationBytes: 2_048 }),
 });
@@ -82,6 +88,7 @@ export function resolveBudgets(overrides: BudgetOverrides = {}): BudgetConfig {
   for (const [group, initial, maximum] of [
     ["neighbors", "defaultPageSize", "maxPageSize"],
     ["detail", "defaultKnowledgePageSize", "maxKnowledgePageSize"],
+    ["specification", "defaultPageSize", "maxPageSize"],
     ["runtime", "defaultPageSize", "maxPageSize"],
   ] as const) {
     if (output[group][initial]! > output[group][maximum]!) invalid(`budgets.${group}.${initial}`);

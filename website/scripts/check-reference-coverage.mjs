@@ -80,7 +80,8 @@ function mutationFor(testCase) {
     case 'provider-config-mismatch': provider.providerId = 'acme.other'; break;
     case 'provider-valid-specification': provider.specification = {
       specificationId: 'acme.http.conventions', version: '1',
-      entryRef: { type: 'relative-file', path: 'PROVIDER.md' }
+      documents: [{ kind: 'document', knowledgeId: 'SPEC-01', role: 'specification',
+        locator: { type: 'relative-file', path: 'PROVIDER.md' } }]
     }; break;
     case 'capability-valid-minimal': break;
     case 'capability-missing-id': delete capability.capabilityId; break;
@@ -96,11 +97,11 @@ function mutationFor(testCase) {
     case 'capability-cross-provider': capability.related = ['other::route']; break;
     case 'capability-invalid-knowledge': capability.knowledge = [{ kind: 'document', knowledgeId: 'guide' }]; break;
     case 'capability-duplicate-knowledge': capability.knowledge = [
-      { kind: 'document', knowledgeId: 'guide', locator: { type: 'http', url: 'https://example.com/a' } },
-      { kind: 'document', knowledgeId: 'guide', locator: { type: 'http', url: 'https://example.com/b' } }
+      { kind: 'document', knowledgeId: 'guide', role: 'guide', locator: { type: 'http', url: 'https://example.com/a' } },
+      { kind: 'document', knowledgeId: 'guide', role: 'guide', locator: { type: 'http', url: 'https://example.com/b' } }
     ]; break;
     case 'capability-path-traversal': capability.knowledge = [{
-      kind: 'document', knowledgeId: 'guide', locator: { type: 'relative-file', path: '../outside.md' }
+      kind: 'document', knowledgeId: 'guide', role: 'guide', locator: { type: 'relative-file', path: '../outside.md' }
     }]; break;
     case 'capability-oversized': capability.description = 'x'.repeat(262_145); break;
     default: throw new Error(`unimplemented definition mutation: ${testCase.mutation}`);

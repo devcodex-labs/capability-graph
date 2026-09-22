@@ -1,6 +1,6 @@
 ---
 title: 查询接口
-description: Catalog、Detail、Neighbor 和 Provider 查询的输入、分页、修订与返回结构参考。
+description: Catalog、Detail、Neighbor、Selection 与文档发现的输入、分页和修订参考。
 ---
 
 # 查询接口
@@ -19,8 +19,16 @@ description: Catalog、Detail、Neighbor 和 Provider 查询的输入、分页�
 
 ## NeighborQuery
 
-可指定关系种类、每组游标、页大小和静态修订。结果为六组固定键，每组独立报告完整性和续页位置。
+可指定关系种类、每组游标、页大小和静态修订。结果为八组固定键：`parents/children`、`specializes/specializedBy`、`related/relatedBy`、`requires/requiredBy`。每组独立报告完整性和续页位置。只有 `requires` 参与 Selection 闭包；`requiredBy` 是由它派生的反向发现关系。
 
 ## Provider 查询
 
-`listProviders()` 返回页级 `meta`；`getProvider()` 保留 Provider 摘要顶层字段并增加 `meta`，便于读取 `servedFrom` 和 `refreshFailed`。
+`listProviders()` 返回页级 `meta`，Specification 只给 `documentCount`。`getProvider()` 增加有界 `specificationDocuments` 首屏与 `meta`；`listSpecificationDocuments()` 按 `knowledgeId` 续取。公开摘要不会携带内部完整规范文档列表。
+
+## Selection
+
+`ResolveSelectionQuery` 提供非空 `selected`、可选的范围收窄和逐 Provider 指定修订。原始选择最多 32 项，即使重复也计入；闭包最多 128 个能力和 256 条真实依赖边。`SelectionResult` 返回首次出现顺序的 `requested`、排序后的 `resolved/added`、全部 `requiresEdges`，以及每个节点的 `SelectionReason.requested/requiredBy`。任何节点、边、Scope 或修订错误都会使整次调用失败，不交付半个闭包。多 Provider 返回 `servedFromByProvider`、`staticRevisionByProvider` 与组合修订；`servedFrom` 可能是 `mixed`。
+
+## 文档发现
+
+`DocumentPageQuery` 以修订、页大小和游标绑定一次分页。`KnowledgeMembersQuery` 需要能力身份和 Collection ID，`KnowledgeMembersPage` 返回成员的完整路由元数据；`SpecificationDocumentsPage` 只返回该 Provider 的规范文档元数据。默认 20 项、最大 100 项，须检查 `completeness` 和 `nextCursor`。

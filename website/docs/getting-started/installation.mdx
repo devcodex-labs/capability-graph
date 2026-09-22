@@ -1,11 +1,13 @@
 ---
 title: 安装
-description: 安装 Capability Graph v1.0.0，并确认 Node.js、ESM 和包入口要求。
+description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要求。
 ---
 
 # 安装
 
-<span className="cg-status">v1.0.0 可用</span>
+<span className="cg-status">1.0.1 文档候选，尚未发布</span>
+
+以下示例对应仓库中的 1.0.1 候选合同。正式发布前，Registry 的无版本安装仍可能取得 1.0.0；先用 `npm view @devcodex/capability-graph version` 核对版本。1.0.1 发布并通过公开安装验收后，下面的无版本安装才对应本页后续接口。
 
 把包装在负责加载 Provider、向 Agent 提供 API/MCP 的 Node.js 接入项目中。Provider 定义目录只是数据目录，不必单独安装一份包；一个接入项目可以加载多个 Provider。
 
@@ -45,7 +47,7 @@ node check.mjs
 
 ## 安装内容
 
-主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及数据库 Authority、Runtime、两类 Retriever 和远程 Reader 的扩展合同。主包没有运行时依赖。
+主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及数据库 Authority、Runtime、两类 Retriever 和远程 Reader 的扩展合同。1.0.1 固定依赖 `bcp-47` 与 `language-subtag-registry`，用于独立于宿主 ICU 的语言标签校验。
 
 它不安装 HTTP/MCP Server、数据库驱动、向量数据库、RAG 后端或 VextJS Adapter。MCP SDK 仅用于仓库的独立私有示例；要提供 MCP，由接入项目安装 SDK 并实现协议层。
 
@@ -58,7 +60,7 @@ node check.mjs
 | Node 版本不满足要求 | 先用 `node --version` 检查上述范围 |
 | npm 返回版本或包不存在 | 用 `npm config get registry` 检查 registry 配置，再用 `npm view @devcodex/capability-graph version` 核对镜像是否已同步 |
 
-本文介绍 `1.0.0` 的公开接口。安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本。
+安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本；1.0.0 不具备后文的 Selection 与多文档 Specification 接口。
 
 ## 下一步
 

@@ -140,7 +140,7 @@ test("batch details retain duplicate/input error slots; expose bounded summaries
 });
 
 test("detail KnowledgeSummary does not expand collections and resumes by knowledgeId", async () => {
-  const doc = (knowledgeId: string) => ({ kind: "document", knowledgeId, locator: { type: "http", url: `https://example.test/${knowledgeId}` } });
+  const doc = (knowledgeId: string) => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "http", url: `https://example.test/${knowledgeId}` } });
   const graph = await CapabilityGraph.open(options({ seed: () => new FakeDatabase([record("a", { knowledge: [doc("z"), { kind: "collection", knowledgeId: "a", members: [doc("inner")] }] })]) }));
   try {
     const bound = graph.forProvider("seed");

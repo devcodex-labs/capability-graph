@@ -44,13 +44,20 @@ import {} from "@devcodex/capability-graph/mcp";
 import type { UnvalidatedCapabilityRecord } from "@devcodex/capability-graph";
 // @ts-expect-error Validated internal graph nodes are not the public bounded detail projection.
 import type { StaticCapability } from "@devcodex/capability-graph";
-import type { BoundProviderGraph, CapabilityDetail } from "@devcodex/capability-graph";
+import type { BoundProviderGraph, CapabilityDetail, KnowledgeDocumentRef, SelectionResult,
+  UnvalidatedProviderRecord } from "@devcodex/capability-graph";
 function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, raw: UnvalidatedCapabilityRecord, neighbors: NeighborPage) {
   const provider: Promise<ProviderResult> = bound.getProvider();
   void provider.then((value) => [value.staticRevision, value.meta.servedFrom, value.meta.refreshFailed]);
   const completeness: "complete" | "truncated" | "partial" = neighbors.groups.children.completeness;
   void completeness;
   void bound.listCatalog({ limit: 2 });
+  const selection: Promise<SelectionResult> = bound.resolveSelection({ selected: ["route.validation"] });
+  void selection.then((value) => [value.resolved, value.requiresEdges, value.reasons, value.meta.servedFromByProvider]);
+  void bound.listKnowledgeMembers({ capabilityId: "route.validation", collectionId: "examples", limit: 20 });
+  void bound.listSpecificationDocuments({ limit: 20 });
+  void bound.readSpecification({ knowledgeIds: ["SPEC-01"], locales: ["zh-CN"] });
+  void bound.readDocuments({ selected: ["route.validation"], roles: ["guide"], locales: ["zh-CN"] });
   // @ts-expect-error Bound calls cannot override provider scope.
   void bound.listCatalog({ requestProviderScope: ["other"] });
   // @ts-expect-error Detail does not expose internal full adjacency lists.
@@ -58,4 +65,19 @@ function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, raw:
   void raw.capabilityId;
 }
 void graphConsumer;
+const document: KnowledgeDocumentRef = { kind: "document", knowledgeId: "guide", role: "guide",
+  locator: { type: "http", url: "https://example.test/guide" } };
+// @ts-expect-error v1.0.1 requires a role on every Document.
+const legacyDocument: KnowledgeDocumentRef = { kind: "document", knowledgeId: "guide",
+  locator: { type: "http", url: "https://example.test/guide" } };
+const legacyProvider: UnvalidatedProviderRecord = { providerId: "seed.http", name: "Seed", version: "1", specification: {
+  specificationId: "rules", version: "1",
+  // @ts-expect-error Single entryRef was removed by the multi-document Specification contract.
+  entryRef: "PROVIDER.md",
+} };
+const legacyRecord: UnvalidatedCapabilityRecord = { capabilityId: "route", name: "Route", description: "Routing", whenToUse: "When routing",
+  // @ts-expect-error requiredBy is derived, never authored in a capability definition.
+  requiredBy: ["other"],
+};
+void [document, legacyDocument, legacyProvider, legacyRecord];
 void [missingProvider, unknownBudget, badBudget, badBatch, computeStaticRevision, resolveBudgets];

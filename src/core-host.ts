@@ -158,6 +158,68 @@ export class CoreHost {
     } finally { await pin.release(); }
   }
 
+  /** A single pin can compose different retained revisions without claiming a cross-provider transaction. */
+  async querySelected<T>(providers: readonly string[], request: readonly string[] | undefined,
+    required: Readonly<Record<string, string>> | undefined, run: (context: QueryContext) => Promise<T>): Promise<T> {
+    if (this.closed) throw new CapabilityGraphError("CG_NO_ACTIVE_VIEW", { nextAction: "refresh" });
+    const pin = this.store.pin();
+    try {
+      const narrowed = computeEffectiveScope({ hostAllowed: [...this.scope], integrationEnabled: [...this.scope], request, phase: "query" });
+      if (!narrowed.ok) throw narrowed.error;
+      const ids = [...new Set(providers)].sort();
+      if (!ids.length || ids.some((id) => !narrowed.scope.has(id))) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
+      if (required !== undefined) {
+        if (required === null || typeof required !== "object" || Array.isArray(required) ||
+            ![Object.prototype, null].includes(Object.getPrototypeOf(required)) ||
+            Reflect.ownKeys(required).some((key) => typeof key !== "string" ||
+              !Object.hasOwn(Object.getOwnPropertyDescriptor(required, key)!, "value")) ||
+            Object.keys(required).sort().join("\0") !== ids.join("\0") ||
+            Object.values(required).some((revision) => typeof revision !== "string" || !revision)) {
+          throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
+        }
+      }
+      const selected = new Map<string, ValidatedProviderView>();
+      const origins: Record<string, "current" | "previous"> = {};
+      const revisions: Record<string, string> = {};
+      for (const id of ids) {
+        const revision = required?.[id];
+        let source = pin.current.getView(id);
+        let origin: "current" | "previous" = "current";
+        if (revision !== undefined && source?.staticRevision !== revision) {
+          source = pin.previous?.getView(id);
+          origin = "previous";
+          if (source?.staticRevision !== revision) throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh" });
+        }
+        if (!source) throw new CapabilityGraphError(revision ? "CG_REVISION_MISMATCH" : "CG_NO_ACTIVE_VIEW", { nextAction: "refresh" });
+        origins[id] = origin;
+        revisions[id] = source.staticRevision;
+        const fixed = source;
+        let readable: Promise<void> | undefined;
+        const read = async <V>(operation: () => Promise<V>): Promise<V> => {
+          try { return await operation(); }
+          catch (error) {
+            if (error instanceof CapabilityGraphError && error.code !== "CG_NO_ACTIVE_VIEW" && error.code !== "CG_REVISION_MISMATCH") throw error;
+            throw new CapabilityGraphError(revision === undefined ? "CG_NO_ACTIVE_VIEW" : "CG_REVISION_MISMATCH", { nextAction: "refresh" });
+          }
+        };
+        const assertReadable = () => readable ??= read(async () => { await fixed.assertReadable?.(); });
+        const fromView = async <V>(operation: () => Promise<V>): Promise<V> => { await assertReadable(); return read(operation); };
+        selected.set(id, { ...fixed, assertReadable, getCapability: (key) => fromView(() => fixed.getCapability(key)),
+          listCapabilities: (page) => fromView(() => fixed.listCapabilities(page)),
+          neighbors: (key, kind, page) => fromView(() => fixed.neighbors(key, kind, page)) });
+      }
+      const graph = new FrozenGraph(selected);
+      const values = new Set(Object.values(origins));
+      const servedFrom = values.size > 1 ? "mixed" : values.has("previous") ? "previous" : "current";
+      const meta: ResultMeta = { completeness: "complete", servedFrom, servedFromByProvider: origins,
+        staticRevisionByProvider: revisions, scope: ids, warnings: [], compositeStaticRevision: graph.compositeStaticRevision(ids),
+        ...(ids.length === 1 ? { staticRevision: revisions[ids[0]!] } : {}),
+        ...(ids.some((id) => pin.failedProviders.has(id)) ? { refreshFailed: true } : {}) };
+      for (const id of ids) if (required?.[id] !== undefined) await selected.get(id)!.assertReadable?.();
+      return await run({ graph, scope: new Set(ids), meta });
+    } finally { await pin.release(); }
+  }
+
   /** Validate before publishing each provider; refresh failure records status without discarding current/previous. */
   reload(options: { providerId?: string } = {}): Promise<ReloadResult> {
     if (!options || typeof options !== "object" || Array.isArray(options)) {

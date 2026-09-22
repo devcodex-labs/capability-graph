@@ -4,8 +4,8 @@ import type { QueryContext } from "../core-host.js";
 import { CapabilityGraphError, type ErrorShape } from "../errors.js";
 import { canonicalJson } from "../hash.js";
 import { formatQualifiedId, isKnowledgeId } from "../identity.js";
-import { locatorSource, readContext, readDocument, validateSelection } from "../knowledge/read.js";
-import type { KnowledgeHit, KnowledgeIndexEvidence, KnowledgeReader, KnowledgeReadContext, KnowledgeRetriever, KnowledgeRetrievalAccess, KnowledgeSearchTarget } from "../knowledge/types.js";
+import { locatorSource, readContext, readDocument, validateDocumentFilters, validateSelection } from "../knowledge/read.js";
+import type { KnowledgeIndexEvidence, KnowledgeReader, KnowledgeReadContext, KnowledgeResultHit, KnowledgeRetriever, KnowledgeRetrievalAccess, KnowledgeSearchTarget } from "../knowledge/types.js";
 import { bytes, capability, identity, inputInvalid, limit } from "../query/common.js";
 import type { KnowledgeDocumentRef, ResultMeta, StaticCapability } from "../types.js";
 import { freeze } from "../validate/values.js";
@@ -21,12 +21,22 @@ const stale = (): never => { throw new CapabilityGraphError("CG_INDEX_STALE", { 
 export function projectKnowledgeTarget(target: KnowledgeSearchTarget): KnowledgeSearchTarget {
   return { id: { providerId: target.id.providerId, capabilityId: target.id.capabilityId }, knowledgeId: target.knowledgeId,
     locator: target.locator.type === "relative-file" ? { type: "relative-file", path: target.locator.path } : { type: "http", url: target.locator.url },
-    viaCollectionIds: [...target.viaCollectionIds] };
+    viaCollectionIds: [...target.viaCollectionIds], role: target.role,
+    ...(target.locale === undefined ? {} : { locale: target.locale }), ...(target.title === undefined ? {} : { title: target.title }),
+    ...(target.summary === undefined ? {} : { summary: target.summary }),
+    ...(target.canonicalUrl === undefined ? {} : { canonicalUrl: target.canonicalUrl }) };
 }
 
 /** Expand only selected knowledge, then verify index evidence and bounded hits against that boundary. */
 export async function queryKnowledge(context: QueryContext, query: QueryKnowledgeQuery, budgets: BudgetConfig, readers: readonly KnowledgeReader[], retriever?: KnowledgeRetriever, bound?: string): Promise<QueryKnowledgePage> {
+  const rawLimit = (value: unknown, maximum: number) => {
+    if (!Array.isArray(value)) inputInvalid();
+    if (value.length > maximum) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  };
+  rawLimit(query.selected, budgets.queryKnowledge.maxSelected);
+  for (const value of [query.knowledgeIds, query.roles, query.locales]) if (value !== undefined) rawLimit(value, budgets.queryKnowledge.maxFilterValuesPerDimension);
   queryText(query.text); validateSelection(query);
+  const filters = validateDocumentFilters(query);
   if (query.knowledgeIds?.length === 0) inputInvalid();
   const count = limit(query.limit, budgets.queryKnowledge.maxHits, budgets.queryKnowledge.maxHits);
   const warnings: ResultMeta["warnings"][number][] = [];
@@ -55,7 +65,12 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
   for (const node of nodes) {
     if (!node.knowledge.length) { warnings.push({ code: "CG_KNOWLEDGE_NOT_ASSOCIATED", message: "Selected capability has no associated knowledge.", details: { qualifiedId: formatQualifiedId(node.id) } }); continue; }
     const add = (ref: KnowledgeDocumentRef, via: string[]) => {
-      const target = { id: node.id, knowledgeId: ref.knowledgeId, locator: ref.locator, viaCollectionIds: via };
+      if ((filters.roles !== undefined && !filters.roles.has(ref.role)) ||
+          (filters.locales !== undefined && (ref.locale === undefined || !filters.locales.has(ref.locale)))) return;
+      const target = { id: node.id, knowledgeId: ref.knowledgeId, locator: ref.locator, viaCollectionIds: via,
+        role: ref.role, ...(ref.locale === undefined ? {} : { locale: ref.locale }), ...(ref.title === undefined ? {} : { title: ref.title }),
+        ...(ref.summary === undefined ? {} : { summary: ref.summary }),
+        ...(ref.canonicalUrl === undefined ? {} : { canonicalUrl: ref.canonicalUrl }) };
       const targetKey = key(target); const previous = allowed.get(targetKey);
       allowed.set(targetKey, { target: { ...target, viaCollectionIds: [...new Set([...(previous?.target.viaCollectionIds ?? []), ...via])].sort() },
         ref, context: readContext(context, node.id.providerId) });
@@ -72,12 +87,22 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
     }
   }
   for (const id of query.knowledgeIds ?? []) if (!matched.has(id)) warnings.push({ code: "CG_NOT_FOUND", message: "Requested knowledge is not declared by any selected capability.", details: { knowledgeId: id } });
-  if (!retriever) throw new CapabilityGraphError("CG_RETRIEVER_UNCONFIGURED", { nextAction: "configure_backend" });
   const meta = (): ResultMeta => ({ ...context.meta, warnings, completeness: warnings.length ? "partial" : "complete",
-    budgets: { "queryKnowledge.maxHits": count, "queryKnowledge.maxSnippetBytes": budgets.queryKnowledge.maxSnippetBytes } });
-  if (!allowed.size) return { items: [], knowledgeState: (query.knowledgeIds ?? []).some((id) => !matched.has(id)) ? "filtered_empty" : "empty_collection", meta: meta() };
+    budgets: { "queryKnowledge.maxHits": count, "queryKnowledge.maxSnippetBytes": budgets.queryKnowledge.maxSnippetBytes,
+      "queryKnowledge.maxTargets": budgets.queryKnowledge.maxTargets, "queryKnowledge.maxTargetBytes": budgets.queryKnowledge.maxTargetBytes } });
+  if (!allowed.size) {
+    const emptyCollection = query.knowledgeIds === undefined && query.roles === undefined && query.locales === undefined &&
+      nodes.every((node) => node.knowledge.length > 0 && node.knowledge.every((ref) => ref.kind === "collection" && !ref.members.length));
+    return { items: [], knowledgeState: emptyCollection ? "empty_collection" : "filtered_empty", meta: meta() };
+  }
 
   const entries = [...allowed.entries()].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  if (entries.length > budgets.queryKnowledge.maxTargets) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  const targets = entries.map(([, entry]) => projectKnowledgeTarget(entry.target));
+  if (Buffer.byteLength(canonicalJson(targets), "utf8") > budgets.queryKnowledge.maxTargetBytes) {
+    throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  }
+  if (!retriever) throw new CapabilityGraphError("CG_RETRIEVER_UNCONFIGURED", { nextAction: "configure_backend" });
   // Mapping identity changes with bindings/source roots, independently of document content identity.
   const mappingRevision = `m:${hash(entries.map(([, entry]) => ({ target: projectKnowledgeTarget(entry.target),
     contextDigest: hash({ providerId: entry.context.providerId, authorityKind: entry.context.sourceContext.authorityKind,
@@ -85,7 +110,7 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
   // Authorization scope is not an index dependency: only expanded, selected targets contribute revisions.
   const staticRevisionByProvider = Object.fromEntries(entries.map(([, entry]) => [entry.context.providerId, entry.context.staticRevision]));
   const request = freeze({ text: query.text, staticRevisionByProvider, mappingRevision,
-    targets: entries.map(([, entry]) => projectKnowledgeTarget(entry.target)), limit: count });
+    targets, limit: count });
   let active = true;
   const accessErrors = new WeakMap<object, CapabilityGraphError>();
   const pending = new Set<ReturnType<KnowledgeReader["read"]>>();
@@ -146,7 +171,7 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
     if (error instanceof CapabilityGraphError && error.code === "CG_REVISION_MISMATCH") throw error;
     stale();
   }
-  const items: KnowledgeHit[] = [];
+  const items: KnowledgeResultHit[] = [];
   for (const [index, hit] of raw.hits.entries()) {
     try {
       if (!hit || typeof hit.snippet !== "string") contract("knowledge_hit_invalid");
@@ -162,7 +187,11 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
       if (observedDocument && (hit.endOffset > observedDocument.bytes.length ||
           !Buffer.from(observedDocument.bytes.subarray(hit.startOffset, hit.endOffset)).equals(Buffer.from(hit.snippet)))) contract("knowledge_hit_content_mismatch");
       items.push({ id, knowledgeId: hit.knowledgeId, contentId: hit.contentId, source: hit.source,
-        startOffset: hit.startOffset, endOffset: hit.endOffset, snippet: hit.snippet, ...(hit.score === undefined ? {} : { score: hit.score }) });
+        startOffset: hit.startOffset, endOffset: hit.endOffset, snippet: hit.snippet, ...(hit.score === undefined ? {} : { score: hit.score }),
+        role: entry.ref.role, ...(entry.ref.locale === undefined ? {} : { locale: entry.ref.locale }),
+        ...(entry.ref.title === undefined ? {} : { title: entry.ref.title }),
+        ...(entry.ref.summary === undefined ? {} : { summary: entry.ref.summary }),
+        ...(entry.ref.canonicalUrl === undefined ? {} : { canonicalUrl: entry.ref.canonicalUrl }) });
     } catch (error) { warnings.push(warning(error instanceof CapabilityGraphError ? error.code : "CG_ADAPTER_CONTRACT_INVALID", index)); }
   }
   return { items, knowledgeState: "searched", indexStatus: { mappingRevision, observedAt: evidence.observedAt, freshness: "current", validatedDocuments: allowed.size },

@@ -16,7 +16,7 @@ description: 诊断 open、Authority、定义校验、Provider scope、身份与
 3. 文件根存在且进程可读，`provider.json` 的 ID 与配置一致。
 4. 单个定义文件不超过 262,144 UTF-8 字节，JSON 可解析。
 5. 所有必填字段、关系端点和知识 locator 合法。
-6. parents 与 specializes 分别无环。
+6. `parents`、`specializes`、`requires` 分别无环；数据库 Authority 的反向关系流还必须与正向记录一致。
 
 首次加载失败没有旧视图可回退。修复来源后重新 open，不要把缺 Authority 改成空目录成功。
 

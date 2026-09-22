@@ -8,7 +8,7 @@
     { "id": "DEF-PROVIDER-05", "target": "provider", "field": "version", "mutation": "provider-empty-version", "expect": "CG_VALIDATION_FAILED", "description": "空 version 被拒绝" },
     { "id": "DEF-PROVIDER-06", "target": "provider", "field": "specification", "mutation": "provider-invalid-specification", "expect": "CG_VALIDATION_FAILED", "description": "不完整 Specification 被拒绝" },
     { "id": "DEF-PROVIDER-07", "target": "provider", "field": "providerId", "mutation": "provider-config-mismatch", "expect": "CG_VALIDATION_FAILED", "description": "定义与配置 Provider ID 不一致时拒绝" },
-    { "id": "DEF-PROVIDER-08", "target": "provider", "field": "specification.entryRef", "mutation": "provider-valid-specification", "expect": "success", "description": "有效 Specification metadata 与相对入口可打开" },
+    { "id": "DEF-PROVIDER-08", "target": "provider", "field": "specification.documents", "mutation": "provider-valid-specification", "expect": "success", "description": "有效多文档 Specification 映射可打开" },
     { "id": "DEF-CAP-01", "target": "capability", "field": "complete record", "mutation": "capability-valid-minimal", "expect": "success", "description": "最小能力定义可打开" },
     { "id": "DEF-CAP-02", "target": "capability", "field": "capabilityId", "mutation": "capability-missing-id", "expect": "CG_VALIDATION_FAILED", "description": "缺少 capabilityId 被拒绝" },
     { "id": "DEF-CAP-03", "target": "capability", "field": "capabilityId", "mutation": "capability-invalid-id", "expect": "CG_IDENTITY_INVALID", "description": "非法 Capability ID 被拒绝" },

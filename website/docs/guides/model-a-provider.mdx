@@ -34,7 +34,7 @@ description: 从职责边界、身份、能力目录、关系、知识和验证�
 
 ## 4. 添加显式关系
 
-只声明能解释的 `parents`、`specializes` 和 `related`。端点必须存在于同一 Provider；不要从名称或文件夹推导边。
+只声明能解释的 `parents`、`specializes`、`related` 和 `requires`。端点必须存在于同一 Provider；不要从名称或文件夹推导边。`requires` 表达任务必需的上下文，会进入 Selection 闭包，不要用它泛化弱关联。
 
 ## 5. 关联知识和 Runtime
 

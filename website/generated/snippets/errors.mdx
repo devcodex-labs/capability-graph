@@ -12,7 +12,7 @@
 | `CG_NOT_FOUND` | 请求的 Provider、Capability、Knowledge 或 Runtime 修订不存在。 | 完整身份在当前可读视图中没有匹配项。 | `fix_input` | 校正身份，或先调用列表/发现接口获取当前可用项。 |
 | `CG_VALIDATION_FAILED` | 静态来源定义未通过验证。 | Schema、哈希、端点或其他图约束不成立。 | `repair_source` | 根据有限 details 修复权威来源，再执行刷新。 |
 | `CG_RELATION_CROSS_PROVIDER` | 图关系跨越了 Provider 边界。 | parents、specializes 或 related 指向其他 Provider。 | `repair_source` | 把关系端点改为同一 Provider 内的能力身份。 |
-| `CG_RELATION_CYCLE` | 分类或特化关系形成环。 | parents 或 specializes 的全图验证发现循环依赖。 | `repair_source` | 调整关系方向或移除闭环边，再刷新来源。 |
+| `CG_RELATION_CYCLE` | 分类或特化关系形成环。 | parents、specializes 或 requires 的独立全图验证发现环。 | `repair_source` | 调整关系方向或移除闭环边，再刷新来源。 |
 | `CG_LOAD_FAILED` | Provider 权威来源加载失败。 | 文件、数据库扫描或视图清理无法完成。 | `repair_source` | 检查来源可读性与后端状态；恢复后重新加载。 |
 | `CG_NO_ACTIVE_VIEW` | 当前没有已验证且可读的 Provider 视图。 | 实例已关闭，或刷新失败且不存在可继续服务的旧视图。 | `refresh` | 恢复来源后刷新；实例已关闭时创建新实例。 |
 | `CG_REVISION_MISMATCH` | 请求的修订或游标不再对应当前可读视图。 | 分页、检索或 Runtime 请求携带了过期修订。 | `refresh` | 放弃旧游标，从首个请求重新获取当前修订。 |

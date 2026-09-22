@@ -12,8 +12,9 @@ description: 选择正确关系类型，验证端点、方向和独立环约束�
 1. “B 是 A 的直接分类或组成上位概念”时，B 可作为 A 的 `parents`。
 2. “A 保留 B 的核心语义但更具体”时，A 可 `specializes` B。
 3. “两者只需要提示关联，且方向有意义”时，使用 `related`。
+4. “使用 A 完成任务前必须同时理解 B”时，A 用 `requires` 指向 B；这条边会被 Selection 展开。
 
-不要为了让图更密而同时声明多种关系。`parents` 和 `specializes` 分别独立检查无环；一个关系图无环不能替另一个关系图背书。
+不要为了让图更密而同时声明多种关系。`parents`、`specializes` 和 `requires` 分别独立检查无环；一个关系图无环不能替另一个关系图背书。`related` 不会加入 Selection 闭包。
 
 以下是需合并到已有 `route.validation` 定义的**配置片段**，省略了必填的 `name`、`description`、`whenToUse`。`route`、`route.http`、`schema.request` 必须已在同一 Provider 定义，完整样本见 [Seed](../examples/seed-provider)。
 
@@ -26,13 +27,13 @@ description: 选择正确关系类型，验证端点、方向和独立环约束�
 }
 ```
 
-反向组 `children`、`specializedBy` 和 `relatedBy` 在查询时生成，不写回定义。`related` 不自动对称；需要双向语义时，两端分别声明。
+反向组 `children`、`specializedBy`、`relatedBy` 和 `requiredBy` 在查询时生成，不写回定义。`related` 不自动对称；需要双向语义时，两端分别声明。
 
 本例把验证归入路由能力族，用 `parents` 表达分类；只有当作者确实把它建模为 HTTP 路由的更具体形式时，才保留 `specializes`。如果验证是独立组合能力，应删去该特化边，改用适合业务的关联。请求 Schema 与验证不是同一种能力，因此以 `related` 提示协作，而不强行建成父子。
 
 ## 验证
 
-通过 `getNeighbors()` 分组检查方向，并加入悬空端点、自环、parents 环和 specializes 环负向 Fixture。
+通过 `getNeighbors()` 分组检查方向，并加入悬空端点、自环，以及 `parents`、`specializes`、`requires` 各自成环的负向 Fixture。只有确实必要的上下文才声明 `requires`，否则会扩大读取前的能力选择。
 
 查询片段，`provider` 已绑定定义所属 Provider：
 
@@ -42,4 +43,4 @@ console.log(page.groups.parents.items.map(({ id }) => id.capabilityId));
 console.log(page.groups.related.items.map(({ id }) => id.capabilityId));
 ```
 
-对上面的片段，预期分别包含 `route`、`schema.request`。查 `route` 的 `children` 才会看到反向的验证能力。若 `open()` 报 `CG_VALIDATION_FAILED`，先检查端点存在性与两种独立的环约束；不要通过改文件名试图改变关系。随后可[添加本地知识](./add-local-knowledge)。
+对上面的片段，预期分别包含 `route`、`schema.request`。查 `route` 的 `children` 才会看到反向的验证能力。若 `open()` 报 `CG_VALIDATION_FAILED`，先检查端点存在性与三种独立的环约束；不要通过改文件名试图改变关系。随后可[添加本地知识](./add-local-knowledge)。

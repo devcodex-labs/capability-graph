@@ -41,7 +41,9 @@
     "specializes",
     "specializedBy",
     "related",
-    "relatedBy"
+    "relatedBy",
+    "requires",
+    "requiredBy"
   ],
   "NextAction": [
     "fix_input",

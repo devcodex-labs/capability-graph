@@ -7,15 +7,15 @@ description: 区分本地 Document、Collection、Retriever 与 Reader 的职责
 
 <span className="cg-status">Document 可用；检索仅合同</span>
 
-能力可以声明 `KnowledgeRef`，但知识不自动随关系展开。调用方先选择非空能力集合，再决定读取或检索哪些知识。
+能力可以声明 `KnowledgeRef`，但知识不自动随一般关系展开。调用方先选择非空能力集合；仅 `requires` 可通过 `resolveSelection()` 加入必要能力，随后再决定读取或检索哪些知识。
 
 ## Document
 
-本地 `relative-file` Document 可由 Core 直接读取，不依赖模型、数据库或网络。路径受 Provider 根、真实路径和字节预算约束，每次读取都会取得内容身份。
+本地 `relative-file` Document 可由 Core 直接读取，不依赖模型、数据库或网络。每篇必须声明角色，可选语言和展示元数据；路径受 Provider 根、真实路径和字节预算约束，每次读取都会取得内容身份。
 
 ## Collection
 
-Collection 表示需要检索的知识集合，不能通过 `readDocuments()` 拼接读取。它需要显式 `KnowledgeRetriever`，并返回与当前静态修订和知识映射一致的证据。
+Collection 表示知识集合，不能通过 `readDocuments()` 拼接整读。`listKnowledgeMembers()` 有界列出成员元数据；调用方知道成员 ID 后，可用 `readDocuments({ knowledgeIds: [...] })` 精确读取成员。按文字检索集合需要显式 `KnowledgeRetriever`，并返回与当前静态修订和知识映射一致的证据。
 
 ## 远程 Reader
 

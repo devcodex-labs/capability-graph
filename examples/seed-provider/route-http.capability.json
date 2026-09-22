@@ -6,5 +6,6 @@
   "distinction": "Describes the route type; concrete method/path registrations are runtime instances.",
   "parents": ["route"],
   "examples": ["Find the registered POST /users instance in the selected project and environment."],
-  "knowledge": [{ "kind": "document", "knowledgeId": "D-01", "locator": { "type": "relative-file", "path": "knowledge/route-http.md" } }]
+  "knowledge": [{ "kind": "document", "knowledgeId": "D-01", "role": "guide", "locale": "en",
+    "locator": { "type": "relative-file", "path": "knowledge/route-http.md" } }]
 }

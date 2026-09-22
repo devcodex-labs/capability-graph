@@ -7,5 +7,6 @@
   "parents": ["request"],
   "related": ["route.validation"],
   "examples": ["Describe required user fields and test malformed payload handling in the host application."],
-  "knowledge": [{ "kind": "document", "knowledgeId": "D-03", "locator": { "type": "relative-file", "path": "knowledge/schema-request.md" } }]
+  "knowledge": [{ "kind": "document", "knowledgeId": "D-03", "role": "reference", "locale": "en",
+    "locator": { "type": "relative-file", "path": "knowledge/schema-request.md" } }]
 }

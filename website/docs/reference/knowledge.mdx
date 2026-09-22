@@ -1,6 +1,6 @@
 ---
 title: 知识接口
-description: KnowledgeRef、ReadDocumentsQuery、DocumentRead、检索目标、命中和索引证据参考。
+description: 文档路由、显式读取、Specification 与检索目标合同参考。
 ---
 
 # 知识接口
@@ -9,14 +9,18 @@ description: KnowledgeRef、ReadDocumentsQuery、DocumentRead、检索目标、�
 
 ## KnowledgeRef
 
-`document` 含 `knowledgeId` 和 locator；`collection` 还含 Document members。locator 当前支持 `relative-file` 和 `http`。
+`KnowledgeDocumentRef` 必填 `knowledgeId`、locator 和 `role`；可声明 `locale/title/summary/canonicalUrl`。`locale` 采用固定注册表校验的 BCP 47 规范值，过滤是精确匹配，没有父语言回退。`KnowledgeCollectionRef` 可有标题和摘要，members 是完整 Document 映射；Collection 没有聚合正文。locator 当前支持 `relative-file` 和 `http`。
 
 ## readDocuments
 
-输入包含非空 `selected`、可选 `knowledgeIds`、范围、修订和读取预算。返回批量结果，每个 `DocumentRead` 携带能力身份、知识 ID、来源、内容类型、内容身份和精确字节。
+`ReadDocumentsQuery` 包含非空 `selected`、可选 `knowledgeIds/roles/locales`、范围和修订。同维取并、异维取交；先筛选再应用每次最多 8 篇的预算和 Reader。`DocumentReadBatch` 的 `knowledgeState` 区分无关联、筛选后为空和匹配，逐项结果保留错误槽。`DocumentRead` 携带能力身份、文档路由元数据、来源、内容类型、内容身份、正文和精确字节。
 
-Collection 不支持直接读；远程 Document 需要 `KnowledgeReader`。
+只有在 `knowledgeIds` 明确写出成员 ID 时才直接读取 Collection 成员；仅给 Collection ID 不会整读。远程 Document 需要 `KnowledgeReader`。
+
+## readSpecification
+
+`ReadSpecificationQuery` 限定一个 Provider，可按 `knowledgeIds/locales` 筛选；正文仅在该方法被显式调用时读取。`SpecificationReadBatch` 保留逐篇成功或错误，成功项 `SpecificationDocumentRead` 以 `providerId` 标识来源，不伪造 Capability ID。无规范、筛空和匹配可区分；单次仍受 8 篇预算。
 
 ## queryKnowledge
 
-`KnowledgeSearchTarget` 是运输安全的已选目标，不含绝对知识根。`KnowledgeHit` 使用 UTF-8 字节偏移，`endOffset` 为开区间。`KnowledgeIndexEvidence` 必须证明映射、配置和内容身份与当前请求一致，即使零命中也不能省略。
+`KnowledgeSearchTarget` 只含最终过滤后的公开文档映射，不含绝对知识根或 `readContext`。原始数组、最终目标数与目标 JSON 字节数均有预算，超限时 Retriever 不会被调用。后端的 `KnowledgeHit` 使用 UTF-8 字节偏移，`endOffset` 为开区间；Core 核验后生成带正式路由元数据的 `KnowledgeResultHit`。`KnowledgeIndexEvidence` 必须证明映射、配置和内容身份与当前请求一致，即使零命中也不能省略。

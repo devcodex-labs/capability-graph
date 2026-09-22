@@ -75,7 +75,7 @@ test("R9: stale candidate revisions remain item warnings even in an explicitly p
   } finally { await graph.close(); }
 });
 
-const remoteDocument = { kind: "document", knowledgeId: "intro", locator: { type: "http", url: "https://example.test/intro" } };
+const remoteDocument = { kind: "document", knowledgeId: "intro", role: "guide", locator: { type: "http", url: "https://example.test/intro" } };
 test("S1: Core access errors retain safe diagnostics even if the retriever mutates and rethrows them", async () => {
   for (const mutate of [false, true]) {
     const retriever: KnowledgeRetriever = { id: "invalid-target", retrieve: async (_input, access) => {
@@ -98,7 +98,7 @@ test("S1: Core access errors retain safe diagnostics even if the retriever mutat
 
 test("S1: local read failures retain the declared relative path at the public query boundary", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "cg-review-read-"));
-  const db = new FakeDatabase([record("a", { knowledge: [{ kind: "document", knowledgeId: "intro", locator: { type: "relative-file", path: "missing.md" } }] })]);
+  const db = new FakeDatabase([record("a", { knowledge: [{ kind: "document", knowledgeId: "intro", role: "guide", locator: { type: "relative-file", path: "missing.md" } }] })]);
   db.knowledgeRootDir = root;
   let graph: CapabilityGraph | undefined;
   try {
@@ -118,7 +118,7 @@ test("S1: a post-load junction escape retains only its declared relative path", 
   let graph: CapabilityGraph | undefined;
   try {
     await mkdir(root); await mkdir(outside);
-    const db = new FakeDatabase([record("a", { knowledge: [{ kind: "document", knowledgeId: "intro", locator: { type: "relative-file", path: "linked" } }] })]);
+    const db = new FakeDatabase([record("a", { knowledge: [{ kind: "document", knowledgeId: "intro", role: "guide", locator: { type: "relative-file", path: "linked" } }] })]);
     db.knowledgeRootDir = root;
     graph = await CapabilityGraph.open(config(db, { knowledgeRetriever: { id: "read-escape", retrieve: async (_input, access) => {
       await access.read({ id, knowledgeId: "intro" }, { maxBytes: 100 }); throw new Error("unexpected success");

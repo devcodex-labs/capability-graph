@@ -22,6 +22,7 @@ export interface SourceChange {
 /** Transport-safe, explicitly selected Document or Collection member; contains no absolute knowledge root. */
 export interface KnowledgeSearchTarget {
   readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly locator: KnowledgeLocator; readonly viaCollectionIds: readonly string[];
+  readonly role: string; readonly locale?: string; readonly title?: string; readonly summary?: string; readonly canonicalUrl?: string;
 }
 /** Query-scoped access, not a general filesystem reader. Saved access cannot start reads after retrieve settles. */
 export interface KnowledgeRetrievalAccess {
@@ -41,6 +42,10 @@ export interface KnowledgeIndexEvidence {
 export interface KnowledgeHit {
   readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly contentId: KnowledgeContentId;
   readonly source: string; readonly startOffset: number; readonly endOffset: number; readonly snippet: string; readonly score?: number;
+}
+/** Core-enriched hit metadata comes from the validated mapping, never the Retriever payload. */
+export interface KnowledgeResultHit extends KnowledgeHit {
+  readonly role: string; readonly locale?: string; readonly title?: string; readonly summary?: string; readonly canonicalUrl?: string;
 }
 /** Optional knowledge search contract; actual indexing/backends are integration-owned. */
 export interface KnowledgeRetriever {

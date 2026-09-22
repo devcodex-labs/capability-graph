@@ -4,7 +4,7 @@ import { invalid } from "./values.js";
 
 /** Run only after the complete ID inventory exists; forward references are legal. */
 export function validateEndpoints(record: CapabilityRecord, ids: ReadonlySet<string>): void {
-  for (const relation of ["parents", "specializes", "related"] as const) {
+  for (const relation of ["parents", "specializes", "related", "requires"] as const) {
     for (const endpoint of record[relation]) if (!ids.has(endpoint)) invalid({ endpoint, relation });
   }
 }
@@ -15,7 +15,7 @@ export function validateEndpoints(record: CapabilityRecord, ids: ReadonlySet<str
  * Re-reading each frame trades adapter reads for bounded retained state; related cycles are intentionally allowed.
  */
 export async function validateCycles(ids: ReadonlySet<string>, read: (id: string) => Promise<CapabilityRecord>): Promise<void> {
-  for (const relation of ["parents", "specializes"] as const) {
+  for (const relation of ["parents", "specializes", "requires"] as const) {
     const color = new Map<string, number>();
     for (const id of ids) {
       if (color.has(id)) continue;

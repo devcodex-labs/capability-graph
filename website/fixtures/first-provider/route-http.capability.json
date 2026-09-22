@@ -9,6 +9,8 @@
     {
       "kind": "document",
       "knowledgeId": "routing-guide",
+      "role": "guide",
+      "locale": "en",
       "locator": { "type": "relative-file", "path": "knowledge/routing.md" }
     }
   ]

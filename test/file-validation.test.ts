@@ -15,7 +15,7 @@ const row = (id: string, extra: object = {}): UnvalidatedCapabilityRecord => ({
   capabilityId: id, name: id, description: "Description", whenToUse: "When needed", ...extra,
 });
 const document = (knowledgeId = "D-01", file = "knowledge/missing.md") => ({
-  kind: "document", knowledgeId, locator: { type: "relative-file", path: file },
+  kind: "document", knowledgeId, role: "guide", locator: { type: "relative-file", path: file },
 });
 const snapshot = (capabilities: readonly UnvalidatedCapabilityRecord[], root = process.cwd()): UnvalidatedProviderSnapshot => ({
   source: { kind: "file", rootDir: root }, knowledgeRootDir: root, provider, capabilities,
@@ -35,7 +35,8 @@ async function fixture(run: (root: string) => Promise<void>): Promise<void> {
 test("PR3: disk definitions load recursively, skip build/dependencies and never import application code", async () => {
   await fixture(async (root) => {
     await writeFile(path.join(root, "provider.json"), JSON.stringify({ ...provider,
-      specification: { specificationId: "rules", version: "1", entryRef: { type: "relative-file", path: "PROVIDER.md" } } }));
+      specification: { specificationId: "rules", version: "1", documents: [{ kind: "document", knowledgeId: "SPEC-01",
+        role: "specification", locator: { type: "relative-file", path: "PROVIDER.md" } }] } }));
     await writeFile(path.join(root, "index.js"), "throw new Error('must never execute')");
     for (const dir of ["nested", "dist", "node_modules"]) await mkdir(path.join(root, dir));
     await writeFile(path.join(root, "nested", "z.capability.json"), JSON.stringify(row("z")));
@@ -155,9 +156,9 @@ test("PR3: relative-file requires an explicit root, HTTP declaration does not ac
   await assert.rejects(validateCapability(row("a", { knowledge: [document()] })), {
     code: "CG_VALIDATION_FAILED", details: { reason: "relative_file_requires_knowledge_root" },
   });
-  await validateCapability(row("a", { knowledge: [{ kind: "document", knowledgeId: "D-02",
+  await validateCapability(row("a", { knowledge: [{ kind: "document", knowledgeId: "D-02", role: "guide",
     locator: { type: "http", url: "https://unreachable.invalid/knowledge" } }] }));
-  await assert.rejects(validateCapability(row("a", { knowledge: [{ kind: "document", knowledgeId: "D-02",
+  await assert.rejects(validateCapability(row("a", { knowledge: [{ kind: "document", knowledgeId: "D-02", role: "guide",
     locator: { type: "http", url: "file:///secret" } }] })), { code: "CG_VALIDATION_FAILED" });
 });
 
@@ -167,7 +168,8 @@ test("PR3: lexical escape rejection precedes I/O for knowledge, members and Spec
     await assert.rejects(validateCapability(row("a", { knowledge: [document("D1", relative)] }), "nonexistent-root"), { code: "CG_PATH_TRAVERSAL" });
   }
   await assert.rejects(validateProvider({ ...provider, specification: { specificationId: "s", version: "1",
-    entryRef: { type: "relative-file", path: "./PROVIDER.md" } } }, "nonexistent-root"), { code: "CG_PATH_TRAVERSAL" });
+    documents: [{ kind: "document", knowledgeId: "SPEC-01", role: "specification",
+      locator: { type: "relative-file", path: "./PROVIDER.md" } }] } }, "nonexistent-root"), { code: "CG_PATH_TRAVERSAL" });
   await assert.rejects(validateCapability(row("a", { knowledge: [{ kind: "collection", knowledgeId: "C1",
     members: [document("D1", "../x")] }] }), "nonexistent-root"), { code: "CG_PATH_TRAVERSAL" });
 });

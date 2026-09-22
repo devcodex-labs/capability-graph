@@ -1,6 +1,7 @@
 import { CoreHost, type StaticOpenConfig } from "./core-host.js";
 import { CapabilityGraphError } from "./errors.js";
-import { documents, validateSelection, type ReadDocumentsQuery } from "./knowledge/read.js";
+import { documents, readSpecification, validateDocumentFilters, validateSelection,
+  type ReadDocumentsQuery, type ReadSpecificationQuery } from "./knowledge/read.js";
 import type { KnowledgeReader, KnowledgeRetriever, CapabilityRetriever } from "./knowledge/types.js";
 import { retrieveCapabilities } from "./retrieval/capabilities.js";
 import { queryKnowledge } from "./retrieval/knowledge.js";
@@ -9,8 +10,10 @@ import type { RuntimeAdapter, QueryRuntimeQuery } from "./runtime/types.js";
 import { queryRuntime, validateRuntimeQuery } from "./runtime/query.js";
 import { inputInvalid, identity } from "./query/common.js";
 import { isId } from "./identity.js";
-import { catalog, details, neighbors, provider, refScope } from "./query/static.js";
-import type { CapabilityDetailQuery, CapabilityRef, CatalogQuery, NeighborQuery, ProviderListQuery, ProviderResult } from "./query/types.js";
+import { catalog, details, knowledgeMembers, neighbors, provider, providerResult, refScope, specificationDocuments } from "./query/static.js";
+import { resolveSelection, selectionInput } from "./query/selection.js";
+import type { CapabilityDetailQuery, CapabilityRef, CatalogQuery, DocumentPageQuery, KnowledgeMembersQuery,
+  NeighborQuery, ProviderListQuery, ProviderResult, ResolveSelectionQuery } from "./query/types.js";
 
 /** One authority per provider; optional adapters do not change the offline static-query contract. */
 export interface OpenConfig extends StaticOpenConfig {
@@ -84,7 +87,13 @@ export class CapabilityGraph {
   getProvider(providerId: string, query: { requiredStaticRevision?: string } = {}): Promise<ProviderResult> {
     queryObject(query);
     this.host.assertAllowed(providerId);
-    return this.host.query([providerId], query.requiredStaticRevision, async (ctx) => ({ ...await provider(ctx, providerId), meta: ctx.meta }));
+    return this.host.query([providerId], query.requiredStaticRevision, (ctx) => providerResult(ctx, providerId, this.host.budgets));
+  }
+  /** Continue the bounded Specification document listing for one Provider. */
+  listSpecificationDocuments(query: DocumentPageQuery & { readonly providerId: string }) {
+    queryObject(query); this.host.assertAllowed(query.providerId);
+    return this.host.query([query.providerId], query.requiredStaticRevision,
+      (ctx) => specificationDocuments(ctx, query.providerId, query, this.host.budgets));
   }
   /** Return a bounded flat discovery page; use nextCursor without changing scope, filters or revision. */
   listCatalog(query: CatalogQuery = {}) {
@@ -97,18 +106,38 @@ export class CapabilityGraph {
     const scope = query.requiredStaticRevision === undefined ? undefined : refScope(ids);
     return this.host.query(scope, query.requiredStaticRevision, (ctx) => details(ctx, ids, query, this.host.budgets));
   }
+  /** Continue a known Collection's members without reading any document bodies. */
+  listKnowledgeMembers(query: KnowledgeMembersQuery) {
+    queryObject(query);
+    const id = identity(query.capability);
+    return this.host.query([id.providerId], query.requiredStaticRevision,
+      (ctx) => knowledgeMembers(ctx, query, this.host.budgets));
+  }
   /** Page direct/reverse edges by kind, within one provider. Related edges are not made symmetric. */
   getNeighbors(ref: CapabilityRef, query: NeighborQuery = {}) {
     queryObject(query);
     const id = identity(ref);
     return this.host.query([id.providerId], query.requiredStaticRevision, (ctx) => neighbors(ctx, id, query, this.host.budgets));
   }
-  /** Read associated Documents from a nonempty selection; Collections require explicit queryKnowledge instead. */
+  /** Resolve the complete necessary-context closure of explicit caller choices. */
+  resolveSelection(query: ResolveSelectionQuery) {
+    queryObject(query);
+    const selected = selectionInput(query.selected, this.host.budgets);
+    return this.host.querySelected(selected.map((id) => id.providerId), query.requestProviderScope,
+      query.requiredStaticRevisionByProvider, (ctx) => resolveSelection(ctx, selected, this.host.budgets));
+  }
+  /** Read selected top-level Documents or explicit Collection member IDs; never concatenate a Collection. */
   readDocuments(query: ReadDocumentsQuery) {
     queryObject(query);
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
       (ctx) => documents(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
+  }
+  /** Explicitly read selected Provider Specification documents; discovery never triggers this call. */
+  readSpecification(query: ReadSpecificationQuery) {
+    queryObject(query); this.host.assertAllowed(query.providerId); validateDocumentFilters(query);
+    return this.host.query([query.providerId], query.requiredStaticRevision,
+      (ctx) => readSpecification(ctx, query, this.host.budgets, this.extensions.readers));
   }
   /** Optional candidate recall, verified against authority with original ranks; never silently substitutes for catalog. */
   retrieveCapabilities(query: RetrieveCapabilitiesQuery) {
@@ -148,7 +177,13 @@ export class BoundProviderGraph {
   /** Read this provider's metadata and provenance, optionally from its retained previous revision. */
   getProvider(query: { requiredStaticRevision?: string } = {}): Promise<ProviderResult> {
     boundQuery(query);
-    return this.host.query([this.providerId], query.requiredStaticRevision, async (ctx) => ({ ...await provider(ctx, this.providerId), meta: ctx.meta }));
+    return this.host.query([this.providerId], query.requiredStaticRevision, (ctx) => providerResult(ctx, this.providerId, this.host.budgets));
+  }
+  /** Continue this Provider's bounded Specification document listing. */
+  listSpecificationDocuments(query: DocumentPageQuery = {}) {
+    boundQuery(query);
+    return this.host.query([this.providerId], query.requiredStaticRevision,
+      (ctx) => specificationDocuments(ctx, this.providerId, query, this.host.budgets));
   }
   /** Page the bound provider's catalog; parent references may omit providerId. */
   listCatalog(query: Omit<CatalogQuery, "requestProviderScope"> = {}) {
@@ -161,11 +196,27 @@ export class BoundProviderGraph {
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => details(ctx, ids.map((capabilityId) => ({ capabilityId })), query, this.host.budgets, this.providerId));
   }
+  /** Page members of a Provider-local Capability's declared Collection. */
+  listKnowledgeMembers(query: Omit<KnowledgeMembersQuery, "capability"> & { readonly capabilityId: string }) {
+    boundQuery(query);
+    return this.host.query([this.providerId], query.requiredStaticRevision,
+      (ctx) => knowledgeMembers(ctx, { ...query, capability: { capabilityId: query.capabilityId } }, this.host.budgets, this.providerId));
+  }
   /** Page each requested relation kind for a provider-local string ID. */
   getNeighbors(capabilityId: string, query: NeighborQuery = {}) {
     boundQuery(query);
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => neighbors(ctx, { capabilityId }, query, this.host.budgets, this.providerId));
+  }
+  /** Resolve provider-local choices without expanding the provider binding. */
+  resolveSelection(query: { readonly selected: readonly string[]; readonly requiredStaticRevision?: string }) {
+    boundQuery(query);
+    if (!Array.isArray(query.selected)) inputInvalid();
+    if (query.selected.length > this.host.budgets.selection.maxSelected) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+    const selected = selectionInput(query.selected.map((capabilityId) => ({ capabilityId })), this.host.budgets, this.providerId);
+    const required = query.requiredStaticRevision === undefined ? undefined : { [this.providerId]: query.requiredStaticRevision };
+    return this.host.querySelected([this.providerId], [this.providerId], required,
+      (ctx) => resolveSelection(ctx, selected, this.host.budgets));
   }
   /** Read associated Documents; selected contains provider-local string IDs, not canonical objects. */
   readDocuments(query: Omit<ReadDocumentsQuery, "requestProviderScope" | "selected"> & { readonly selected: readonly string[] }) {
@@ -174,6 +225,12 @@ export class BoundProviderGraph {
     validateSelection(normalized);
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => documents(ctx, normalized, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever, this.providerId));
+  }
+  /** Read this Provider's Specification only when explicitly requested. */
+  readSpecification(query: Omit<ReadSpecificationQuery, "providerId"> = {}) {
+    boundQuery(query); validateDocumentFilters(query);
+    return this.host.query([this.providerId], query.requiredStaticRevision,
+      (ctx) => readSpecification(ctx, { ...query, providerId: this.providerId }, this.host.budgets, this.extensions.readers));
   }
   /** Recall candidates only within this provider; candidate failures remain warnings. */
   retrieveCapabilities(query: Omit<RetrieveCapabilitiesQuery, "requestProviderScope">) {

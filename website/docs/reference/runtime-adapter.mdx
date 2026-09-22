@@ -55,6 +55,6 @@ Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期�
 
 `openView(providerId)` 返回稳定 `DatabaseReadView`，暴露 Provider metadata、sourceRevision、可选知识根，以及 `getCapability()`、`scanCapabilities()`、`neighbors()` 和 `close()`。
 
-同一 view 的 Provider、知识根、sourceRevision 和记录必须稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。Core 先完整扫描和收集 ID，再进行端点检查和 `parents`/`specializes` 两类无环检查，不能边扫边判不存在。Static Revision 使用与文件模式相同的规范序列化算法。
+同一 view 的 Provider、知识根、sourceRevision 和记录必须稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。Core 先完整扫描和收集 ID，再进行端点检查和 `parents`/`specializes`/`requires` 三类无环检查，不能边扫边判不存在。随后交叉验证完整的 `requires`/`requiredBy` 流，缺失或伪造的反向依赖也必须使装载失败。Static Revision 使用与文件模式相同的规范序列化算法。
 
 Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有查询 pin 时延迟关闭。Adapter 不提供通用写入、CRUD 或迁移能力。

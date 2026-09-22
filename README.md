@@ -9,6 +9,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [查询与更新](#queries)
 - [支持边界](#boundaries)
 - [本地开发](#development)
+- [1.0.1 迁移与变更](changelogs/1.0.1.md)
 - [1.0.0 变更](changelogs/1.0.0.md)
 - [许可证](#license)
 
@@ -16,7 +17,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 
 ## 当前状态
 
-当前版本为 `1.0.0`。主包只有 ESM 根入口，零运行时依赖；MCP 示例为独立私有包，不导出 `./mcp`。完整文档见 [Capability Graph Documentation](https://devcodex-labs.github.io/capability-graph/)，文档源码位于 [website](website/)。
+仓库中的包版本为待发布 `1.0.1`；公开 Registry 与网站在单独发布验收完成前仍以已发布版本为准。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
 
 ```sh
 npm install @devcodex/capability-graph
@@ -39,14 +40,15 @@ Provider 在独立目录提供 `provider.json`、`*.capability.json` 和可选�
   "parents": ["route", "request"],
   "specializes": ["route.http"],
   "related": ["schema.request"],
+  "requires": ["schema.request"],
   "knowledge": [{
-    "kind": "document", "knowledgeId": "D-02",
+    "kind": "document", "knowledgeId": "D-02", "role": "guide", "locale": "en",
     "locator": { "type": "relative-file", "path": "knowledge/route-validation.md" }
   }]
 }
 ```
 
-上述关系端点必须由同一 Provider 定义。`parents` 与 `specializes` 分别无环；`related` 有方向，不自动补正向对称边。能力 ID 不包含 Provider 前缀；完整身份为 `{ providerId, capabilityId }`，可逆显示形式为 `seed.http::route.validation`，不按点号猜边界。概念不兼容时由作者使用新 ID。
+上述关系端点必须由同一 Provider 定义。`parents`、`specializes` 与 `requires` 分别无环；`related` 有方向，不参与依赖闭包。能力 ID 不包含 Provider 前缀；完整身份为 `{ providerId, capabilityId }`，可逆显示形式为 `seed.http::route.validation`，不按点号猜边界。概念不兼容时由作者使用新 ID。
 
 ```ts
 import { CapabilityGraph } from "@devcodex/capability-graph";
@@ -65,11 +67,13 @@ try {
   const requiredStaticRevision = catalog.meta.staticRevision;
   const detail = await provider.getCapabilities(["route.validation"], { requiredStaticRevision });
   const neighbors = await provider.getNeighbors("route.validation", { requiredStaticRevision });
-  // Selection belongs to the caller; relations never select knowledge implicitly.
+  const selection = await provider.resolveSelection({ selected: ["route.validation"], requiredStaticRevision });
   const documents = await provider.readDocuments({
-    selected: ["route.validation", "schema.request"], requiredStaticRevision,
+    selected: selection.resolved.map(({ capabilityId }) => capabilityId),
+    roles: ["guide", "reference"], locales: ["en"], requiredStaticRevision,
   });
-  console.log({ detail, neighbors, documents });
+  const specification = await provider.readSpecification({ knowledgeIds: ["SPEC-01"], requiredStaticRevision });
+  console.log({ detail, neighbors, selection, documents, specification });
 } finally {
   await graph.close();
 }
@@ -87,15 +91,16 @@ try {
 
 | 原语 | 用途 |
 |---|---|
-| `listProviders` / `getProvider` | Provider 元数据及其规范入口，不读取规范正文 |
+| `listProviders` / `getProvider` / `listSpecificationDocuments` | Provider 元数据及有界规范文档发现，不读取正文 |
 | `listCatalog` | 平坦摘要；按范围、ID 前缀、显式 parent 过滤，支持分页 |
-| `getCapabilities` / `getNeighbors` | 有界详情、六种正反向关系，不自动展开整图 |
-| `readDocuments` | 仅读取所选能力声明的 Document，逐项返回成功或错误 |
+| `getCapabilities` / `getNeighbors` / `listKnowledgeMembers` | 有界详情、八种关系和 Collection 成员发现 |
+| `resolveSelection` | 沿 `requires` 求完整必要上下文闭包，返回边与直接原因 |
+| `readDocuments` / `readSpecification` | 按用途/语言显式读取能力文档或 Provider 规范，逐项返回结果 |
 | `retrieveCapabilities` | 显式调用已配置召回后端，Core 校验候选身份与修订 |
 | `queryKnowledge` | 对已选知识执行检索，校验证据、内容版本与片段边界 |
 | `queryRuntime` | 查询单 Provider、指定项目和环境下的运行实例 |
 
-已知身份可直接查详情或读取，不强制从目录开始。第一轮目录只含能力摘要；后续选择和是否查询子能力由调用者决定。分页必须保留过滤条件及修订；检查 `meta.completeness`、`warnings` 和 `nextCursor`，不能把部分结果当成全集。批量结果保留输入槽位，逐项检查 `ok`。
+已知身份可直接查详情或读取，不强制从目录开始。第一轮目录只含能力摘要；显式选择由调用者决定，Core 只沿 `requires` 补齐必要上下文。分页必须保留过滤条件及修订；检查 `meta.completeness`、`warnings` 和 `nextCursor`，不能把部分结果当成全集。批量结果逐项检查 `ok`。
 
 `getProvider` 保留摘要顶层字段，同时返回 `meta`，默认调用与绑定调用都能查看 `servedFrom` 和 `refreshFailed`。来源只在实际读取时检查；无关 Provider 故障不阻断独立查询。未指定修订的混合详情/文档请求保留正常槽位与各项错误，指定修订失效仍明确失败。
 

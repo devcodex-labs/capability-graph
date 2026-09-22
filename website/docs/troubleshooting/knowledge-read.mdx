@@ -6,7 +6,7 @@ description: 诊断知识关联、Reader、路径、Retriever、索引证据和 
 # 知识与 Adapter
 
 - `CG_KNOWLEDGE_NOT_ASSOCIATED`：已选能力没有匹配的 knowledgeId；核对选择和过滤。
-- `CG_KNOWLEDGE_TYPE_UNSUPPORTED`：对 Collection 使用了直接读取；改用 `queryKnowledge()`。
+- `CG_KNOWLEDGE_TYPE_UNSUPPORTED`：将 Collection ID 当成单篇文档读取。可先用 `listKnowledgeMembers()` 发现成员，再按成员 ID 精确读取；需要全文检索时配置 Retriever 并使用 `queryKnowledge()`。
 - `CG_READER_UNCONFIGURED`：远程引用存在，但没有 Reader；配置 Reader，不要写成“没有知识”。
 - `CG_READER_UNAVAILABLE`：匹配 Reader 执行失败；检查外部来源和资源清理。
 - `CG_SOURCE_UNREADABLE`：本地或远程来源当前不可读。

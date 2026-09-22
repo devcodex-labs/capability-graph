@@ -16,11 +16,15 @@ import PublicApi from '../../generated/snippets/public-api.mdx';
 | `CapabilityGraph.open(config)` | 校验配置和全部初始 Authority | 任一初始来源失败则拒绝 open |
 | `forProvider(providerId)` | 创建 Provider 绑定查询 facade | 共享图生命周期，不绑定修订 |
 | `listProviders(query?)` | 列出范围内 Provider | 不读取 Specification 正文 |
-| `getProvider(providerId, query?)` | 读取 Provider metadata 和来源状态 | 返回 `meta`、`servedFrom`、`refreshFailed` |
+| `getProvider(providerId, query?)` | 读取 Provider metadata 与规范文档首屏 | 返回有界文档列表、`meta` 与来源状态 |
+| `listSpecificationDocuments(query)` | 续取规范文档元数据 | 不读正文，游标绑定 Provider、修订与页大小 |
 | `listCatalog(query?)` | 跨 Provider 平坦发现 | 有界、可分页、保留二元身份 |
 | `getCapabilities(ids, query?)` | 批量读取能力详情 | 保留输入槽位和逐项失败 |
-| `getNeighbors(ref, query?)` | 分页读取六种关系组 | 单 Provider、非递归 |
-| `readDocuments(query)` | 读取已选能力的 Document | 选择非空，Collection 不支持直接读 |
+| `getNeighbors(ref, query?)` | 分页读取八种关系组 | 单 Provider、非递归 |
+| `listKnowledgeMembers(query)` | 续取已知 Collection 的成员元数据 | 有界，不读正文 |
+| `resolveSelection(query)` | 从显式能力沿 `requires` 求完整闭包 | 不沿其他关系扩张；超预算整次失败 |
+| `readDocuments(query)` | 按 ID、用途、语言读取文档 | Collection 成员须显式给出成员 ID |
+| `readSpecification(query)` | 显式读取 Provider 规范文档 | 不由其他查询自动触发 |
 | `retrieveCapabilities(query)` | 可选候选召回 | 不替代目录，需配置 Retriever |
 | `queryKnowledge(query)` | 检索已选知识 | 返回证据片段，不生成答案 |
 | `queryRuntime(query)` | 查询运行实例 | 需要 Provider、项目和环境 |
@@ -38,10 +42,14 @@ import PublicApi from '../../generated/snippets/public-api.mdx';
 | 方法 | 与顶层方法的差异 |
 |---|---|
 | `getProvider()` | 不再传 providerId |
+| `listSpecificationDocuments()` | Provider 身份由绑定补全 |
 | `listCatalog()` | `parent` 可省略 providerId |
 | `getCapabilities(ids)` | `ids` 是 Provider 内字符串数组 |
 | `getNeighbors(capabilityId)` | 只接受 Provider 内字符串 ID |
+| `listKnowledgeMembers({ capabilityId, collectionId })` | 用本地能力 ID 定位 Collection |
+| `resolveSelection({ selected })` | `selected` 是本地能力 ID 数组 |
 | `readDocuments({ selected })` | `selected` 是字符串数组 |
+| `readSpecification()` | 规范来源固定为绑定 Provider |
 | `retrieveCapabilities()` | 召回限制在绑定 Provider |
 | `queryKnowledge()` | 缺省 Provider 身份由绑定补全 |
 | `queryRuntime()` | Runtime 来源固定为绑定 Provider |
