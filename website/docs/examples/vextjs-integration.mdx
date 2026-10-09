@@ -48,3 +48,5 @@ node scripts/validation/vextjs-session.mjs /external/fixed-vextjs
 真实 Redis Jobs、MongoDB 业务、热重载/cluster、浏览器 SSR/水合与纯 HTML、Cookie/Session 的验证须使用对应固定框架及服务，执行记录另存仓库外。默认 `npm test` 中的受控合同测试不能替代这些实际执行，也不能据此宣称支持任意版本或平台。
 
 已单独核验 npm `vextjs@2.0.0`：其 CLI 不包含 `mcp`，因此不能使用原生 schema 2 Provider/Runtime 接入；该发布包的实际 TCP Session/CSRF 场景可另行验证。此原生接入当前适用于固定 main 快照 `ef926649926e17543562b8169982fa1786285ecf`，不把同版本号的发布包视为等价来源。
+
+该固定快照在 Windows Node 22.12.0 会因 `lstat.dev` 与 `fstat.dev` 的平台差异拒绝源码构建，不能据 Core 的兼容结果宣称框架也支持。Windows 已核验 20.19.0/24.19.0；框架 CI 的 Node 22 使用固定补丁 22.23.3，并保留旧补丁的失败诊断。验证不修改框架源码或绕过身份检查。

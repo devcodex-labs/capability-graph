@@ -26,4 +26,6 @@ node scripts/validation/vextjs-service-lifecycle.mjs /external/fixed-vextjs redi
 
 `.github/workflows/vextjs-ci.yml` 固定源码提交，在 Linux/Windows、Node 20/22/24 上验证原生目录、检索和实际 TCP Session。框架下载、构建、临时应用及报告均在仓库外。Redis/MongoDB、cluster 和浏览器的扩展验证单独记录，不归为这个兼容矩阵的覆盖内容。
 
+该固定框架在 Windows Node 22.12.0 的源码构建失败：只读诊断确认同一未改变文件的 `lstat.dev=0`，而 `fstat.dev` 为实际设备号，框架将差异判为实现改变；inode、大小、时间与正文均一致。它是该框架的身份检查兼容边界，Core 的 Windows 22.12 回归仍通过。框架 CI 的 Windows Node 22 改用固定补丁 22.23.3；此前失败及诊断保留，未修改框架或绕过检查。已核验的 Windows 20.19.0/24.19.0 也是可用选择。
+
 `node scripts/validation/knowledge-profile.mjs` 可测量实际 HTTP 单篇/多篇正文的冷启动、缓存复核、零命中场景，比较 read-only 与 streaming Reader 的调用、传输量和延迟。该合成工作负载用于比较传输成本，不替代上面的独立检索任务集；每次完整 hash 复核仍可能需要读取整篇正文。
