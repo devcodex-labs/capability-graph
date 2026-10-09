@@ -33,6 +33,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build && npm run build:tests
+      - id: paths
+        name: Resolve physical artifact paths
+        shell: bash
+        run: |
+          node --input-type=module - <<'JS'
+          import path from 'node:path';
+          import { appendFileSync, mkdirSync } from 'node:fs';
+          const artifacts = path.resolve(process.env.CG_ARTIFACTS_DIR);
+          const framework = path.resolve(process.env.VEXT_ROOT);
+          const verification = path.join(artifacts, 'verification');
+          mkdirSync(verification, {recursive:true});
+          appendFileSync(process.env.GITHUB_ENV, `CG_ARTIFACTS_DIR=${artifacts}\nVEXT_ROOT=${framework}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `verification=${verification}\n`);
+          JS
       - name: Fetch and verify the fixed framework source outside the project
         shell: bash
         run: |
@@ -45,7 +59,13 @@ jobs:
           test "$(git -C "$VEXT_ROOT" rev-parse HEAD)" = "$VEXT_SOURCE_COMMIT"
       - name: Install the framework's lockfile and build its actual CLI
         shell: bash
-        run: npm ci --ignore-scripts --prefix "$VEXT_ROOT" && npm --prefix "$VEXT_ROOT" run build
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --prefix "$VEXT_ROOT"
+          if ! npm --prefix "$VEXT_ROOT" run build; then
+            node scripts/validation/vextjs-file-identity.mjs "$VEXT_ROOT" > "$CG_ARTIFACTS_DIR/verification/vextjs-build-diagnostic.json"
+            exit 1
+          fi
       - name: Verify native catalog, retrieval and actual TCP Sessions
         shell: bash
         run: |
@@ -56,5 +76,5 @@ jobs:
         if: always()
         with:
           name: vextjs-${{ matrix.os }}-node-${{ matrix.node }}
-          path: ${{ env.CG_ARTIFACTS_DIR }}/verification/
+          path: ${{ steps.paths.outputs.verification }}
           retention-days: 7
