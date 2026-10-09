@@ -2,6 +2,7 @@ import { defineConfig } from '@rspress/core';
 import { pluginSitemap } from '@rspress/plugin-sitemap';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { generatedRoot, siteOutputRoot } from '../scripts/lib/website-paths.mjs';
 
 const siteOrigin = 'https://devcodex-labs.github.io';
 const base = '/capability-graph/';
@@ -46,6 +47,10 @@ const sitemapMaps = Object.fromEntries(
 
 export default defineConfig({
   root: 'docs',
+  outDir: siteOutputRoot,
+  builderConfig: {
+    resolve: { alias: { '@generated': generatedRoot } }
+  },
   title: 'Capability Graph',
   description: '面向 Provider 的能力建模、发现与知识导航基础设施',
   base,

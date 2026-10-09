@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { websiteRoot } from './lib/paths.mjs';
+import { websiteRoot, siteOutputRoot } from '../../scripts/lib/website-paths.mjs';
 
-const outputRoot = path.join(websiteRoot, 'doc_build');
+const outputRoot = siteOutputRoot;
 const publicOrigin = 'https://devcodex-labs.github.io';
 const publicBase = '/capability-graph/';
 const redirects = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'route-redirects.json'), 'utf8'));

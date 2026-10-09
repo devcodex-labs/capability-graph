@@ -3,7 +3,7 @@ title: 知识接口
 description: 文档路由、显式读取、Specification 与检索目标合同参考。
 ---
 
-import Contracts from '../../generated/snippets/contracts-knowledge.mdx';
+import Contracts from '@generated/snippets/contracts-knowledge.mdx';
 
 # 知识接口
 
@@ -76,6 +76,8 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 | 省略 `roles/locales` | 不限制对应维度；locale 规范化后精确匹配，无父语言回退 |
 | `knowledgeIds/roles/locales: []` | 合法但匹配为空；不要与 `queryKnowledge` 不允许空 `knowledgeIds` 的规则混淆 |
 | 正文预算 | 默认每篇最多 32,768 字节，每次最多 8 篇；篇数在实际读取前检查，超限为查询级 `CG_BUDGET_EXCEEDED` |
+| 原始输入预算 | selected 默认最多 32 项；knowledgeIds/roles/locales 每维默认最多 128 项，重复值也计数，超限在点读前失败 |
+| 完整响应预算 | 默认 4 MiB JSON UTF-8 字节，包含正文转义、失败槽位和元数据；超限为查询级 `CG_BUDGET_EXCEEDED`，需要拆批或过滤 |
 | 单篇失败 | 缺失文件、无匹配 Reader、非法 UTF-8、Reader 合同错误或单篇超限产生失败槽位，其他成功项保留；查看 `meta.completeness` |
 
 具体 Reader 选择、来源身份和错误码见[Reader 与 Adapter](./runtime-adapter#knowledgereader)。这里的默认值可以通过 `budgets.read` 调整，不能绕过所选修订和 Provider 范围。

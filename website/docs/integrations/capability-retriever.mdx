@@ -5,9 +5,11 @@ description: 接入能力召回与知识检索后端，并由 Core 校验身份�
 
 # 检索 Adapter 接入
 
-<span className="cg-status">仅合同</span>
+<span className="cg-status">合同与可运行参考</span>
 
 `CapabilityRetriever` 是可选候选召回合同；主包不附带向量或模型后端。
+
+仓库提供[Node.js HTTP 与文本索引参考](../examples/seed-provider#http-文档与文本检索)，从真实 Catalog 和 HTTP 正文建立有限的词项索引，覆盖零命中、过期证据和显式重建。下面的通用接口骨架仍需要接入方实现自己的后端。
 
 当能力多到仅靠分类浏览不易找到目标时，可以按用户文字召回候选；规模较小时先用 Catalog 和关系查询即可。Flat Catalog 是可确定分页的静态摘要接口，Retriever 是另一个显式调用，不会替换目录或自动判断最终选择。
 

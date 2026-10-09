@@ -1,9 +1,9 @@
-import type { BudgetConfig } from "../budgets.js";
+import type { BudgetConfig, ResolvedBudgetConfig } from "../budgets.js";
 import { errorShape, type QueryContext } from "../core-host.js";
 import { CapabilityGraphError, type ErrorShape } from "../errors.js";
 import { formatQualifiedId, isKnowledgeId } from "../identity.js";
 import { normalizeLocale } from "../locale.js";
-import { capability, inputInvalid } from "../query/common.js";
+import { bytes, capability, inputInvalid } from "../query/common.js";
 import type { CapabilityRef } from "../query/types.js";
 import type { BatchItem, BatchResult, CanonicalCapabilityId, KnowledgeDocumentRef, KnowledgeRef, StaticCapability } from "../types.js";
 import { freeze } from "../validate/values.js";
@@ -66,6 +66,36 @@ export function validateSelection(query: ReadDocumentsQuery): void {
   validateDocumentFilters(query);
 }
 
+/** Bound raw arrays before conversion, filtering, provider pinning or authority reads. */
+export function validateReadBudgetInput(query: {
+  readonly selected?: readonly unknown[];
+  readonly knowledgeIds?: readonly string[];
+  readonly roles?: readonly string[];
+  readonly locales?: readonly string[];
+}, budgets: ResolvedBudgetConfig): void {
+  for (const field of ["selected", "knowledgeIds", "roles", "locales"] as const) {
+    const values = query[field];
+    if (values === undefined) continue;
+    if (!Array.isArray(values)) inputInvalid();
+    const maximum = field === "selected" ? budgets.read.maxSelected : budgets.read.maxFilterValuesPerDimension;
+    if (values.length > maximum) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", {
+      nextAction: "page_or_filter", details: { field, maximum },
+    });
+  }
+}
+
+function readBudgetMeta(budgets: ResolvedBudgetConfig): Record<string, number> {
+  return Object.fromEntries(Object.entries(budgets.read).map(([key, value]) => [`read.${key}`, value]));
+}
+
+/** Do not catch response overflow as an item error or silently drop requested slots. */
+function boundedReadBatch<T extends BatchResult<unknown>>(result: T, budgets: ResolvedBudgetConfig): T {
+  if (bytes(result) > budgets.read.maxResponseBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", {
+    nextAction: "page_or_filter", details: { field: "read.maxResponseBytes", maximum: budgets.read.maxResponseBytes },
+  });
+  return result;
+}
+
 export function validateDocumentFilters(query: { readonly knowledgeIds?: readonly string[]; readonly roles?: readonly string[]; readonly locales?: readonly string[] }):
   { readonly roles?: ReadonlySet<string>; readonly locales?: ReadonlySet<string> } {
   if (query.knowledgeIds !== undefined && (!Array.isArray(query.knowledgeIds) || query.knowledgeIds.some((id) => !isKnowledgeId(id)))) inputInvalid();
@@ -102,7 +132,8 @@ async function readSlot(ref: KnowledgeDocumentRef, id: CanonicalCapabilityId, co
   return { id, ...await readValue(ref, id.providerId, context, budgets, readers) };
 }
 
-export async function documents(context: QueryContext, query: ReadDocumentsQuery, budgets: BudgetConfig, readers: readonly KnowledgeReader[], retriever?: KnowledgeRetriever, bound?: string): Promise<DocumentReadBatch> {
+export async function documents(context: QueryContext, query: ReadDocumentsQuery, budgets: ResolvedBudgetConfig, readers: readonly KnowledgeReader[], retriever?: KnowledgeRetriever, bound?: string): Promise<DocumentReadBatch> {
+  validateReadBudgetInput(query, budgets);
   validateSelection(query);
   const filters = validateDocumentFilters(query);
   const slots: ({ node: StaticCapability; ref: KnowledgeDocumentRef } | { error: ErrorShape })[] = [];
@@ -111,6 +142,7 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
   const seen = new Set<string>();
   const selectedIds = query.knowledgeIds === undefined ? undefined : new Set(query.knowledgeIds);
   let associated = false;
+  let readCount = 0;
   for (const selected of query.selected) {
     let node: StaticCapability;
     try { node = await capability(context, selected, bound); }
@@ -126,7 +158,10 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
       declared.add(ref.knowledgeId);
       if ((!selectedIds && !explicit) || (selectedIds && !selectedIds.has(ref.knowledgeId)) || !matches(ref, filters)) return;
       const key = `${formatQualifiedId(node.id)}::${ref.knowledgeId}`;
-      if (!seen.has(key)) { seen.add(key); slots.push({ node, ref }); }
+      if (!seen.has(key)) {
+        if (++readCount > budgets.read.maxDocumentsPerCall) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+        seen.add(key); slots.push({ node, ref });
+      }
     };
     for (const ref of node.knowledge) {
       if (ref.kind === "document") add(ref, true);
@@ -141,8 +176,6 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
       nextAction: "fix_input", details: { knowledgeId: id, retrieval: retriever ? "configured" : "CG_RETRIEVER_UNCONFIGURED" } })) });
     else if (!declared.has(id)) slots.push({ error: errorShape(new CapabilityGraphError("CG_NOT_FOUND", { nextAction: "fix_input", details: { knowledgeId: id } })) });
   }
-  const readCount = slots.filter((slot) => "node" in slot).length;
-  if (readCount > budgets.read.maxDocumentsPerCall) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
   const results: BatchItem<DocumentRead>[] = [];
   for (const [inputIndex, slot] of slots.entries()) {
     if ("error" in slot) { results.push({ inputIndex, ok: false, error: slot.error }); continue; }
@@ -150,15 +183,16 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
       results.push({ inputIndex, ok: true, value: await readSlot(slot.ref, slot.node.id, context, budgets, readers) });
     } catch (error) { results.push({ inputIndex, ok: false, error: errorShape(error) }); }
   }
-  return { results, knowledgeState: !associated ? "not_associated" : readCount ? "matched" : "filtered_empty",
+  return boundedReadBatch<DocumentReadBatch>({ results, knowledgeState: !associated ? "not_associated" : readCount ? "matched" : "filtered_empty",
     meta: { ...context.meta, completeness: results.some((slot) => !slot.ok) ? "partial" : "complete",
-    budgets: { "read.maxBytes": budgets.read.maxBytes, "read.maxDocumentsPerCall": budgets.read.maxDocumentsPerCall },
+    budgets: readBudgetMeta(budgets),
     view: { capabilities: slots.flatMap((slot) => "node" in slot ? [{ id: slot.node.id, staticRevision: slot.node.staticRevision }] : []),
-      knowledge: results.flatMap((slot) => slot.ok ? [{ id: slot.value.id, knowledgeId: slot.value.knowledgeId, contentId: slot.value.contentId }] : []) } } };
+      knowledge: results.flatMap((slot) => slot.ok ? [{ id: slot.value.id, knowledgeId: slot.value.knowledgeId, contentId: slot.value.contentId }] : []) } } }, budgets);
 }
 
 export async function readSpecification(context: QueryContext, query: ReadSpecificationQuery,
-  budgets: BudgetConfig, readers: readonly KnowledgeReader[]): Promise<SpecificationReadBatch> {
+  budgets: ResolvedBudgetConfig, readers: readonly KnowledgeReader[]): Promise<SpecificationReadBatch> {
+  validateReadBudgetInput(query, budgets);
   const filters = validateDocumentFilters(query);
   if (!context.scope.has(query.providerId)) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
   const provider = context.graph.getProvider(query.providerId);
@@ -180,7 +214,7 @@ export async function readSpecification(context: QueryContext, query: ReadSpecif
     results.push({ inputIndex: results.length, ok: false, error: errorShape(new CapabilityGraphError("CG_NOT_FOUND", {
       nextAction: "fix_input", details: { knowledgeId } })) });
   }
-  return { results, knowledgeState: !provider.specification ? "not_associated" : docs.length ? "matched" : "filtered_empty",
+  return boundedReadBatch<SpecificationReadBatch>({ results, knowledgeState: !provider.specification ? "not_associated" : docs.length ? "matched" : "filtered_empty",
     meta: { ...context.meta, completeness: results.some((item) => !item.ok) ? "partial" : "complete",
-      budgets: { "read.maxBytes": budgets.read.maxBytes, "read.maxDocumentsPerCall": budgets.read.maxDocumentsPerCall } } };
+      budgets: readBudgetMeta(budgets) } }, budgets);
 }

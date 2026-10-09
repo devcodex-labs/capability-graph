@@ -30,7 +30,11 @@ export function memoryGraphStore(snapshot: ValidatedProviderSnapshot): Validated
     indexes.get(forward)!.set(node.id.capabilityId, [...new Map(node[forward].map((id) => [id.capabilityId, id])).values()]);
     for (const id of new Set(node[forward].map((id) => id.capabilityId))) {
       const back = indexes.get(reverse)!;
-      back.set(id, [...(back.get(id) ?? []), node.id]);
+      // These arrays belong to this new view. Append instead of repeatedly
+      // copying a high-fanout reverse adjacency list during construction.
+      const items = back.get(id);
+      if (items) items.push(node.id);
+      else back.set(id, [node.id]);
     }
   }
   for (const groups of indexes.values()) for (const items of groups.values()) {

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { copyFile, lstat, mkdir, readFile, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,7 +8,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 const compilerOptions = { target: "ES2022", module: "Node16", moduleResolution: "Node16", types: ["node"], strict: true, skipLibCheck: true };
 async function fixture(run: (root: string, links: string[]) => Promise<void>) {
-  const parent = await realpath(tmpdir()); const root = await mkdtemp(path.join(parent, "capability-graph-build-"));
+  const { artifactsRoot, createTemporaryDirectory } = await import(pathToFileURL(path.join(repository, 'scripts/lib/website-paths.mjs')).href);
+  const parent: string = artifactsRoot; const root: string = await createTemporaryDirectory('capability-graph-build-');
   const links: string[] = [];
   try { await run(root, links); }
   finally {
@@ -41,7 +41,7 @@ function command(args: string[], cwd: string) {
 
 test("deep R6: standard npm test cleans orphaned tests before discovery", async () => fixture(async (root, links) => {
   for (const file of ["scripts/build.mjs", "scripts/build-tests.mjs", "scripts/clean-output.mjs", "scripts/run-tests.mjs"]) await copyScript(root, file);
-  for (const directory of ["src", "test", "dist", "dist-test/test"]) await mkdir(path.join(root, directory), { recursive: true });
+  for (const directory of ["src", "test/validation", "dist", "dist-test/test"]) await mkdir(path.join(root, directory), { recursive: true });
   await dependencies(root, links);
   const metadata = JSON.parse(await readFile(path.join(repository, "package.json"), "utf8"));
   await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "build-fixture", private: true, type: "module", scripts: metadata.scripts }));
@@ -50,13 +50,20 @@ test("deep R6: standard npm test cleans orphaned tests before discovery", async 
   await writeFile(path.join(root, "tsconfig.consumer.json"), JSON.stringify({ compilerOptions: { ...compilerOptions, noEmit: true }, include: ["src"] }));
   await writeFile(path.join(root, "src/index.ts"), "export {};\n");
   await writeFile(path.join(root, "test/active.test.ts"), "import { test } from 'node:test'; test('active source test', () => {});\n");
+  await writeFile(path.join(root, 'test/validation/active.test.mjs'), "import { test } from 'node:test'; test('active validation test', () => {});\n");
   await writeFile(path.join(root, "dist/stale.js"), "throw new Error('stale build');\n");
   await writeFile(path.join(root, "dist-test/test/deleted.test.js"), "throw new Error('deleted test must not run');\n");
   const npm = process.env.npm_execpath; assert.ok(npm, "Run regression through npm test");
   const output = command([npm, "test"], root);
-  assert.match(output, /active source test/); assert.match(output, /(?:#|ℹ) tests 1\b/); // TAP and Node 24 spec reporter.
+  assert.match(output, /active source test/); assert.match(output, /active validation test/);
+  assert.match(output, /(?:#|ℹ) tests 2\b/); // TAP and Node 24 spec reporter.
   for (const file of ["dist/stale.js", "dist-test/test/deleted.test.js"]) await assert.rejects(lstat(path.join(root, file)), { code: "ENOENT" });
   assert.ok((await lstat(path.join(root, "dist-test/test/active.test.js"))).isFile());
+  await rm(path.join(root, 'dist-test/test/active.test.js'));
+  const empty = spawnSync(process.execPath, ['scripts/run-tests.mjs'], { cwd: root, encoding: 'utf8' });
+  assert.equal(empty.status, 1);
+  assert.match(empty.stderr, /No compiled \*\.test\.js files found/,
+    'validation tests must not hide missing compiled Core tests');
 }));
 
 test("deep R6: private MCP build also removes orphaned output", async () => fixture(async (root, links) => {

@@ -6,6 +6,9 @@ on:
     paths:
       - "website/**"
       - "src/**"
+      - "scripts/**"
+      - "tsconfig*.json"
+      - "test/**"
       - "examples/**"
       - "package.json"
       - "package-lock.json"
@@ -17,6 +20,9 @@ on:
     paths:
       - "website/**"
       - "src/**"
+      - "scripts/**"
+      - "tsconfig*.json"
+      - "test/**"
       - "examples/**"
       - "package.json"
       - "package-lock.json"
@@ -25,6 +31,10 @@ on:
       - ".github/workflows/docs-deploy.yml"
       - ".github/workflows/release.yml"
   workflow_dispatch:
+
+env:
+  CG_ARTIFACTS_DIR: ${{ github.workspace }}/../capability-graph-artifacts
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../capability-graph-artifacts/browser-binaries
 
 permissions:
   contents: read
@@ -85,8 +95,6 @@ jobs:
         working-directory: website
       - run: npm run check:build
         working-directory: website
-      - run: npm run build:ai
-        working-directory: website
 
   docs-browser:
     runs-on: ubuntu-latest
@@ -105,17 +113,16 @@ jobs:
       - run: npm run build
       - run: npm ci
         working-directory: website
-      - run: npx playwright install --with-deps chromium
-        working-directory: website
+      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build
         working-directory: website
       - run: npm run test:site
         working-directory: website
+      - run: npm run test:site:cross
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: docs-browser-failure
           path: |
-            website/output/playwright/
-            website/test-results/
+            ${{ github.workspace }}/../capability-graph-artifacts/website/playwright/
           retention-days: 7

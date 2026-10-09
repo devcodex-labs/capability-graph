@@ -18,7 +18,7 @@
 
 ## 验证
 
-文档材料维护：最小 acme.http/route 对照为 website/fixtures/minimal-provider，输入来自公开页面；website/fixtures/first-provider 是独立的关系、知识、Specification 高级回归，不能暗中给最小教程补文件。两者由 check:examples 分别验证，不向读者解释内部夹具组织。
+文档材料维护：最小 acme.http/route 对照为 test/fixtures/website/minimal-provider，输入来自公开页面；test/fixtures/website/advanced-provider 是独立的关系、知识、Specification 高级回归，不能暗中给最小教程补文件。两者由 check:examples 分别验证，不向读者解释内部夹具组织。
 
 VextJS 仅为概念示例。升级为可运行状态前，需要公开源码/固定材料、公开包入口编译、真实主入口/下钻/错误路径，以及 CI 与页面同源验证；只补代码或标签不能改变状态。
 
@@ -34,21 +34,23 @@ check:reference 独立比较公开声明与生成签名，包括函数、类静�
 
 网络错误、缺失发布标签、版本漂移或未知部署身份都应停止流程并排查，只有明确 404 才作为首次站点部署处理。此工作流落地不等于已上线；需要独立的公网 verify-public 证据。
 
-在 website 执行 npm run build。scripts/lib/tutorial.mjs 是本地、Registry及MCP测试共用的页面还原器，只接受固定检查点/文件白名单。页面是输入真相源，Fixture只对照，不能复制Fixture补文件。check:examples运行helper负例、G0-G4及独立G4四例、页面输出，保留高级Fixture Specification/Reader/API和类型片段回归。安装验证需使用仓库外消费者和独立冻结的期望版本，不以实际读取的版本自证。
+在 website 执行 npm run build。../scripts/validation/website/lib/tutorial.mjs 是本地、Registry及MCP测试共用的页面还原器，只接受固定检查点/文件白名单。页面是输入真相源，Fixture只对照，不能复制Fixture补文件。check:examples运行helper负例、G0-G4及独立G4四例、页面输出，保留高级Fixture Specification/Reader/API和类型片段回归。安装验证需使用仓库外消费者和独立冻结的期望版本，不以实际读取的版本自证。
 
 维护 First Provider Fixture 时，在仓库根先构建主包，再执行：
 
 ```sh
 npm run build
-node website/fixtures/first-provider/discover.mjs
+node test/fixtures/website/advanced-provider/discover.mjs
 cd website
 npm run check:examples
 ```
 
 这些命令属于源码贡献者验证，不应放回公开教程的 npm 使用主路径。
 
-新增被称为可运行的代码时，将其加入 `scripts/check-doc-code.mjs` 或真实示例测试；不要只增一个状态标签。生成与验证临时文件必须清理。Seed 的真实性另由根 `npm test` 和 `examples/seed-mcp` 的 `npm test` 验证。
+新增被称为可运行的代码时，将其加入 `../scripts/validation/website/check-doc-code.mjs` 或真实示例测试；不要只增一个状态标签。生成与验证临时文件必须清理。Seed 的真实性另由根 `npm test` 和 `examples/seed-mcp` 的 `npm test` 验证。
 
-最终验收顺序是 build → build:ai → check:build → test:site → check:build/check:package，记录最终doc_build全部文件SHA；浏览器预览不得隐式重建。之后若页面/配置/生成输入或输出变化，必须重建并重验同一制品。Playwright管理自己的preview，结束确认端口释放，不复用或杀用户服务。自动检查不替代独立用户走读，未取得真实走读证据时仍UNVERIFIED。
+最终验收顺序是 build → check:build → test:site → check:build/check:package，记录最终doc_build全部文件SHA；浏览器预览不得隐式重建。之后若页面/配置/生成输入或输出变化，必须重建并重验同一制品。Playwright管理自己的preview，结束确认端口释放，不复用或杀用户服务。自动检查不替代独立用户走读，未取得真实走读证据时仍UNVERIFIED。
 
-MCP完整Server/Client由公开页面还原到私有包下一层临时目录，保留固定SDK解析与Seed相对路径，标准stdio测试核对主入口无首轮泄漏、修订/参数/文档错误和进程退出。原十二工具/五能力平坦Catalog回归不可替换。新增验证消费者必须同步页面、状态数据、helper、安装链、生成输出和测试，不只改截图断言。
+MCP完整Server/Client由公开页面还原到仓库同级临时消费者，安装固定SDK和实际公开tarball，保留Seed相对路径，标准stdio测试核对主入口无首轮泄漏、修订/参数/文档错误和进程退出。原十二工具/五能力平坦Catalog回归不可替换。新增验证消费者必须同步页面、状态数据、helper、安装链、生成输出和测试，不只改截图断言。
+
+目录职责与统一构建入口见 [README](README.md)。正式测试和固定材料位于根 test，验证工具位于根 scripts/validation/website。临时消费者、一次性报告、生成片段、构建制品、截图及trace全部位于仓库同级 capability-graph-artifacts；不要在仓库内部另建隐藏产物目录。截图使用 testInfo.outputPath() 随用例隔离，CI 从同级目录上传制品。

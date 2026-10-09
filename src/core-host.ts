@@ -1,5 +1,5 @@
 import path from "node:path";
-import { resolveBudgets, type BudgetConfig, type BudgetOverrides } from "./budgets.js";
+import { resolveBudgets, type ResolvedBudgetConfig, type BudgetOverrides } from "./budgets.js";
 import { CapabilityGraphError, type ErrorShape } from "./errors.js";
 import { isId } from "./identity.js";
 import { computeEffectiveScope } from "./scope.js";
@@ -41,7 +41,7 @@ export function errorShape(error: unknown, fallback = "CG_LOAD_FAILED" as const)
 
 /** Owns authority handles and serialized publication; query code only receives pinned contexts. */
 export class CoreHost {
-  readonly budgets: BudgetConfig;
+  readonly budgets: ResolvedBudgetConfig;
   readonly scope: ReadonlySet<string>;
   private readonly specs: readonly ProviderLoadSpec[];
   private readonly store = new ProviderViewStore();

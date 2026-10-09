@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test dist/test/server.test.js",
+    "test": "npm run build && node --test dist/test/server.test.js dist/test/retrieval.test.js",
     "start": "node dist/src/main.js"
   },
   "dependencies": {

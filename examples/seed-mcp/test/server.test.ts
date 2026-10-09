@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -119,17 +119,28 @@ test("MCP: actual stdio child serves requests and exits on close", async (contex
 test("MCP docs: page-restored main entry runs the progressive stdio chain and preserves failures", async (context) => {
   const privateRoot = path.resolve(fileURLToPath(new URL("../../", import.meta.url)));
   const websiteRoot = path.resolve(fileURLToPath(new URL("../../../../website/", import.meta.url)));
-  const helperUrl = pathToFileURL(path.join(websiteRoot, "scripts", "lib", "tutorial.mjs")).href;
+  const repositoryRoot = path.dirname(websiteRoot);
+  const helperUrl = pathToFileURL(path.join(repositoryRoot, "scripts/validation/website/lib/tutorial.mjs")).href;
   const { loadTutorial, materializeTutorial, compareFixture } = await import(helperUrl);
-  // Keep one directory level under the private package for SDK and Seed path resolution.
-  const scratch = await mkdtemp(path.join(privateRoot, ".docs-main-"));
+  const { artifactsRoot, createTemporaryDirectory } = await import(pathToFileURL(path.join(repositoryRoot, "scripts/lib/website-paths.mjs")).href);
+  const { installLocalConsumer } = await import(pathToFileURL(path.join(repositoryRoot, "scripts/validation/website/lib/consumer.mjs")).href);
+  const allocation = await createTemporaryDirectory(".docs-main-");
+  // Preserve the documented layout in an independent installed consumer.
+  const scratch = path.join(allocation, "examples/seed-mcp/docs-main");
   let pid: number | null = null;
   try {
+    await mkdir(scratch, { recursive: true });
+    await cp(root, path.join(allocation, "examples/seed-provider"), { recursive: true });
+    const manifest = JSON.parse(await readFile(path.join(privateRoot, "package.json"), "utf8"));
+    await installLocalConsumer(allocation, { dependencies: [
+      `@modelcontextprotocol/sdk@${manifest.dependencies["@modelcontextprotocol/sdk"]}`,
+      `zod@${manifest.dependencies.zod}`
+    ] });
     const tutorial = await loadTutorial("MCP");
-    await compareFixture(tutorial, path.join(websiteRoot, "fixtures", "mcp-main-entry"));
+    await compareFixture(tutorial, path.join(repositoryRoot, "test/fixtures/website/mcp-main-entry"));
     const materialized = await materializeTutorial(scratch, tutorial);
     const output = JSON.parse(execFileSync(process.execPath, [materialized.script], {
-      cwd: privateRoot, encoding: "utf8", timeout: 30_000,
+      cwd: scratch, encoding: "utf8", timeout: 30_000,
     }));
     assert.deepEqual(output, tutorial.expected);
 
@@ -189,8 +200,8 @@ test("MCP docs: page-restored main entry runs the progressive stdio chain and pr
     }
     context.diagnostic(`page-only MCP chain passed; child PID=${pid} absent; no TCP listener`);
   } finally {
-    assert.equal(path.dirname(scratch), privateRoot);
-    assert(path.basename(scratch).startsWith(".docs-main-"));
-    await rm(scratch, { recursive: true, force: true });
+    assert.equal(path.dirname(allocation), artifactsRoot);
+    assert(path.basename(allocation).startsWith(".docs-main-"));
+    await rm(allocation, { recursive: true, force: true });
   }
 });

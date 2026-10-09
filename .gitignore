@@ -5,10 +5,6 @@ coverage/
 .turbo/
 .cache/
 *.tsbuildinfo
-website/doc_build/
-website/output/
-website/test-results/
-website/playwright-report/
 
 .env
 .env.*

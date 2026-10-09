@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
+import { repositoryRoot, websiteRoot, siteOutputRoot } from '../../scripts/lib/website-paths.mjs';
 
-const outputRoot = path.join(websiteRoot, 'doc_build');
+const outputRoot = siteOutputRoot;
 const publicBase = 'https://devcodex-labs.github.io/capability-graph/';
 
 function assert(condition, message) {

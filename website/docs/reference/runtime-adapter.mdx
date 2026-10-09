@@ -3,7 +3,7 @@ title: Adapter 接口
 description: Runtime、能力检索、知识检索、Reader 与数据库 Authority Adapter 的统一合同参考。
 ---
 
-import Contracts from '../../generated/snippets/contracts-runtime-adapter.mdx';
+import Contracts from '@generated/snippets/contracts-runtime-adapter.mdx';
 
 # Adapter 接口
 
@@ -25,7 +25,7 @@ Adapter 自己管理连接、取消、重试和清理。Core 的 5 秒默认超�
 
 ## CapabilityRetriever
 
-<span className="cg-status">仅合同</span>
+<span className="cg-status">合同与可运行参考</span>
 
 输入查询文本、允许的 Provider IDs、每个 Provider 的当前 Static Revision 和候选上限；输出候选身份、可选 score 与 `sourceStaticRevision`。
 
@@ -35,7 +35,7 @@ Core 按 Adapter 原始顺序生成一基 `rank`。候选被拒绝时保留排�
 
 ## KnowledgeRetriever
 
-<span className="cg-status">仅合同</span>
+<span className="cg-status">合同与可运行参考</span>
 
 `retrieve(input, access)` 只处理 Core 展开的最终 targets。每个 target 含能力身份、`knowledgeId`、声明 locator 和经过的 Collection IDs，不含绝对知识根或 `readContext`。
 
@@ -45,7 +45,7 @@ Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期�
 
 ## KnowledgeReader
 
-<span className="cg-status">可用</span> <span className="cg-status">仅合同</span>
+<span className="cg-status">本地读取与 HTTP 参考可用</span>
 
 `canRead(ref)` 同步决定是否支持非本地来源。Core 选择第一个匹配的自定义 Reader；内置本地 Reader 优先处理 `relative-file`。
 

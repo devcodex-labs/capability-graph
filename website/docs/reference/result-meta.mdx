@@ -3,7 +3,7 @@ title: 结果与控制元数据
 description: 解释 ResultMeta、批量槽位、作用域、修订、分页、预算与完整性合同。
 ---
 
-import Contracts from '../../generated/snippets/contracts-result-meta.mdx';
+import Contracts from '@generated/snippets/contracts-result-meta.mdx';
 
 # 结果与控制元数据
 
@@ -123,6 +123,9 @@ Selection 按选择、节点和依赖边数量限制工作量，当前没有独�
 | `selection.maxEdges` | 256 | 完整闭包真实依赖边数量 |
 | `read.maxBytes` | 32768 | 每篇正文原始字节 |
 | `read.maxDocumentsPerCall` | 8 | 整次正文读取文档数量 |
+| `read.maxSelected` | 32 | 文档读取原始 selected 数量，去重前检查 |
+| `read.maxFilterValuesPerDimension` | 128 | 直接读取每维 knowledgeIds/roles/locales 原始数量 |
+| `read.maxResponseBytes` | 4194304 | 完整 Core 响应的 JSON UTF-8 字节，含失败槽位、meta 和 view |
 | `retrieveCapabilities.maxCandidates` | 20 | 候选数量，也是缺省 limit |
 | `retrieveCapabilities.maxCandidateBytes` | 512 | UTF-8 单候选字节 |
 | `queryKnowledge.maxHits` | 8 | 命中数量，也是缺省 limit |
@@ -138,5 +141,7 @@ Selection 按选择、节点和依赖边数量限制工作量，当前没有独�
 | `runtime.maxAssociationBytes` | 2048 | 每实例整个 associations 的 UTF-8 字节 |
 
 例如 `budgets: { runtime: { timeoutMs: 2000 } }` 只更改等待时间，所有其他默认值保留。增加预算需要结合宿主资源，不使 scope 变成沙箱或后端自动可用。
+
+新增的三个 read 数量/响应字段在公开配置中可省略，内部总会补齐默认值，旧完整 BudgetConfig 仍可使用。原始数量在查询 pin、点读及 Reader 前检查；展开后的篇数超限也不调用 Reader。总响应需取得有界正文后按 JSON 转义后的字节计算，超限为查询级 CG_BUDGET_EXCEEDED，不能静默丢项。单篇正文超限仍是逐项失败。宿主可降低响应上限以适应自己的上下文容量。
 
 <Contracts />

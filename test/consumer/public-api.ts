@@ -26,6 +26,13 @@ formatQualifiedId("seed.http::route.http");
 const unknownBudget: BudgetOverrides = { catalog: { bytes: 10 } };
 // @ts-expect-error Configuration budgets require numeric values.
 const badBudget: BudgetOverrides = { read: { maxBytes: "10" } };
+const newReadLimits: BudgetOverrides = { read: { maxSelected: 32, maxFilterValuesPerDimension: 128, maxResponseBytes: 4194304 } };
+function oldFullBudgetConsumer(config: Omit<BudgetConfig, "read"> & { read: { maxBytes: number; maxDocumentsPerCall: number } }): BudgetConfig {
+  return config;
+}
+// @ts-expect-error New read limits require numeric configuration.
+const badReadLimit: BudgetOverrides = { read: { maxResponseBytes: "4194304" } };
+void [newReadLimits, oldFullBudgetConsumer, badReadLimit];
 // @ts-expect-error A successful item requires a value.
 const badBatch: BatchItem<string> = { inputIndex: 0, ok: true };
 // @ts-expect-error Error codes are a closed contract.

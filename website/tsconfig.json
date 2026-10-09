@@ -5,8 +5,15 @@
     "moduleResolution": "Bundler",
     "target": "ES2022",
     "strict": true,
-    "types": ["node"],
-    "skipLibCheck": true
+    "types": [
+      "node"
+    ],
+    "skipLibCheck": true,
+    "allowJs": true
   },
-  "include": ["rspress.config.ts", "theme/**/*.tsx", "tests/**/*.ts"]
+  "include": [
+    "rspress.config.ts",
+    "theme/**/*.tsx",
+    "theme/**/*.ts"
+  ]
 }

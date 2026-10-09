@@ -20,7 +20,7 @@ examples/
 ├── seed-provider/  provider.json、5 个能力、PROVIDER.md、knowledge/
 ├── seed-api/       main.ts：普通 API 查询链
 ├── seed-mcp/       独立私有包及 stdio 入口
-└── seed-runtime/   service.ts、adapter.ts、main.ts
+└── seed-runtime/   Runtime 服务、HTTP Reader、文本索引及演示入口
 test/              端到端与合同测试
 ```
 
@@ -103,5 +103,19 @@ node --test dist-test/test/real-runtime.test.js
 测试启动独立进程，使用同一注册表响应真实业务请求和 Runtime 查询。预期观察到 `GET /users`、`POST /users`，动态注册后 Runtime Revision 改变；错误环境、失联和旧游标不能返回假空结果。诊断输出包含 PID/端口，测试结束关闭进程并验证端口可重新绑定。
 
 手动运行服务前，必须从实际部署的 Provider 取得 Static Revision，按[服务 README](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/README.md)传入项目、环境和构建参数。不要把请求端最新修订填成旧服务的部署修订。
+
+## HTTP 文档与文本检索
+
+在仓库根执行：
+
+```sh
+npm run demo:http
+```
+
+该入口启动真实 HTTP 文档来源与业务服务，从公开 Catalog 建立有限的能力词项索引，再由调用方显式选择 `route.validation`。Selection 的 requires 闭包包含 `schema.request`，文档检索仍只针对明确传入的 selected 和 knowledgeIds。
+
+预期 JSON 包含 `document: "HTTP-GUIDE"`、大于零的 `knowledgeHits`、`zeroHits: 0`、`staleRejected: true`、大于零的 `recoveredHits`、`businessStatus: 201` 和 `modelCalls: 0`。HTTP Reader 读取实际中文正文；片段偏移按 UTF-8 字节计算。正文改变后旧索引被拒绝，由接入方显式 invalidate 后恢复。根 `test/http-retrieval.test.ts` 同时覆盖超时、响应超限、重定向、连接关闭、配置和静态修订变更。
+
+这是本机词项检索参考，没有模型或向量数据库，不能据此推断语义搜索质量、Agent 修改代码的成功率或生产容量。临时材料在仓库同级目录，结束时释放两个 HTTP 端口及 Reader 连接。[查看源码](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/retrieval-demo.ts)
 
 只需首次发现时，使用[最小 Provider](../getting-started/first-provider)，不必克隆 Seed；关系、知识和规范可在[进阶教程](../guides/progressive-discovery)按需添加。

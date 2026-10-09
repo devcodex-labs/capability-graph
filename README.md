@@ -9,6 +9,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [查询与更新](#queries)
 - [支持边界](#boundaries)
 - [本地开发](#development)
+- [未发布改动](changelogs/unreleased.md)
 - [1.0.1 迁移与变更](changelogs/1.0.1.md)
 - [1.0.0 变更](changelogs/1.0.0.md)
 - [许可证](#license)
@@ -125,7 +126,7 @@ try {
 ## 支持边界
 
 - 文件定义、本地 Document、普通 API 和私有 MCP 示例可直接运行。
-- 数据库、两类检索与远程 Reader 提供公开合同和正负测试，不附真实数据库、向量/RAG 后端或 HTTP Reader；它们是后续迭代项。
+- 数据库、两类检索与远程 Reader 提供公开合同和正负测试；仓库示例另含真实本机 HTTP Reader 与有限词项索引，主包不附数据库、向量或模型后端。
 - Runtime Core 已实现调度、观察状态与返回校验；[独立 HTTP 参考](examples/seed-runtime/README.md)实际采集应用注册路由，并验证项目环境隔离、实时变化和失败恢复。它不是通用框架扫描器或远程集群监控服务。
 - Adapter 在调用进程内运行，属于显式信任代码；scope 不是进程沙箱。相对知识路径受根目录及真实路径约束，远程读取策略归已配置 Reader。
 - [API 示例](examples/seed-api/README.md)与 [MCP 示例](examples/seed-mcp/README.md)共享 Core。工具命名、认证、宿主意图判断及规范采用归接入方，不属于主包。
@@ -145,7 +146,15 @@ npm run evaluate
 
 `npm test` 先构建和核对独立 TypeScript 消费者，再清理 `dist-test`、重新编译并发现测试；删除或重命名源码后不会继续执行旧测试输出。`test:package` 在无 dist 的源码副本中离线执行标准打包，并核对旧产物清理、预构建一致性、独立项目的真实安装与类型，结束后清理临时文件，不执行发布。
 
-只构建使用 `npm run build`，会清理仓库内 dist 后重新编译；标准 `npm pack` 的 prepack 自动执行同一构建，不能跳过脚本后假定产物仍然有效。构建产物位于 `dist/`，测试编译产物位于 `dist-test/`。CI 配置覆盖 Windows/Linux 与 Node 20.19.0、22.12.0，远端运行结果以实际 CI 为准。
+只构建使用 `npm run build`，会清理仓库内 dist 后重新编译；标准 `npm pack` 的 prepack 自动执行同一构建，不能跳过脚本后假定产物仍然有效。构建产物位于 `dist/`，测试编译产物位于 `dist-test/`。CI 配置覆盖 Windows/Linux 与 Node 20.19.0、22.12.0、24.19.0，远端运行结果以实际 CI 为准。
+
+`npm run demo:http` 运行真实 Node.js HTTP 文档读取、能力词项召回、知识检索、过期拒绝和重建恢复，再请求业务路由。示例不调用模型；数据库与真实框架接入仍需分别实现和验证。
+
+`npm run evaluate:capacity` 执行可复用的真实文件容量验证。默认 1 万节点、2 个 Provider、10 并发，混合目录/详情/八类邻居/选择/正文/规范查询，并交错定义更新与 reload，验证关闭时已 pin 的读取完成和新查询拒绝。扩大验证可运行 `npm run evaluate:capacity -- --nodes 100000 --providers 2 --concurrency 100 --operations 3000 --duration-ms 120000 --reload-every 1000`；持续时间是负载下限，等待中的 reload/读取会延长总耗时。临时来源执行后删除，JSON 报告保留在同级产物目录。延迟和采样内存只说明本机本次运行，不是生产容量承诺。
+
+容量工具每类延迟最多保留 4096 个样本，报告标明分位数来自全量还是抽样；计数和最大值持续累计，内存统计也使用固定大小，避免验证工具自身随运行时长持续增长。
+
+文档站点的正式测试位于根 `test/website`，固定样例位于 `test/fixtures/website`，验证工具位于 `scripts/validation/website`。临时消费者、报告、截图、生成材料与站点制品统一位于仓库同级 `capability-graph-artifacts`；站点配置和使用入口见 [website/README.md](website/README.md)。
 
 `npm run build:tests` 单独清理并编译测试，`evaluate` 也使用此入口。根包及私有 MCP 示例的构建清理只接受已知、归当前包所有的输出目录，拒绝符号链接或普通文件，不跟随输出链接删除其他目录。
 

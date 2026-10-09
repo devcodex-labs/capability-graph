@@ -2,6 +2,16 @@
 
 该服务独立运行，注册表同时用于真实 HTTP 请求分派与能力实例采集。Core 不负责启动服务，Adapter 也不包含预设实例列表。
 
+## HTTP 读取与文本检索
+
+在仓库根运行 `npm run demo:http`，会构建并执行 `retrieval-demo.ts`：建立真实 HTTP 文档来源，从公开 Catalog 建立能力词项索引，显式选择能力，读取中文正文，核对 UTF-8 字节偏移的检索片段，再验证零命中、正文变更后的过期拒绝和显式重建恢复，最后实际调用 `POST /users` 得到 201。
+
+`knowledge-reader.ts` 限制来源 origin、并发数、总时限和原始响应字节，拒绝重定向与压缩；超时及关闭都会销毁请求并等待连接关闭。`text-retrieval.ts` 是确定性的内存词项索引，使用有限缓存，按已选 targets 重查内容身份；零命中也需要有效证据。静态定义、正文或分块配置变更后，由接入方显式重建或调用 invalidate，Core 不自动刷新。
+
+分块保留 UTF-8 BOM 和补充字符，偏移对应原始正文的字节。缓存按选择做 LRU 淘汰；即便正文和静态修订相同，切换知识根目录仍须失效旧映射。来源读取失败不会伪装成缓存成功，能力索引重建超容量也不会发布半个索引。这些边界分别由根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts` 通过真实来源验收。
+
+这条路径使用零次模型调用，证明本机 HTTP 和检索链路，不证明语义搜索质量或 Agent 任务成功率。临时 Provider 位于仓库同级 `capability-graph-artifacts`，结束后关闭 Reader、graph、HTTP 服务并清理自建目录。正式回归位于根 `test/http-retrieval.test.ts`。
+
 ## 运行
 
 1. 在仓库运行 `npm test`，生成 `dist-test/examples/seed-runtime`。

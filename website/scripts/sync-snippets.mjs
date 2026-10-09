@@ -1,8 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { generatedRoot, websiteRoot } from './lib/paths.mjs';
+import { generatedRoot, websiteRoot, websiteFixtureRoot } from '../../scripts/lib/website-paths.mjs';
 
-const fixtureRoot = path.join(websiteRoot, 'fixtures', 'first-provider');
+const fixtureRoot = path.join(websiteFixtureRoot, 'advanced-provider');
 const files = ['provider.json', 'route.capability.json', 'route-http.capability.json'];
 const snapshot = {};
 for (const file of files) {

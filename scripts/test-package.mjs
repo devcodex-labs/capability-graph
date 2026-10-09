@@ -4,12 +4,13 @@ import { copyFile, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { artifactsRoot, createTemporaryDirectory } from "./lib/website-paths.mjs";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 const npm = process.env.npm_execpath;
 assert.ok(npm, "Run this check with npm run test:package");
-const temporaryRoot = await realpath(tmpdir());
-const temporary = await mkdtemp(path.join(temporaryRoot, "capability-graph-package-"));
+const temporaryRoot = artifactsRoot;
+const temporary = await createTemporaryDirectory("capability-graph-package-");
 const command = (args, cwd = repository) => execFileSync(process.execPath, args, {
   cwd, encoding: "utf8", timeout: 120_000, maxBuffer: 2 * 1024 * 1024,
 });

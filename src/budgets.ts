@@ -13,7 +13,16 @@ export interface BudgetConfig {
   };
   readonly specification: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number };
   readonly selection: { readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number };
-  readonly read: { readonly maxBytes: number; readonly maxDocumentsPerCall: number };
+  readonly read: {
+    readonly maxBytes: number;
+    readonly maxDocumentsPerCall: number;
+    /** Raw selection count, before deduplication. Omission inherits the default. */
+    readonly maxSelected?: number;
+    /** Raw values in each knowledgeIds/roles/locales filter dimension. */
+    readonly maxFilterValuesPerDimension?: number;
+    /** Complete Core response serialized as UTF-8 JSON, including failures and meta. */
+    readonly maxResponseBytes?: number;
+  };
   readonly retrieveCapabilities: { readonly maxCandidates: number; readonly maxCandidateBytes: number };
   readonly queryKnowledge: { readonly maxHits: number; readonly maxSnippetBytes: number; readonly maxSelected: number;
     readonly maxFilterValuesPerDimension: number; readonly maxTargets: number; readonly maxTargetBytes: number };
@@ -29,14 +38,18 @@ export interface BudgetConfig {
 /** Configuration has one grouping level, not an arbitrary recursive schema. */
 export type BudgetOverrides = { readonly [K in keyof BudgetConfig]?: Partial<BudgetConfig[K]> };
 
-export const DEFAULT_BUDGETS: BudgetConfig = Object.freeze({
+/** Internal normalized budgets; legacy public full configurations may omit new fields. */
+export type ResolvedBudgetConfig = { readonly [K in keyof BudgetConfig]: Required<BudgetConfig[K]> };
+
+export const DEFAULT_BUDGETS: ResolvedBudgetConfig = Object.freeze({
   catalog: Object.freeze({ maxBytes: 24_576, maxItems: 200, maxItemBytes: 2_048 }),
   neighbors: Object.freeze({ defaultPageSize: 50, maxPageSize: 100, maxBytes: 24_576, maxItemBytes: 2_048 }),
   detail: Object.freeze({ maxCapabilities: 20, maxItemBytes: 16_384, maxBytes: 131_072,
     defaultKnowledgePageSize: 20, maxKnowledgePageSize: 100 }),
   specification: Object.freeze({ defaultPageSize: 20, maxPageSize: 100, maxBytes: 131_072, maxItemBytes: 16_384 }),
   selection: Object.freeze({ maxSelected: 32, maxNodes: 128, maxEdges: 256 }),
-  read: Object.freeze({ maxBytes: 32_768, maxDocumentsPerCall: 8 }),
+  read: Object.freeze({ maxBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
+    maxFilterValuesPerDimension: 128, maxResponseBytes: 4_194_304 }),
   retrieveCapabilities: Object.freeze({ maxCandidates: 20, maxCandidateBytes: 512 }),
   queryKnowledge: Object.freeze({ maxHits: 8, maxSnippetBytes: 2_048, maxSelected: 32,
     maxFilterValuesPerDimension: 128, maxTargets: 128, maxTargetBytes: 131_072 }),
@@ -64,7 +77,7 @@ function dataObject(value: unknown, field: string): Record<string, unknown> {
 }
 
 /** Internal open-config normalization; omitted fields inherit immutable defaults. */
-export function resolveBudgets(overrides: BudgetOverrides = {}): BudgetConfig {
+export function resolveBudgets(overrides: BudgetOverrides = {}): ResolvedBudgetConfig {
   const input = dataObject(overrides, "budgets");
   for (const group of Object.getOwnPropertyNames(input)) {
     if (!Object.hasOwn(DEFAULT_BUDGETS, group)) invalid(`budgets.${group}`);
@@ -93,5 +106,5 @@ export function resolveBudgets(overrides: BudgetOverrides = {}): BudgetConfig {
   ] as const) {
     if (output[group][initial]! > output[group][maximum]!) invalid(`budgets.${group}.${initial}`);
   }
-  return Object.freeze(output) as unknown as BudgetConfig;
+  return Object.freeze(output) as unknown as ResolvedBudgetConfig;
 }

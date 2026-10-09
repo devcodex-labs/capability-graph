@@ -5,11 +5,19 @@
     "source": "../examples/seed-provider",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
+    "prerequisites": [
+      "root: npm ci"
+    ],
     "entry": "npm test",
     "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
-    "claims": ["file authority", "local document"]
+    "userResponsibilities": [
+      "按页面创建文件和安装依赖",
+      "接入方负责认证、部署和进程管理"
+    ],
+    "claims": [
+      "file authority",
+      "local document"
+    ]
   },
   {
     "id": "seed-api",
@@ -17,11 +25,18 @@
     "source": "../examples/seed-api",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
+    "prerequisites": [
+      "root: npm ci"
+    ],
     "entry": "npm test",
     "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
-    "claims": ["provider-owned API reference"]
+    "userResponsibilities": [
+      "按页面创建文件和安装依赖",
+      "接入方负责认证、部署和进程管理"
+    ],
+    "claims": [
+      "provider-owned API reference"
+    ]
   },
   {
     "id": "seed-mcp",
@@ -29,11 +44,20 @@
     "source": "../examples/seed-mcp",
     "verify": "npm test",
     "runDir": "examples/seed-mcp",
-    "prerequisites": ["root: npm ci","root: npm test","examples/seed-mcp: npm ci --ignore-scripts"],
+    "prerequisites": [
+      "root: npm ci",
+      "root: npm test",
+      "examples/seed-mcp: npm ci --ignore-scripts"
+    ],
     "entry": "npm test；页面 docs-main-entry/client.mjs",
     "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
-    "claims": ["provider-owned MCP reference"]
+    "userResponsibilities": [
+      "按页面创建文件和安装依赖",
+      "接入方负责认证、部署和进程管理"
+    ],
+    "claims": [
+      "provider-owned MCP reference"
+    ]
   },
   {
     "id": "seed-runtime",
@@ -41,23 +65,38 @@
     "source": "../examples/seed-runtime",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
+    "prerequisites": [
+      "root: npm ci"
+    ],
     "entry": "npm test",
     "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
-    "claims": ["real HTTP runtime observation"]
+    "userResponsibilities": [
+      "按页面创建文件和安装依赖",
+      "接入方负责认证、部署和进程管理"
+    ],
+    "claims": [
+      "real HTTP runtime observation"
+    ]
   },
   {
     "id": "first-provider-tutorial",
     "status": "Runnable",
-    "source": "fixtures/minimal-provider",
+    "source": "../test/fixtures/website/minimal-provider",
     "verify": "npm run check:examples",
     "runDir": "website",
-    "prerequisites": ["root: npm run build","website: npm ci"],
+    "prerequisites": [
+      "root: npm run build",
+      "website: npm ci"
+    ],
     "entry": "页面还原的 discover.mjs",
     "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
-    "claims": ["first provider tutorial"]
+    "userResponsibilities": [
+      "按页面创建文件和安装依赖",
+      "接入方负责认证、部署和进程管理"
+    ],
+    "claims": [
+      "first provider tutorial"
+    ]
   },
   {
     "id": "lifecycle-example",
@@ -65,11 +104,19 @@
     "source": "docs/guides/lifecycle-and-reload.mdx",
     "verify": "npm run check:examples",
     "runDir": "website",
-    "prerequisites": ["root: npm run build", "website: npm ci"],
+    "prerequisites": [
+      "root: npm run build",
+      "website: npm ci"
+    ],
     "entry": "页面还原的 lifecycle-demo.mjs",
     "proof": "真实定义更新、previous 查询和失败保留 current；亦经 Registry 实装验证",
-    "userResponsibilities": ["接入方管理自己的共享 graph 与实际 Authority 生命周期"],
-    "claims": ["reload lifecycle", "page-only revision and recovery"]
+    "userResponsibilities": [
+      "接入方管理自己的共享 graph 与实际 Authority 生命周期"
+    ],
+    "claims": [
+      "reload lifecycle",
+      "page-only revision and recovery"
+    ]
   },
   {
     "id": "multi-provider",
@@ -77,11 +124,19 @@
     "source": "../test/provider-isolation.test.ts",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
+    "prerequisites": [
+      "root: npm ci"
+    ],
     "entry": "npm test",
     "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
-    "claims": ["provider isolation", "union catalog"]
+    "userResponsibilities": [
+      "按页面创建文件和安装依赖",
+      "接入方负责认证、部署和进程管理"
+    ],
+    "claims": [
+      "provider isolation",
+      "union catalog"
+    ]
   },
   {
     "id": "vextjs-integration",
@@ -92,8 +147,12 @@
     "prerequisites": [],
     "entry": null,
     "proof": "职责与推荐组合，无执行证据",
-    "userResponsibilities": ["实现并验证对应Adapter"],
-    "claims": ["recommended integration shape only"]
+    "userResponsibilities": [
+      "实现并验证对应Adapter"
+    ],
+    "claims": [
+      "recommended integration shape only"
+    ]
   },
   {
     "id": "database-authority",
@@ -101,46 +160,81 @@
     "source": "../src/store/types.ts",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
+    "prerequisites": [
+      "root: npm ci"
+    ],
     "entry": "npm test",
     "proof": "公开类型与正负合同，不证明真实后端",
-    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
-    "claims": ["adapter contract", "contract tests"]
+    "userResponsibilities": [
+      "实现实际后端",
+      "配置访问与生命周期"
+    ],
+    "claims": [
+      "adapter contract",
+      "contract tests"
+    ]
   },
   {
     "id": "capability-retrieval",
-    "status": "Contract-only",
-    "source": "../src/retrieval/types.ts",
+    "status": "Runnable",
+    "source": "../examples/seed-runtime",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
-    "entry": "npm test",
-    "proof": "公开类型与正负合同，不证明真实后端",
-    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
-    "claims": ["adapter contract", "contract tests"]
+    "prerequisites": [
+      "root: npm ci"
+    ],
+    "entry": "npm run demo:http",
+    "proof": "真实本机 HTTP 与有限词项索引，包含中文偏移、零命中和过期恢复；不证明语义搜索质量、Agent 成功率或生产容量",
+    "userResponsibilities": [
+      "实现实际后端",
+      "配置访问与生命周期"
+    ],
+    "claims": [
+      "real local HTTP transport",
+      "bounded lexical index",
+      "explicit stale rejection and recovery"
+    ]
   },
   {
     "id": "knowledge-retrieval",
-    "status": "Contract-only",
-    "source": "../src/retrieval/types.ts",
+    "status": "Runnable",
+    "source": "../examples/seed-runtime",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
-    "entry": "npm test",
-    "proof": "公开类型与正负合同，不证明真实后端",
-    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
-    "claims": ["adapter contract", "contract tests"]
+    "prerequisites": [
+      "root: npm ci"
+    ],
+    "entry": "npm run demo:http",
+    "proof": "真实本机 HTTP 与有限词项索引，包含中文偏移、零命中和过期恢复；不证明语义搜索质量、Agent 成功率或生产容量",
+    "userResponsibilities": [
+      "实现实际后端",
+      "配置访问与生命周期"
+    ],
+    "claims": [
+      "real local HTTP transport",
+      "bounded lexical index",
+      "explicit stale rejection and recovery"
+    ]
   },
   {
     "id": "remote-reader",
-    "status": "Contract-only",
-    "source": "../src/knowledge/types.ts",
+    "status": "Runnable",
+    "source": "../examples/seed-runtime",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["root: npm ci"],
-    "entry": "npm test",
-    "proof": "公开类型与正负合同，不证明真实后端",
-    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
-    "claims": ["reader contract", "negative tests"]
+    "prerequisites": [
+      "root: npm ci"
+    ],
+    "entry": "npm run demo:http",
+    "proof": "真实本机 HTTP 与有限词项索引，包含中文偏移、零命中和过期恢复；不证明语义搜索质量、Agent 成功率或生产容量",
+    "userResponsibilities": [
+      "实现实际后端",
+      "配置访问与生命周期"
+    ],
+    "claims": [
+      "real local HTTP transport",
+      "bounded lexical index",
+      "explicit stale rejection and recovery"
+    ]
   }
 ]

@@ -8,30 +8,27 @@
   },
   "scripts": {
     "dev": "npm run generate && rspress dev",
-    "build": "npm run generate && npm run check:content && npm run check:reference && npm run check:examples && rspress build && node scripts/write-route-redirects.mjs && node scripts/write-public-release.mjs",
-    "build:site": "rspress build && node scripts/write-route-redirects.mjs && node scripts/write-public-release.mjs",
-    "prebuild:ai": "npm run generate",
-    "build:ai": "node scripts/build-ai.mjs && npm run check:build",
+    "build": "npm run generate && npm run check:content && npm run check:reference && npm run check:examples && node scripts/build-site.mjs && npm run check:build",
+    "build:site": "npm run build",
+    "build:ai": "npm run build",
     "preview": "rspress preview",
     "pregenerate": "npm --prefix .. run build",
     "generate": "node scripts/generate.mjs",
-    "check:content": "node scripts/check-content.mjs",
-    "check:types": "tsc --noEmit",
-    "check:deployment": "node scripts/check-deployment.test.mjs",
-    "check:reference": "node scripts/check-reference-coverage.mjs && node scripts/check-contract-negatives.mjs",
-    "check:examples": "node scripts/check-examples.mjs",
-    "check:release-order": "node scripts/check-release-order.test.mjs",
-    "check:package": "node scripts/check-package-boundary.mjs",
-    "check:build": "node scripts/check-build-output.mjs",
-    "test:site": "playwright test",
-    "check": "npm run check:release-order && npm run check:deployment && npm run check:types && npm run build && npm run build:ai && npm run test:site && npm run check:build && npm run check:package"
+    "check:content": "node ../scripts/validation/website/check-content.mjs",
+    "check:types": "tsc --noEmit && tsc -p ../test/website/tsconfig.json --noEmit",
+    "check:deployment": "node --test ../test/website/unit/artifact-paths.test.mjs ../test/website/unit/deployment.test.mjs",
+    "check:reference": "node ../scripts/validation/website/check-reference-coverage.mjs && node ../scripts/validation/website/check-contract-negatives.mjs",
+    "check:examples": "node ../scripts/validation/website/check-examples.mjs",
+    "check:release-order": "node ../test/website/unit/release-order.test.mjs",
+    "check:package": "node ../scripts/validation/website/check-package-boundary.mjs",
+    "check:build": "node ../scripts/validation/website/check-build-output.mjs",
+    "test:site": "npm --prefix .. run test:site",
+    "check": "npm run check:release-order && npm run check:deployment && npm run check:types && npm run build && npm run test:site && npm run check:build && npm run check:package"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
     "@rspress/core": "2.0.22",
     "@rspress/plugin-sitemap": "2.0.22",
     "@types/react-dom": "19.2.3",
-    "typescript": "5.9.2",
-    "yaml": "2.8.2"
+    "typescript": "5.9.2"
   }
 }

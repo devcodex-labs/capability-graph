@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "strict": true,
+    "types": [
+      "node"
+    ],
+    "skipLibCheck": true,
+    "allowJs": true
+  },
+  "include": [
+    "browser/**/*.ts",
+    "playwright.config.ts",
+    "playwright.smoke.config.ts"
+  ]
+}

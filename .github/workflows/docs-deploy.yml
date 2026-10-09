@@ -9,6 +9,10 @@ concurrency:
   cancel-in-progress: false
   queue: max
 
+env:
+  CG_ARTIFACTS_DIR: ${{ github.workspace }}/../capability-graph-artifacts
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../capability-graph-artifacts/browser-binaries
+
 permissions:
   contents: read
 
@@ -35,26 +39,25 @@ jobs:
             package-lock.json
             website/package-lock.json
       - id: baseline
-        run: node website/scripts/check-docs-deployment.mjs
+        run: node scripts/validation/website/check-docs-deployment.mjs
       - run: npm ci
       - run: npm test
       - run: npm ci
         working-directory: website
       - run: npx playwright install --with-deps chromium
-        working-directory: website
-      - run: npm run check:deployment && npm run check:types && npm run build && npm run build:ai && npm run test:site && npm run check:build && npm run check:package
+      - run: npm run check:deployment && npm run check:types && npm run build && npm run test:site && npm run check:build && npm run check:package
         working-directory: website
         env:
           DEPLOYMENT_KIND: documentation
           RELEASE_TAG: ${{ steps.baseline.outputs.release_tag }}
           RELEASE_COMMIT: ${{ steps.baseline.outputs.release_commit }}
           DOCS_COMMIT: ${{ steps.baseline.outputs.documentation_commit }}
-      - run: node website/scripts/check-registry-install.mjs "$PACKAGE_VERSION"
+      - run: node scripts/validation/website/check-registry-install.mjs "$PACKAGE_VERSION"
         env:
           PACKAGE_VERSION: ${{ steps.baseline.outputs.package_version }}
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: website/doc_build
+          path: ${{ github.workspace }}/../capability-graph-artifacts/website/doc_build
 
   deploy:
     needs: build
@@ -81,8 +84,8 @@ jobs:
         with:
           node-version: "24.19.0"
       - name: Recheck package/main and prevent documentation rollback
-        run: node website/scripts/check-docs-deployment.mjs && node website/scripts/check-pages-advance.mjs
+        run: node scripts/validation/website/check-docs-deployment.mjs && node scripts/validation/website/check-pages-advance.mjs
       - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4
-      - run: node website/scripts/verify-public.mjs
+      - run: node scripts/validation/website/verify-public.mjs

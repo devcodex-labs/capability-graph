@@ -1,6 +1,6 @@
 import { CoreHost, type StaticOpenConfig } from "./core-host.js";
 import { CapabilityGraphError } from "./errors.js";
-import { documents, readSpecification, validateDocumentFilters, validateSelection,
+import { documents, readSpecification, validateDocumentFilters, validateSelection, validateReadBudgetInput,
   type ReadDocumentsQuery, type ReadSpecificationQuery } from "./knowledge/read.js";
 import type { KnowledgeReader, KnowledgeRetriever, CapabilityRetriever } from "./knowledge/types.js";
 import { retrieveCapabilities } from "./retrieval/capabilities.js";
@@ -129,13 +129,15 @@ export class CapabilityGraph {
   /** Read selected top-level Documents or explicit Collection member IDs; never concatenate a Collection. */
   readDocuments(query: ReadDocumentsQuery) {
     queryObject(query);
+    validateReadBudgetInput(query, this.host.budgets);
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
       (ctx) => documents(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
   }
   /** Explicitly read selected Provider Specification documents; discovery never triggers this call. */
   readSpecification(query: ReadSpecificationQuery) {
-    queryObject(query); this.host.assertAllowed(query.providerId); validateDocumentFilters(query);
+    queryObject(query); this.host.assertAllowed(query.providerId);
+    validateReadBudgetInput(query, this.host.budgets); validateDocumentFilters(query);
     return this.host.query([query.providerId], query.requiredStaticRevision,
       (ctx) => readSpecification(ctx, query, this.host.budgets, this.extensions.readers));
   }
@@ -221,6 +223,7 @@ export class BoundProviderGraph {
   /** Read associated Documents; selected contains provider-local string IDs, not canonical objects. */
   readDocuments(query: Omit<ReadDocumentsQuery, "requestProviderScope" | "selected"> & { readonly selected: readonly string[] }) {
     boundQuery(query); if (!Array.isArray(query.selected)) inputInvalid();
+    validateReadBudgetInput(query, this.host.budgets);
     const normalized = { ...query, selected: query.selected.map((capabilityId) => ({ capabilityId })) };
     validateSelection(normalized);
     return this.host.query([this.providerId], query.requiredStaticRevision,
@@ -228,7 +231,7 @@ export class BoundProviderGraph {
   }
   /** Read this Provider's Specification only when explicitly requested. */
   readSpecification(query: Omit<ReadSpecificationQuery, "providerId"> = {}) {
-    boundQuery(query); validateDocumentFilters(query);
+    boundQuery(query); validateReadBudgetInput(query, this.host.budgets); validateDocumentFilters(query);
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => readSpecification(ctx, { ...query, providerId: this.providerId }, this.host.budgets, this.extensions.readers));
   }

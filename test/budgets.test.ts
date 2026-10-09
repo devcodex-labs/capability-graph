@@ -20,7 +20,8 @@ test("T-F11: all numeric defaults match the design", () => {
       defaultKnowledgePageSize: 20, maxKnowledgePageSize: 100 },
     specification: { defaultPageSize: 20, maxPageSize: 100, maxBytes: 131_072, maxItemBytes: 16_384 },
     selection: { maxSelected: 32, maxNodes: 128, maxEdges: 256 },
-    read: { maxBytes: 32_768, maxDocumentsPerCall: 8 },
+    read: { maxBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
+      maxFilterValuesPerDimension: 128, maxResponseBytes: 4_194_304 },
     retrieveCapabilities: { maxCandidates: 20, maxCandidateBytes: 512 },
     queryKnowledge: { maxHits: 8, maxSnippetBytes: 2_048, maxSelected: 32,
       maxFilterValuesPerDimension: 128, maxTargets: 128, maxTargetBytes: 131_072 },
@@ -66,4 +67,17 @@ test("T-F11: page defaults cannot exceed effective maxima", () => {
     assert.throws(() => resolveBudgets(bad), { code: "CG_CONFIG_INCOMPLETE" });
   }
   assert.equal(resolveBudgets({ neighbors: { defaultPageSize: 1, maxPageSize: 1 } }).neighbors.maxPageSize, 1);
+});
+
+test("new read limits inherit defaults for legacy full configurations and validate overrides", () => {
+  const { maxSelected, maxFilterValuesPerDimension, maxResponseBytes, ...legacyRead } = DEFAULT_BUDGETS.read;
+  const legacy: BudgetConfig = { ...DEFAULT_BUDGETS, read: legacyRead };
+  assert.deepEqual(resolveBudgets(legacy).read, DEFAULT_BUDGETS.read);
+  for (const field of ["maxSelected", "maxFilterValuesPerDimension", "maxResponseBytes"] as const) {
+    assert.equal(resolveBudgets({ read: { [field]: 1 } }).read[field], 1);
+    for (const value of [0, -1, 1.5, Infinity, NaN, undefined, "1"]) {
+      assert.throws(() => resolveBudgets({ read: { [field]: value } } as never), { code: "CG_CONFIG_INCOMPLETE" });
+    }
+  }
+  void [maxSelected, maxFilterValuesPerDimension, maxResponseBytes];
 });

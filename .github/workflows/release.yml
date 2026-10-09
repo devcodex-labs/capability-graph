@@ -16,6 +16,10 @@ concurrency:
   cancel-in-progress: false
   queue: max
 
+env:
+  CG_ARTIFACTS_DIR: ${{ github.workspace }}/../capability-graph-artifacts
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/../capability-graph-artifacts/browser-binaries
+
 permissions:
   contents: read
 
@@ -48,7 +52,7 @@ jobs:
         with:
           node-version: "22.12.0"
       - id: contract
-        run: node website/scripts/check-release.mjs
+        run: node scripts/validation/website/check-release.mjs
         env:
           RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
           RELEASE_COMMIT: ${{ steps.target.outputs.release_commit }}
@@ -89,10 +93,7 @@ jobs:
       - run: npm ci
         working-directory: website
       - run: npx playwright install --with-deps chromium
-        working-directory: website
       - run: npm run check
-        working-directory: website
-      - run: npm run build:ai
         working-directory: website
 
   package:
@@ -121,13 +122,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm pack --json >pack.json
-          filename="$(node --input-type=module --eval "import fs from 'node:fs'; const [pack]=JSON.parse(fs.readFileSync('pack.json')); console.log(pack.filename)")"
-          shasum="$(node --input-type=module --eval "import fs from 'node:fs'; const [pack]=JSON.parse(fs.readFileSync('pack.json')); console.log(pack.shasum)")"
-          echo "filename=$filename" >>"$GITHUB_OUTPUT"
+          release_artifacts="$CG_ARTIFACTS_DIR/release"
+          mkdir -p "$release_artifacts"
+          npm pack --json --pack-destination "$release_artifacts" >"$release_artifacts/pack.json"
+          filename="$(node --input-type=module --eval "import fs from 'node:fs'; import path from 'node:path'; const [pack]=JSON.parse(fs.readFileSync(path.join(process.env.CG_ARTIFACTS_DIR, 'release/pack.json'))); console.log(pack.filename)")"
+          shasum="$(node --input-type=module --eval "import fs from 'node:fs'; import path from 'node:path'; const [pack]=JSON.parse(fs.readFileSync(path.join(process.env.CG_ARTIFACTS_DIR, 'release/pack.json'))); console.log(pack.shasum)")"
+          echo "filename=$release_artifacts/$filename" >>"$GITHUB_OUTPUT"
           echo "shasum=$shasum" >>"$GITHUB_OUTPUT"
       - id: registry
         name: Reject duplicate, stale or divergent releases
+        working-directory: ${{ github.workspace }}/../capability-graph-artifacts/release
         shell: bash
         run: |
           set -euo pipefail
@@ -159,7 +163,7 @@ jobs:
             fi
           elif grep -q 'E404' registry-error.log; then
             version_exists=false
-            node website/scripts/check-release-order.mjs "$PACKAGE_VERSION" "$latest"
+            node "$GITHUB_WORKSPACE/scripts/validation/website/check-release-order.mjs" "$PACKAGE_VERSION" "$latest"
           else
             cat registry-error.log >&2
             exit 1
@@ -188,7 +192,7 @@ jobs:
           name="@devcodex/capability-graph"
           package="${name}@${PACKAGE_VERSION}"
           for attempt in {1..30}; do
-            cache="$RUNNER_TEMP/npm-registry-probe-$attempt"
+            cache="$CG_ARTIFACTS_DIR/release/npm-registry-probe-$attempt"
             version="$(npm view "$package" version --prefer-online --cache "$cache" 2>/dev/null || true)"
             shasum="$(npm view "$package" dist.shasum --prefer-online --cache "$cache" 2>/dev/null || true)"
             latest="$(npm view "$name" dist-tags.latest --prefer-online --cache "$cache" 2>/dev/null || true)"
@@ -206,12 +210,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          temporary="$(mktemp -d)"
+          temporary="$(mktemp -d "$CG_ARTIFACTS_DIR/registry-consumer-XXXXXX")"
           trap 'rm -rf "$temporary"' EXIT
           cd "$temporary"
           npm init -y >/dev/null
           npm install --ignore-scripts --no-audit --no-fund "@devcodex/capability-graph"
-          node "$GITHUB_WORKSPACE/website/scripts/check-installed-tutorial.mjs" "$temporary" "$PACKAGE_VERSION"
+          node "$GITHUB_WORKSPACE/scripts/validation/website/check-installed-tutorial.mjs" "$temporary" "$PACKAGE_VERSION"
 
   pages-build:
     needs: [freeze, package]
@@ -250,12 +254,12 @@ jobs:
             echo "npm latest is $latest, not $PACKAGE_VERSION" >&2
             exit 1
           }
-      - run: npm run build:ai
+      - run: npm run build
         working-directory: website
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: website/doc_build
+          path: ${{ github.workspace }}/../capability-graph-artifacts/website/doc_build
 
   deploy:
     needs: [freeze, pages-build]
@@ -289,7 +293,7 @@ jobs:
             exit 1
           }
       - name: Prevent overwriting newer documentation
-        run: node website/scripts/check-pages-advance.mjs
+        run: node scripts/validation/website/check-pages-advance.mjs
         env:
           PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
           DOCS_COMMIT: ${{ needs.freeze.outputs.documentation_commit }}
@@ -307,7 +311,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "22.12.0"
-      - run: node website/scripts/verify-public.mjs
+      - run: node scripts/validation/website/verify-public.mjs
         env:
           PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
           RELEASE_ID: ${{ needs.freeze.outputs.release_id }}
