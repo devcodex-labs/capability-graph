@@ -26,6 +26,7 @@ jobs:
       release_id: ${{ steps.contract.outputs.release_id }}
       release_tag: ${{ steps.contract.outputs.release_tag }}
       release_commit: ${{ steps.contract.outputs.release_commit }}
+      documentation_commit: ${{ steps.contract.outputs.documentation_commit }}
       package_version: ${{ steps.contract.outputs.package_version }}
     steps:
       - uses: actions/checkout@v7
@@ -260,12 +261,18 @@ jobs:
     needs: [freeze, pages-build]
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.freeze.outputs.documentation_commit }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
@@ -281,6 +288,11 @@ jobs:
             echo "npm latest is $latest, not $PACKAGE_VERSION" >&2
             exit 1
           }
+      - name: Prevent overwriting newer documentation
+        run: node website/scripts/check-pages-advance.mjs
+        env:
+          PACKAGE_VERSION: ${{ needs.freeze.outputs.package_version }}
+          DOCS_COMMIT: ${{ needs.freeze.outputs.documentation_commit }}
       - id: deployment
         uses: actions/deploy-pages@v4
 
@@ -301,3 +313,4 @@ jobs:
           RELEASE_ID: ${{ needs.freeze.outputs.release_id }}
           RELEASE_TAG: ${{ needs.freeze.outputs.release_tag }}
           RELEASE_COMMIT: ${{ needs.freeze.outputs.release_commit }}
+          DOCS_COMMIT: ${{ needs.freeze.outputs.documentation_commit }}

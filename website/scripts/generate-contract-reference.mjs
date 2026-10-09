@@ -28,6 +28,43 @@ function literalUnion(symbol, checker) {
   return values.length === type.types.length ? values : undefined;
 }
 
+const printer = ts.createPrinter({ removeComments: true });
+const typeFlags = ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;
+const publicType = (value) => value.replace(/import\("[^"]+"\)\./g, '');
+function contractShape(symbol, checker) {
+  const declaration = symbol.declarations?.[0];
+  if (!declaration) throw new Error(`missing declaration for ${symbol.name}`);
+  const name = symbol.name;
+  const type = checker.getDeclaredTypeOfSymbol(symbol);
+  const fields = (symbol.flags & (ts.SymbolFlags.Interface | ts.SymbolFlags.Class | ts.SymbolFlags.TypeAlias))
+    && (type.flags & ts.TypeFlags.Object) ? checker.getPropertiesOfType(type).flatMap((field) => {
+      const member = field.valueDeclaration ?? field.declarations?.[0];
+      if (!member || ts.getCombinedModifierFlags(member) & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected)) return [];
+      return [{ name: field.name, optional: Boolean(field.flags & ts.SymbolFlags.Optional),
+        type: publicType(checker.typeToString(checker.getTypeOfSymbolAtLocation(field, member), member, typeFlags)) }];
+    }) : [];
+  let signature;
+  if (ts.isClassDeclaration(declaration)) {
+    const members = declaration.members.flatMap((member) => {
+      if ((!ts.isMethodDeclaration(member) && !ts.isConstructorDeclaration(member)) || ts.getCombinedModifierFlags(member) & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected)) return [];
+      if (ts.isConstructorDeclaration(member) && name === 'BoundProviderGraph') return [];
+      if (ts.isConstructorDeclaration(member)) return [`  ${publicType(printer.printNode(ts.EmitHint.Unspecified, member, member.getSourceFile()))}`];
+      const call = checker.getSignatureFromDeclaration(member);
+      const prefix = ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static ? 'static ' : '';
+      return [`  ${prefix}${member.name.getText()}${publicType(checker.signatureToString(call, member, typeFlags))};`];
+    });
+    signature = `class ${name} {\n${members.join('\n')}\n}`;
+  } else if (ts.isInterfaceDeclaration(declaration)) {
+    signature = `interface ${name}${declaration.typeParameters?.length ? `<${declaration.typeParameters.map((part) => part.getText()).join(', ')}>` : ''} {\n${fields.map((field) =>
+      `  readonly ${field.name}${field.optional ? '?' : ''}: ${field.type};`).join('\n')}\n}`;
+  } else if (ts.isTypeAliasDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) {
+    signature = publicType(printer.printNode(ts.EmitHint.Unspecified, declaration, declaration.getSourceFile()));
+  } else {
+    signature = `const ${name}: ${publicType(checker.typeToString(checker.getTypeOfSymbolAtLocation(symbol, declaration), declaration, typeFlags))};`;
+  }
+  return { fields, signature };
+}
+
 await readFile(declarationPath, 'utf8');
 const program = ts.createProgram([declarationPath], {
   module: ts.ModuleKind.NodeNext,
@@ -55,7 +92,8 @@ const symbols = checker.getExportsOfModule(moduleSymbol)
     return {
       name: symbol.getName(),
       kind: symbolKind(target),
-      literals: literalUnion(target, checker)
+      literals: literalUnion(target, checker),
+      ...contractShape(target, checker)
     };
   })
   .sort((left, right) => left.name.localeCompare(right.name));
@@ -97,6 +135,21 @@ const table = [
   ''
 ].join('\n');
 await writeFile(path.join(generatedRoot, 'snippets', 'public-api.mdx'), table, 'utf8');
+
+const coverage = JSON.parse(await readFile(path.join(websiteRoot, 'data/reference-coverage.json'), 'utf8'));
+for (const page of new Set(coverage.entries.map((entry) => entry.page))) {
+  const entries = coverage.entries.filter((entry) => entry.page === page);
+  const lines = ['## 完整签名与字段', '',
+    '以下由公开声明生成。接口继承字段已展开；`?` 表示可省略，**不表示可传 null**。类型不能表达的默认值、值域、预算与失败语义以本页正文为准。类仅列公开方法；绑定对象必须由 forProvider 获取。', ''];
+  for (const entry of entries) {
+    const symbol = symbols.find((item) => item.name === entry.symbol);
+    if (!symbol) throw new Error(`unknown reference symbol: ${entry.symbol}`);
+    lines.push(`### ${symbol.name} 合同`, '', '```ts', symbol.signature, '```', '');
+    if (symbol.fields.length) lines.push('| 字段/方法 | 类型 | 必填 |', '|---|---|---|',
+      ...symbol.fields.map((field) => `| \`${field.name}\` | \`${field.type.replaceAll('|', '\\|')}\` | ${field.optional ? '否' : '是'} |`), '');
+  }
+  await writeFile(path.join(generatedRoot, 'snippets', `contracts-${path.basename(page)}`), lines.join('\n'), 'utf8');
+}
 
 const errorGuidance = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'error-guidance.json'), 'utf8'));
 const errorCodes = unionContracts.ErrorCode ?? [];

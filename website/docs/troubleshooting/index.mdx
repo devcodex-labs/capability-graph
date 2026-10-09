@@ -7,7 +7,11 @@ description: 按症状定位配置、范围、修订、Runtime、知识、Adapte
 
 先保留原始 `ErrorCode`、`NextAction`、`meta` 和逐项结果，再按发生阶段诊断。不要把后端不可用、范围拒绝或部分结果改写成空结果。
 
-- [配置与作用域](./open-and-configuration)
-- [修订、预算与分页](./revision-and-reload)
-- [运行时与超时](./runtime-states)
-- [知识与 Adapter](./knowledge-read)
+| 出错阶段/症状 | 先保留的证据 | 入口与恢复结果 |
+|---|---|---|
+| open 失败、Provider 拒绝或绑定参数不合法 | 配置、Provider ID、code/nextAction（不公开凭据） | [配置与作用域](./open-and-configuration)：修正 Authority/范围/输入，再重开或重查 |
+| reload 失败、游标失效、截断或超预算 | required 修订、servedFrom、refreshFailed、过滤与页大小 | [修订、预算与分页](./revision-and-reload)：使用可读视图、续页或重新发现 |
+| 没有实例、未配置、来源不可用或超时 | project/environment、observation、静态与运行修订 | [运行时与超时](./runtime-states)：区分真实空观察、缺 Adapter 和失联 |
+| 文档失败、零命中或后端合同无效 | 每项 ok、knowledgeState、locator、contentId、索引证据 | [知识与 Adapter](./knowledge-read)：修正选择/Reader/索引，不能伪装为成功空结果 |
+
+本分区提供症状分流，不会自动修复后端。错误全集和具体调用方动作见[错误与恢复动作](../reference/errors)。

@@ -13,6 +13,10 @@ description: 查看 Capability Graph 的可运行 Seed 组合和明确标记的�
 | 仅合同 | 类型/接口骨架及合同测试可核对；数据库、检索和远程 Reader 不附真实后端 |
 | 概念示例 | 只说明组合与职责，没有可运行实现，不宣称 VextJS Adapter 已交付 |
 
-- [Seed 端到端示例](./seed-provider) - 可运行，覆盖 Provider、API、MCP 与 Runtime
-- [多 Provider 示例](./multi-provider) - 可运行
-- [VextJS 集成](./vextjs-integration) - 概念示例
+| 想验证什么 | 前置与状态 | 入口及证明范围 |
+|---|---|---|
+| 一个完整 Provider 的不同接入层 | 克隆源码并安装依赖；可运行 | [Seed 端到端示例](./seed-provider)：API、十二工具 MCP 与真实 HTTP Runtime，非通用后端 |
+| 多来源遇到故障是否保留合法项 | 根 npm test；可运行隔离测试 | [多 Provider 隔离测试](./multi-provider)：文件源加数据库假实现；批量点读与联合目录的边界不同 |
+| 如何映射到 VextJS | 理解模型即可；概念示例 | [VextJS 集成](./vextjs-integration)：职责和采集设计，不含可导入 Adapter 或运行命令 |
+
+如果只是想试第一次查询，不需要先下载全部 Seed；按上面的最小 Provider 路径即可。

@@ -62,6 +62,53 @@ node check.mjs
 
 安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本；1.0.0 不具备后文的 Selection 与多文档 Specification 接口。
 
+## 从 1.0.0 迁移到 1.0.1
+
+这次升级包含破坏性 Schema 变化，**没有双 Schema 兼容层**。即使依赖写的是 `^1.0.0`，npm 也可能安装到 1.0.1；升级前核对 lockfile、备份定义，并在隔离项目中重测。仅锁定旧修订不能让旧定义变成兼容配置。
+
+旧配置片段（仅用于识别，不能在 1.0.1 加载）：
+
+```json title="migration-old-specification.json"
+{
+  "specification": {
+    "specificationId": "acme.http.conventions",
+    "version": "1",
+    "entryRef": {
+      "kind": "document",
+      "knowledgeId": "SPEC-01",
+      "locator": { "type": "relative-file", "path": "PROVIDER.md" }
+    }
+  }
+}
+```
+
+新配置片段，替换 `provider.json` 中的 `specification`（Provider 的 `providerId/name/version` 保留）：
+
+```json title="migration-new-specification.json"
+{
+  "specification": {
+    "specificationId": "acme.http.conventions",
+    "version": "1",
+    "documents": [{
+      "kind": "document",
+      "knowledgeId": "SPEC-01",
+      "role": "specification",
+      "locator": { "type": "relative-file", "path": "PROVIDER.md" }
+    }]
+  }
+}
+```
+
+| 迁移步骤 | 必须调整 | 如何验收 |
+|---|---|---|
+| 规范入口 | `entryRef` → 非空 `documents`；每篇 role 必须为 `specification` | 保存实际 PROVIDER.md；open 后 getProvider 显示 documentCount，显式 readSpecification 返回正文 |
+| 能力知识 | 所有 Document、包括 Collection 成员补必填 `role`，如 `guide`/`example` | readDocuments 成功并能按角色过滤；缺 role 的旧声明预期 `CG_VALIDATION_FAILED` |
+| 数据库 Adapter | 支持全部八类邻居，含 `requires/requiredBy` 的完整有序页 | 对照[数据库合同](../reference/runtime-adapter#databaseauthorityadapter)验证扫描、点读、正反依赖和 close |
+| 正向依赖 | 作者可声明 `requires`，不能在源定义写派生的 `requiredBy` | open 校验无环和端点；按需调用 resolveSelection 验证完整闭包 |
+| 修订与消费者 | 哈希覆盖关系与文档映射变化，重新取得 Static Revision | TypeScript 重新编译；从新 Catalog 开始，重置旧游标/旧任务修订，不手写 provider.version 代替哈希 |
+
+保留旧 `entryRef`、缺少 `role` 或写入源 `requiredBy` 都会明确校验失败。迁移后先跑[最小发现](./first-provider)，再核对你实际使用的知识、Selection 与 Adapter 路径；详见[完整 1.0.1 更新记录](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/1.0.1.md)。此说明不改变 npm 版本或重新发布包。
+
 ## 下一步
 
 在[创建第一个 Provider](./first-provider)中建立两个 JSON 定义和 `discover.mjs`，完成第一次目录查询。安装不会自动注册框架业务能力，也不会启动 API/MCP 服务。

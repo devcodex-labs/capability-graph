@@ -79,14 +79,14 @@
   {
     "code": "CG_REVISION_MISMATCH",
     "meaning": "请求的修订或游标不再对应当前可读视图。",
-    "trigger": "分页、检索或 Runtime 请求携带了过期修订。",
+    "trigger": "分页、检索或 Runtime 的指定修订不匹配，或知识检索证据中的 Static Revision 不匹配。",
     "action": "refresh",
     "handling": "放弃旧游标，从首个请求重新获取当前修订。"
   },
   {
     "code": "CG_INDEX_STALE",
     "meaning": "检索索引与当前来源身份不一致。",
-    "trigger": "Retriever 返回的来源修订或能力身份已过期。",
+    "trigger": "能力召回的来源已过期，或知识索引的 mapping/config/content 身份、freshness 或证据结构无效。",
     "action": "refresh",
     "handling": "刷新或重建索引，再从新的发现请求开始。"
   },

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const queries = [
   ['Provider', /Provider 与 Specification|建模 Provider|创建第一个 Provider/],
@@ -21,3 +21,117 @@ for (const [query, expectedResult] of queries) {
     await expect(page.getByRole('link', { name: expectedResult }).filter({ visible: true }).last()).toBeVisible({ timeout: 10_000 });
   });
 }
+
+test('Enter outside search never throws or reuses a closed result', async ({ page }) => {
+  await page.goto('./');
+  const originalURL = page.url();
+  await page.locator('body').press('Enter');
+  await expect(page).toHaveURL(originalURL);
+  await page.locator('.rp-search-button').click();
+  await page.getByRole('textbox', { name: '搜索文档' }).fill('MCP');
+  await expect(page.locator('.rp-search-panel__results a').first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.locator('body').press('Enter');
+  await expect(page).toHaveURL(originalURL);
+});
+
+test('empty, cleared and zero-result searches ignore Enter and arrows', async ({ page }) => {
+  await page.goto('./');
+  const originalURL = page.url();
+  await page.locator('.rp-search-button').click();
+  const input = page.getByRole('textbox', { name: '搜索文档' });
+  await input.press('ArrowUp');
+  await input.press('ArrowDown');
+  await input.press('Enter');
+  await expect(page).toHaveURL(originalURL);
+  await input.fill('MCP');
+  await expect(page.locator('.rp-search-panel__results a').first()).toBeVisible();
+  await input.fill('');
+  await input.press('Enter');
+  await expect(page).toHaveURL(originalURL);
+  await input.fill('zzzz_no_matching_document_92831');
+  await expect(page.locator('.rp-search-panel__results')).toContainText('没有找到');
+  await input.press('ArrowUp');
+  await input.press('Enter');
+  await expect(page).toHaveURL(originalURL);
+});
+
+test('IME confirmation does not navigate; a normal selected result does', async ({ page }) => {
+  await page.goto('./');
+  const originalURL = page.url();
+  await page.locator('.rp-search-button').click();
+  const input = page.getByRole('textbox', { name: '搜索文档' });
+  await input.fill('MCP');
+  const first = page.locator('.rp-search-panel__results a').first();
+  await expect(first).toBeVisible();
+  await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true });
+  await expect(page).toHaveURL(originalURL);
+  const href = await first.getAttribute('href');
+  await input.press('Enter');
+  await expect(page).toHaveURL(new RegExp(href!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'));
+  await expect(page.getByRole('dialog', { name: '搜索文档' })).toBeHidden();
+});
+
+test('clear cancels visible stale results even while a query is debouncing', async ({ page }) => {
+  await page.goto('./');
+  await page.locator('.rp-search-button').click();
+  const input = page.getByRole('textbox', { name: '搜索文档' });
+  await input.fill('MCP');
+  await expect(page.locator('.rp-search-panel__results a').first()).toBeVisible();
+  await input.fill('Runtime');
+  await page.getByRole('button', { name: '清空搜索' }).click();
+  await expect(input).toHaveValue('');
+  await expect(page.locator('.rp-search-panel__results')).toContainText('输入关键词');
+  // Wait beyond the engine debounce by completing a browser round trip with its timer.
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 250)));
+  await expect(page.locator('.rp-search-panel__results a')).toHaveCount(0);
+  await input.press('Enter');
+  await expect(page).toHaveURL(/\/capability-graph\/$/);
+});
+
+test.describe('search recovers from an unavailable index', () => {
+  // Only the deliberately injected index 503 is expected; other browser and
+  // essential request failures still fail the shared fixture.
+  test.use({ expectedHTTPFailures: [{ url: /\/search_index[^/]*\.json$/, status: 503 }] });
+  for (const recovery of ['reopen', 'retry'] as const) {
+    test(`transient 503 recovers by ${recovery} with focus and keyboard navigation`, async ({ page }) => {
+      let failures = 0;
+      await page.route('**/search_index*.json', (route) => {
+        failures++;
+        return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+      });
+      await page.goto('./');
+      const origin = page.locator('.rp-search-button');
+      await origin.click();
+      await expect(page.getByRole('alert')).toContainText('搜索索引加载失败');
+      expect(failures).toBeGreaterThan(0);
+      const input = page.getByRole('textbox', { name: '搜索文档' });
+      await input.fill('Provider');
+      await page.unroute('**/search_index*.json');
+      if (recovery === 'reopen') {
+        await page.keyboard.press('Escape');
+        await expect(origin).toBeFocused();
+        await page.keyboard.press('Control+k');
+        await input.fill('Provider');
+      } else {
+        await page.getByRole('button', { name: '重试搜索' }).click();
+        await expect(input).toHaveValue('Provider');
+      }
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      await expect(input).toBeFocused();
+      const result = page.locator('.rp-search-panel__results a').first();
+      await expect(result).toBeVisible();
+      if (recovery === 'retry') await page.screenshot({ path: 'output/round4-search-recovered.png' });
+      // Recovery must not leave background inert or lose the opening control.
+      await page.keyboard.press('Escape');
+      await expect(origin).toBeFocused();
+      expect(await origin.evaluate((element) => Boolean(element.closest('[inert]')))).toBe(false);
+      await page.keyboard.press('Control+k');
+      await input.fill('Provider');
+      await expect(result).toBeVisible();
+      const href = await result.getAttribute('href');
+      await input.press('Enter');
+      await expect(page).toHaveURL(new RegExp(href!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'));
+    });
+  }
+});

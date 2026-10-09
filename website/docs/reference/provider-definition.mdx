@@ -3,6 +3,8 @@ title: 定义与身份
 description: Provider、Capability 定义字段、验证矩阵和二元身份合同参考。
 ---
 
+import Contracts from '../../generated/snippets/contracts-provider-definition.mdx';
+
 # 定义与身份
 
 <span className="cg-status">可用</span>
@@ -18,7 +20,22 @@ description: Provider、Capability 定义字段、验证矩阵和二元身份合
 
 文件 Authority 的 `provider.json` 必须与配置中的 `providerId` 一致。每个有效启用 Provider 必须恰有一个 Authority。
 
-首次定义使用[最小 Provider](../getting-started/first-provider)，不需要 specification。需要跨能力规则时使用[独立 G4](../guides/progressive-discovery#g4-provider-specification)的完整文件；不要用空 specification 对象作占位。Provider/specification 版本、包版本与修订各自含义见[版本与内容身份](../concepts/provider-and-specification#版本与内容身份)。
+文件 Authority 必须有 `provider.json`；没有任何 `*.capability.json` 的空 Provider 也可加载，Catalog 返回完整空目录。要完成首次能力发现，使用[最小 Provider](../getting-started/first-provider)的一个能力定义，不需要 specification。需要跨能力规则时使用[独立 G4](../guides/progressive-discovery#g4-provider-specification)的完整文件；不要用空 specification 对象作占位。Provider/specification 版本、包版本与修订各自含义见[版本与内容身份](../concepts/provider-and-specification#版本与内容身份)。
+
+## ID 格式与值约束
+
+ID 只接受 ASCII，区分大小写，不自动去空格。以下正则覆盖完整字符串：
+
+| 字段 | 格式 | 合法示例 |
+|---|---|---|
+| `providerId`、`capabilityId`、关系端点 | `^[a-z][a-z0-9._-]{0,127}$` | `acme.http`、`route.validation` |
+| `knowledgeId`、Document `role` | `^[A-Za-z][A-Za-z0-9._-]{0,127}$` | `D-02`、`routing-guide`、`guide` |
+
+两类 ID 均为 1–128 个 ASCII 字符，首字符为字母；Provider/能力 ID 的字母只能小写，知识 ID 和角色允许大写。`Route`、`route validation`、`acme::route` 不能作为 Provider/能力 ID。正式关系端点填写本地能力 ID，不填二元对象或 `::` 显示字符串。
+
+`name/version/description/whenToUse` 以及提供时的 `distinction` 必须是非空白字符串，`examples` 中每项同样如此。`provider.version` 和 `specification.version` 是非空白版本标签，Core 不要求它们符合 SemVer；`specificationId` 也是非空白字符串，不套用上述能力 ID 正则。
+
+可选集合省略时使用表中的默认值，显式 `null` 无效；定义中的未知字段会被拒绝。知识字段、成员和 locator 的完整要求见[知识接口](./knowledge#knowledgeref)。
 
 ## 可执行验证用例
 
@@ -88,3 +105,5 @@ interface CanonicalCapabilityId {
 `QualifiedCapabilityId` 是显示字符串，正式分隔符 `QUALIFIED_SEPARATOR` 为 `::`。导出的身份辅助函数包括 `isId()`、`isKnowledgeId()`、`formatQualifiedId()`、`parseQualifiedId()`、`equalId()` 和 `idKey()`。
 
 不绑定 Provider 的查询必须使用完整二元身份。`{ capabilityId }` 短形式只在 `BoundProviderGraph` 中合法。Provider 版本不是身份的一部分。
+
+<Contracts />

@@ -1,0 +1,147 @@
+## 完整签名与字段
+
+以下由公开声明生成。接口继承字段已展开；`?` 表示可省略，**不表示可传 null**。类型不能表达的默认值、值域、预算与失败语义以本页正文为准。类仅列公开方法；绑定对象必须由 forProvider 获取。
+
+### AuthoritySpec 合同
+
+```ts
+export type AuthoritySpec = {
+    readonly kind: "file";
+    readonly rootDir: string;
+} | {
+    readonly kind: "database";
+    readonly adapter: DatabaseAuthorityAdapter;
+};
+```
+
+### BoundProviderGraph 合同
+
+```ts
+class BoundProviderGraph {
+  getProvider(query?: { requiredStaticRevision?: string; }): Promise<ProviderResult>;
+  listSpecificationDocuments(query?: DocumentPageQuery): Promise<SpecificationDocumentsPage>;
+  listCatalog(query?: Omit<CatalogQuery, "requestProviderScope">): Promise<CatalogPage>;
+  getCapabilities(ids: readonly string[], query?: CapabilityDetailQuery): Promise<BatchResult<CapabilityDetail>>;
+  listKnowledgeMembers(query: Omit<KnowledgeMembersQuery, "capability"> & { readonly capabilityId: string; }): Promise<KnowledgeMembersPage>;
+  getNeighbors(capabilityId: string, query?: NeighborQuery): Promise<NeighborPage>;
+  resolveSelection(query: { readonly selected: readonly string[]; readonly requiredStaticRevision?: string; }): Promise<SelectionResult>;
+  readDocuments(query: Omit<ReadDocumentsQuery, "requestProviderScope" | "selected"> & { readonly selected: readonly string[]; }): Promise<DocumentReadBatch>;
+  readSpecification(query?: Omit<ReadSpecificationQuery, "providerId">): Promise<SpecificationReadBatch>;
+  retrieveCapabilities(query: Omit<RetrieveCapabilitiesQuery, "requestProviderScope">): Promise<RetrieveCapabilitiesPage>;
+  queryKnowledge(query: Omit<QueryKnowledgeQuery, "requestProviderScope">): Promise<QueryKnowledgePage>;
+  queryRuntime(query: Omit<QueryRuntimeQuery, "requestProviderScope">): Promise<QueryRuntimePage>;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `providerId` | `string` | 是 |
+| `getProvider` | `(query?: { requiredStaticRevision?: string; }) => Promise<ProviderResult>` | 是 |
+| `listSpecificationDocuments` | `(query?: DocumentPageQuery) => Promise<SpecificationDocumentsPage>` | 是 |
+| `listCatalog` | `(query?: Omit<CatalogQuery, "requestProviderScope">) => Promise<CatalogPage>` | 是 |
+| `getCapabilities` | `(ids: readonly string[], query?: CapabilityDetailQuery) => Promise<BatchResult<CapabilityDetail>>` | 是 |
+| `listKnowledgeMembers` | `(query: Omit<KnowledgeMembersQuery, "capability"> & { readonly capabilityId: string; }) => Promise<KnowledgeMembersPage>` | 是 |
+| `getNeighbors` | `(capabilityId: string, query?: NeighborQuery) => Promise<NeighborPage>` | 是 |
+| `resolveSelection` | `(query: { readonly selected: readonly string[]; readonly requiredStaticRevision?: string; }) => Promise<SelectionResult>` | 是 |
+| `readDocuments` | `(query: Omit<ReadDocumentsQuery, "requestProviderScope" \| "selected"> & { readonly selected: readonly string[]; }) => Promise<DocumentReadBatch>` | 是 |
+| `readSpecification` | `(query?: Omit<ReadSpecificationQuery, "providerId">) => Promise<SpecificationReadBatch>` | 是 |
+| `retrieveCapabilities` | `(query: Omit<RetrieveCapabilitiesQuery, "requestProviderScope">) => Promise<RetrieveCapabilitiesPage>` | 是 |
+| `queryKnowledge` | `(query: Omit<QueryKnowledgeQuery, "requestProviderScope">) => Promise<QueryKnowledgePage>` | 是 |
+| `queryRuntime` | `(query: Omit<QueryRuntimeQuery, "requestProviderScope">) => Promise<QueryRuntimePage>` | 是 |
+
+### CapabilityGraph 合同
+
+```ts
+class CapabilityGraph {
+  static open(config: OpenConfig): Promise<CapabilityGraph>;
+  reload(options?: { providerId?: string; }): Promise<ReloadResult>;
+  close(): Promise<void>;
+  forProvider(providerId: string): BoundProviderGraph;
+  listProviders(query?: ProviderListQuery): Promise<{ items: ProviderSummary[]; meta: ResultMeta; }>;
+  getProvider(providerId: string, query?: { requiredStaticRevision?: string; }): Promise<ProviderResult>;
+  listSpecificationDocuments(query: DocumentPageQuery & { readonly providerId: string; }): Promise<SpecificationDocumentsPage>;
+  listCatalog(query?: CatalogQuery): Promise<CatalogPage>;
+  getCapabilities(ids: readonly CapabilityRef[], query?: CapabilityDetailQuery): Promise<BatchResult<CapabilityDetail>>;
+  listKnowledgeMembers(query: KnowledgeMembersQuery): Promise<KnowledgeMembersPage>;
+  getNeighbors(ref: CapabilityRef, query?: NeighborQuery): Promise<NeighborPage>;
+  resolveSelection(query: ResolveSelectionQuery): Promise<SelectionResult>;
+  readDocuments(query: ReadDocumentsQuery): Promise<DocumentReadBatch>;
+  readSpecification(query: ReadSpecificationQuery): Promise<SpecificationReadBatch>;
+  retrieveCapabilities(query: RetrieveCapabilitiesQuery): Promise<RetrieveCapabilitiesPage>;
+  queryKnowledge(query: QueryKnowledgeQuery): Promise<QueryKnowledgePage>;
+  queryRuntime(query: QueryRuntimeQuery): Promise<QueryRuntimePage>;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `reload` | `(options?: { providerId?: string; }) => Promise<ReloadResult>` | 是 |
+| `close` | `() => Promise<void>` | 是 |
+| `forProvider` | `(providerId: string) => BoundProviderGraph` | 是 |
+| `listProviders` | `(query?: ProviderListQuery) => Promise<{ items: ProviderSummary[]; meta: ResultMeta; }>` | 是 |
+| `getProvider` | `(providerId: string, query?: { requiredStaticRevision?: string; }) => Promise<ProviderResult>` | 是 |
+| `listSpecificationDocuments` | `(query: DocumentPageQuery & { readonly providerId: string; }) => Promise<SpecificationDocumentsPage>` | 是 |
+| `listCatalog` | `(query?: CatalogQuery) => Promise<CatalogPage>` | 是 |
+| `getCapabilities` | `(ids: readonly CapabilityRef[], query?: CapabilityDetailQuery) => Promise<BatchResult<CapabilityDetail>>` | 是 |
+| `listKnowledgeMembers` | `(query: KnowledgeMembersQuery) => Promise<KnowledgeMembersPage>` | 是 |
+| `getNeighbors` | `(ref: CapabilityRef, query?: NeighborQuery) => Promise<NeighborPage>` | 是 |
+| `resolveSelection` | `(query: ResolveSelectionQuery) => Promise<SelectionResult>` | 是 |
+| `readDocuments` | `(query: ReadDocumentsQuery) => Promise<DocumentReadBatch>` | 是 |
+| `readSpecification` | `(query: ReadSpecificationQuery) => Promise<SpecificationReadBatch>` | 是 |
+| `retrieveCapabilities` | `(query: RetrieveCapabilitiesQuery) => Promise<RetrieveCapabilitiesPage>` | 是 |
+| `queryKnowledge` | `(query: QueryKnowledgeQuery) => Promise<QueryKnowledgePage>` | 是 |
+| `queryRuntime` | `(query: QueryRuntimeQuery) => Promise<QueryRuntimePage>` | 是 |
+
+### OpenConfig 合同
+
+```ts
+interface OpenConfig {
+  readonly runtimeAdapters?: readonly RuntimeAdapter[];
+  readonly readers?: readonly KnowledgeReader[];
+  readonly knowledgeRetriever?: KnowledgeRetriever;
+  readonly capabilityRetriever?: CapabilityRetriever;
+  readonly hostAllowedProviders: readonly string[];
+  readonly integrationEnabledProviders: readonly string[];
+  readonly providers: readonly ProviderLoadSpec[];
+  readonly budgets?: BudgetOverrides;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `runtimeAdapters` | `readonly RuntimeAdapter[]` | 否 |
+| `readers` | `readonly KnowledgeReader[]` | 否 |
+| `knowledgeRetriever` | `KnowledgeRetriever` | 否 |
+| `capabilityRetriever` | `CapabilityRetriever` | 否 |
+| `hostAllowedProviders` | `readonly string[]` | 是 |
+| `integrationEnabledProviders` | `readonly string[]` | 是 |
+| `providers` | `readonly ProviderLoadSpec[]` | 是 |
+| `budgets` | `BudgetOverrides` | 否 |
+
+### ProviderLoadSpec 合同
+
+```ts
+interface ProviderLoadSpec {
+  readonly providerId: string;
+  readonly authority: AuthoritySpec;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `providerId` | `string` | 是 |
+| `authority` | `AuthoritySpec` | 是 |
+
+### ReloadResult 合同
+
+```ts
+interface ReloadResult {
+  readonly ok: boolean;
+  readonly providers: readonly { readonly providerId: string; readonly staticRevision?: StaticRevision; readonly servedFrom: "current" | "previous" | "none"; readonly refreshFailed?: boolean; readonly error?: ErrorShape; }[];
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `ok` | `boolean` | 是 |
+| `providers` | `readonly { readonly providerId: string; readonly staticRevision?: StaticRevision; readonly servedFrom: "current" \| "previous" \| "none"; readonly refreshFailed?: boolean; readonly error?: ErrorShape; }[]` | 是 |

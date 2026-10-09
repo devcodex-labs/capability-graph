@@ -27,4 +27,4 @@ Core 校验证据和边界，不生成最终答案。实现步骤见[添加本�
 
 扩展后的 `route.validation` 可以绑定验证指南，`schema.request` 绑定 Schema 指南。任务只选择前者时，读取范围只有验证指南；即使两者有 `related` 边，也不会自动读取后者。Agent 确认还需要 Schema 后，应把它加入 `selected` 再查询。
 
-入门 Fixture 的 `route.http` 绑定单篇 `routing-guide`，直接读取即可。只有需要从多篇知识中按文字检索时才考虑 Collection/检索后端；远程单篇文档则是 Reader 问题，不等于必须建 RAG。
+[G2 本地知识示例](../guides/progressive-discovery#g2-local-knowledge)的 `route.http` 绑定单篇 `routing-guide`，直接读取即可。最小 G0 只有 `route`，尚未关联知识。只有需要从多篇知识中按文字检索时才考虑 Collection/检索后端；远程单篇文档则是 Reader 问题，不等于必须建 RAG。

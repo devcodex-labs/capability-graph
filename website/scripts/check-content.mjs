@@ -78,6 +78,8 @@ for (const section of sections) {
 const titles = new Map();
 const descriptions = new Map();
 const publicPages = [path.join(docsRoot, 'index.mdx')];
+const navigationRoutes = [];
+const diskRoutes = [];
 
 for (const section of sections) {
   const sectionRoot = path.join(docsRoot, section);
@@ -88,7 +90,12 @@ for (const section of sections) {
   for (const item of meta) {
     assertChineseNavigationLabel(item.label, `${section}/_meta.json:${item.name}`);
     if (item.tag !== undefined) assertChineseNavigationLabel(item.tag, `${section}/_meta.json:${item.name}:tag`);
-    expectedPageTitles.set(`docs/${section}/${item.name}.mdx`, item.label);
+    const route = item.type === 'file' ? `${section}/${item.name}` : item.link?.replace(/^\//, '');
+    if (!route || !/^[a-z0-9-]+\/[a-z0-9-]+$/.test(route)) fail(`invalid internal navigation route in ${section}`);
+    navigationRoutes.push(route);
+    expectedPageTitles.set(`docs/${route}.mdx`, item.label);
+    const relativeLink = item.type === 'file' ? `./${item.name}` : `../${route}`;
+    if (!overview.includes(relativeLink)) fail(`${section}/index.mdx does not link ${route}`);
   }
   if (new Set(names).size !== names.length) fail(`${section}/_meta.json has duplicate pages`);
 
@@ -96,16 +103,15 @@ for (const section of sections) {
     .filter((name) => name.endsWith('.mdx') && name !== 'index.mdx')
     .map((name) => name.slice(0, -4))
     .sort();
-  const declared = [...names].sort();
-  if (JSON.stringify(diskPages) !== JSON.stringify(declared)) {
-    fail(`${section} disk pages and _meta.json differ`);
-  }
-
-  for (const name of names) {
-    if (!overview.includes(`./${name}`)) fail(`${section}/index.mdx does not link ${name}`);
+  for (const name of diskPages) {
+    diskRoutes.push(`${section}/${name}`);
     publicPages.push(path.join(sectionRoot, `${name}.mdx`));
   }
   publicPages.push(path.join(sectionRoot, 'index.mdx'));
+}
+if (new Set(navigationRoutes).size !== navigationRoutes.length ||
+    JSON.stringify([...navigationRoutes].sort()) !== JSON.stringify([...diskRoutes].sort())) {
+  fail('every topic route must have exactly one navigation entry, including cross-section links');
 }
 
 const terminology = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'terminology.json'), 'utf8'));

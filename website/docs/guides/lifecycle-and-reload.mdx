@@ -15,27 +15,81 @@ description: 正确管理 open、reload、current/previous 视图和 close 的�
 4. 新候选完整通过才成为 current；旧 current 成为 previous。
 5. `close()` 停止接受新查询并回收 Core 拥有的视图句柄。
 
-```ts
-import { fileURLToPath } from 'node:url';
+## 实演新修订、previous 和失败恢复
+
+在已安装包的项目根保存 `lifecycle-demo.mjs` 并运行 `node lifecycle-demo.mjs`。完整脚本只创建自己拥有的临时 Provider，不修改已有定义，也不依赖教程 Fixture：
+
+```js title="lifecycle-demo.mjs"
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
-// This program owns the graph; request handlers should not close a shared graph.
-const config = {
-  hostAllowedProviders: ['acme.http'],
-  integrationEnabledProviders: ['acme.http'],
-  providers: [{ providerId: 'acme.http',
-    authority: { kind: 'file' as const, rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url)) } }]
-};
-const graph = await CapabilityGraph.open(config);
+const root = await mkdtemp(path.join(os.tmpdir(), 'cg-lifecycle-demo-'));
+const capabilityFile = path.join(root, 'route.capability.json');
+const initial = { capabilityId: 'route', name: 'Routing v1',
+  description: 'Route requests.', whenToUse: 'Change a request entrypoint.' };
+const save = (value) => writeFile(capabilityFile, JSON.stringify(value), 'utf8');
+let graph;
 try {
-  const reloaded = await graph.reload({ providerId: 'acme.http' });
-  console.log(reloaded.ok, reloaded.providers);
+  await writeFile(path.join(root, 'provider.json'), JSON.stringify({
+    providerId: 'acme.http', name: 'Acme HTTP', version: '0.1.0'
+  }), 'utf8');
+  await save(initial);
+  graph = await CapabilityGraph.open({
+    hostAllowedProviders: ['acme.http'], integrationEnabledProviders: ['acme.http'],
+    providers: [{ providerId: 'acme.http', authority: { kind: 'file', rootDir: root } }]
+  });
+  const provider = graph.forProvider('acme.http');
+  const s1 = (await provider.listCatalog()).meta.staticRevision;
+  assert(s1);
+
+  await save({ ...initial, name: 'Routing v2' });
+  const updated = await graph.reload({ providerId: 'acme.http' });
+  assert.equal(updated.ok, true);
+  const current = await provider.listCatalog();
+  const s2 = current.meta.staticRevision;
+  assert(s2 && s2 !== s1);
+  const previous = await provider.listCatalog({ requiredStaticRevision: s1 });
+  assert.equal(previous.items[0].name, 'Routing v1');
+  assert.equal(previous.meta.servedFrom, 'previous');
+
+  // Missing mandatory whenToUse makes the candidate invalid, not an empty graph.
+  const invalid = { ...initial, name: 'Invalid candidate' };
+  delete invalid.whenToUse;
+  await save(invalid);
+  const failed = await graph.reload({ providerId: 'acme.http' });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.providers[0].error.code, 'CG_VALIDATION_FAILED');
+  const retained = await provider.getProvider();
+  const readable = await provider.listCatalog({ requiredStaticRevision: s2 });
+  assert.equal(readable.items[0].name, 'Routing v2');
+  assert.equal(readable.meta.servedFrom, 'current');
+  assert.equal(retained.meta.refreshFailed, true);
+  console.log(JSON.stringify({ changed: s1 !== s2,
+    current: current.items[0].name, previous: previous.items[0].name,
+    previousSource: previous.meta.servedFrom, failedCode: failed.providers[0].error.code,
+    retained: readable.items[0].name, refreshFailed: retained.meta.refreshFailed }));
 } finally {
-  await graph.close();
+  try { await graph?.close(); }
+  finally {
+    assert.equal(path.dirname(root), os.tmpdir());
+    assert(path.basename(root).startsWith('cg-lifecycle-demo-'));
+    await rm(root, { recursive: true, force: true });
+  }
 }
 ```
 
-前置为最小页两个定义；代码保存到安装项目根，使用当前程序自己创建的 graph。适合作者更新定义后主动刷新；只改知识正文不需要刷新静态图。未改定义时 reloaded.ok 应为 true，修订可不变，这只证明刷新机制，不证明定义已升级。返回 ok:false 时检查 providers 内错误，不把 Promise resolve 当更新成功。
+预期输出一行 JSON：`changed: true`，current 为 `Routing v2`，previous 为 `Routing v1`，previousSource 为 `previous`，failedCode 为 `CG_VALIDATION_FAILED`，retained 仍为 `Routing v2`，refreshFailed 为 `true`。真实哈希来自每次查询，脚本不硬编码修订。
+
+| 时刻 | current | previous | 失败后可做什么 |
+|---|---|---|---|
+| 首次 open | S1 / v1 | 无 | 初次加载无回退视图 |
+| 更新定义且 reload 成功 | S2 / v2 | S1 / v1 | 用 requiredStaticRevision: S1 完成旧任务 |
+| 无效候选 reload 失败 | 仍为 S2 / v2 | 仍为 S1 / v1 | 检查逐 Provider 错误、修复定义，再 reload |
+
+`reload()` 的 Promise resolve 不等于更新成功，要检查 `ok` 和每个 Provider 的结果。未改定义时修订可以不变；只改知识正文不必刷新静态图，正文身份另由 contentId 表达。再次成功更新会退休更旧的 previous，旧任务必须按 `CG_REVISION_MISMATCH` 重新发现。
 
 `rootDir` 在 open 时固定为绝对根，之后改变 `cwd` 不会重定位来源。Core 不监听文件，也不定时刷新。
 

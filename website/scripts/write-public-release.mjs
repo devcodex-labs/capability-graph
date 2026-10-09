@@ -24,7 +24,7 @@ function hash(text) {
 }
 
 function cleanRedirectTarget(target) {
-  return target.replace(/\/(?=#|$)/, '');
+  return target.split('#')[0].split('/').filter(Boolean).length === 1 ? target : target.replace(/\/(?=#|$)/, '');
 }
 
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
@@ -34,6 +34,12 @@ const releaseCommit = process.env.RELEASE_COMMIT ?? execFileSync('git', ['rev-pa
   encoding: 'utf8'
 }).trim();
 const releaseId = `capability-graph-${manifest.version}`;
+const documentationCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim();
+assert(!process.env.DOCS_COMMIT || process.env.DOCS_COMMIT === documentationCommit, 'documentation commit must equal the actual build checkout');
+const documentationDirty = Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: repositoryRoot, encoding: 'utf8' }).trim());
+const deploymentKind = process.env.DEPLOYMENT_KIND ?? (process.env.RELEASE_COMMIT ? 'package-release' : 'local');
+assert(['documentation', 'package-release', 'local'].includes(deploymentKind), 'invalid deployment kind');
+assert(deploymentKind === 'local' || !documentationDirty, 'cannot publish a dirty worktree identity');
 assert(releaseTag === `v${manifest.version}`, `release tag ${releaseTag} does not match package ${manifest.version}`);
 assert(/^[0-9a-f]{40}$/i.test(releaseCommit), `invalid release commit: ${releaseCommit}`);
 
@@ -64,6 +70,10 @@ const release = {
   releaseId,
   releaseTag,
   releaseCommit,
+  documentationCommit,
+  documentationDirty,
+  deploymentKind,
+  documentationId: `capability-graph-docs-${manifest.version}-${documentationCommit}-${hash(JSON.stringify({ pages: sortObject(pages), redirects: sortObject(redirects) })).slice(0, 12)}`,
   packageName: manifest.name,
   packageVersion: manifest.version,
   pages: sortObject(pages),

@@ -7,9 +7,24 @@ description: 理解 Capability Graph 的产品边界、身份、关系、知识�
 
 本分区解释模型为什么这样划分。API 签名请前往 [API 参考](../reference/index)，任务步骤请前往 [使用指南](../guides/index)。
 
-- [产品边界](./product-boundary)
-- [Provider 与能力](./provider-and-specification)
-- [身份与关系](./capability-identity)
-- [知识模型](./knowledge)
-- [运行时模型](./runtime)
-- [作用域、修订与完整性](./provider-scope)
+| 需要解释的问题 | 阅读入口 | 得到的判断依据 |
+|---|---|---|
+| 作者、能力和全局规范怎样分工 | [Provider、能力与规范](./provider-and-specification) | 规范不自动投递、Applicability 不由 Core 判断 |
+| 什么才是同一个能力，边怎样走 | [身份与关系](./capability-identity) | 二元身份、八类关系、正反向与 Selection 区别 |
+| 为什么目录不直接给知识全文 | [知识模型](./knowledge) | 文档/集合、声明映射、正文身份与显式选择 |
+| 静态能力和运行实例有什么不同 | [运行时模型](./runtime) | 项目/环境/实例身份以及观察兼容性 |
+| 结果能否直接当作全集 | [作用域、修订与完整性](./provider-scope) | 范围收窄、current/previous 和不同操作的失败边界 |
+
+这些是模型说明，不是可运行代码；第一次接入先走[快速开始](../getting-started/index)。
+
+## 产品边界
+
+Capability Graph 是本地优先、协议无关的能力发现基础设施：校验定义、关系、修订、范围、知识引用和 Runtime 观察，不执行业务能力，也不扫描任意框架源码猜能力。
+
+### 责任链
+
+Provider 作者维护权威定义与 Adapter；Core 校验并提供查询原语；Provider-owned API/MCP 负责协议、认证、工具设计与规范投递；Agent 根据意图选择能力；业务系统执行真正的路由、构建或部署。Core 不是统一 MCP Server、任务编排器、权限系统或执行沙箱。
+
+### 当前边界
+
+文件 Authority、本地 Document、Seed API/MCP 和真实 HTTP Runtime 参考可运行；数据库 Authority、检索及远程 Reader 是扩展合同，不附真实后端。集成前用[集成入口](../integrations/index)核对实施状态和自己需要提供的组件。

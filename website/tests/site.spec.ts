@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const base = 'https://devcodex-labs.github.io/capability-graph/';
 
@@ -17,7 +17,7 @@ test('top navigation is compact and all sidebar sections are expanded by default
     await expect(sidebar.getByRole('link', { name: section, exact: true })).toBeVisible();
   }
   const sectionBody = (name: string) => sidebar.getByRole('link', { name, exact: true })
-    .locator('xpath=following-sibling::div[1]');
+    .locator('xpath=../following-sibling::div[1]');
   for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
     await expect.poll(() => sectionBody(section).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
   }
@@ -74,6 +74,29 @@ test('tutorial checkpoints and MCP entry remain directly reachable', async ({ pa
   await expect(page.getByRole('main')).toContainText('node examples/seed-mcp/docs-main-entry/client.mjs');
   await expect(page.getByRole('main')).toContainText('十二工具');
 });
+
+test('task navigation keeps API design in integrations and derives section jumps', async ({ page }) => {
+  await page.goto('./');
+  const sidebar = page.locator('.rp-doc-layout__sidebar');
+  const integration = sidebar.locator('[data-section="集成"]');
+  await expect(integration.getByRole('link', { name: '设计 Provider API', exact: true })).toHaveAttribute('href', '/capability-graph/getting-started/provider-owned-api');
+  await expect(sidebar.locator('[data-section="快速开始"]').getByRole('link', { name: '设计 Provider API' })).toHaveCount(0);
+  const options = await sidebar.getByLabel('跳转分区').locator('option').allTextContents();
+  const groups = await sidebar.locator('[data-section]').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-section')));
+  expect(options.slice(1)).toEqual(groups);
+  const url = page.url();
+  await sidebar.getByLabel('跳转分区').selectOption({ label: '故障排查' });
+  await expect(sidebar.getByRole('link', { name: '故障排查', exact: true })).toBeInViewport();
+  await expect(page).toHaveURL(url);
+});
+
+for (const fragment of ['产品边界', '责任链', '当前边界']) {
+  test(`merged product boundary preserves bookmark ${fragment}`, async ({ page }) => {
+    await page.goto(`concepts/product-boundary.html#${fragment}`);
+    await expect(page).toHaveURL(new RegExp(`/capability-graph/concepts/#${encodeURIComponent(fragment)}$`));
+    await expect(page.locator(`[id="${fragment}"]`)).toBeInViewport();
+  });
+}
 
 for (const [route, canonical] of [
   ['./', base],

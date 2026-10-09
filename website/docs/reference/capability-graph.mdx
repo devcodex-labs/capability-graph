@@ -4,6 +4,7 @@ description: CapabilityGraph、BoundProviderGraph、打开配置、Authority 和
 ---
 
 import PublicApi from '../../generated/snippets/public-api.mdx';
+import Contracts from '../../generated/snippets/contracts-capability-graph.mdx';
 
 # Core 与生命周期
 
@@ -31,7 +32,7 @@ import PublicApi from '../../generated/snippets/public-api.mdx';
 | `reload(options?)` | 串行刷新一个或全部 Provider | 每个 Provider 独立发布结果 |
 | `close()` | 停止新工作并释放 Core 资源 | 不取消 Adapter 自有任务 |
 
-方法的准确类型由包内 `dist/index.d.ts` 提供；本页的公共符号覆盖由生成器校验。
+准确方法签名与配置字段在本页末尾由公开声明生成；下列符号索引用于查找，不替代类型与语义。
 
 <PublicApi />
 
@@ -78,3 +79,13 @@ type AuthoritySpec =
 每个有效启用 Provider 必须恰有一个 Authority。文件根在 `open()` 时解析并固定；数据库 read view 在交给 Core 后成为稳定逻辑快照。
 
 `reload({ providerId? })` 返回每个 Provider 的 `servedFrom`、修订、刷新状态和可选错误。一个刷新失败不回滚其他 Provider 已成功发布的新视图，也不删除仍可读取的旧 current。
+
+## 配置缺省与资源归属
+
+hostAllowedProviders、integrationEnabledProviders、providers 都必填，可以显式为空但不能省略。每个有效启用 Provider 恰好一个 Authority，providerId 是[合法稳定 ID](./provider-definition#id-格式与值约束)。重复来源为 CG_DUAL_AUTHORITY，缺来源/无效配置为 CG_CONFIG_INCOMPLETE；任一首次加载失败拒绝 open。
+
+budgets 省略使用[默认预算](./result-meta#预算字段与默认值)，允许一层分组内覆盖。runtimeAdapters/readers 省略为无自定义实现；Runtime 每 Provider 最多一个；本地 Reader 内置。两个 Retriever 各可选一个，不会自动补目录或网络后端。
+
+reload 省略 providerId 刷新所有启用来源，只在新候选完整通过后发布；没有自动监听/定时刷新。close 返回 Promise&lt;void&gt;，停止新查询并释放 Core 拥有的视图；已持有 pin 的查询可延迟清理，不取消 Adapter 自有任务。完整演练见[生命周期指南](../guides/lifecycle-and-reload)。
+
+<Contracts />

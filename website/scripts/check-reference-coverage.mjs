@@ -3,6 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { CapabilityGraph } from '../../dist/index.js';
 import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
+import { verifyReferenceContracts } from './lib/reference-contracts.mjs';
+import { verifyGeneratedContracts } from './lib/public-contracts.mjs';
+import { verifyAdapterContracts } from './lib/adapter-contracts.mjs';
 
 const readJson = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const contracts = await readJson(path.join(websiteRoot, 'generated', 'contracts', 'public-api.json'));
@@ -153,4 +156,7 @@ for (const testCase of definitionCases.cases) {
   await executeDefinitionCase(testCase);
 }
 
+await verifyGeneratedContracts(contracts, coverage, docsRoot);
+await verifyReferenceContracts(docsRoot);
+await verifyAdapterContracts(docsRoot);
 console.log(`reference check passed: ${publicSymbols.length} symbols, ${definitionCases.cases.length} definition cases`);

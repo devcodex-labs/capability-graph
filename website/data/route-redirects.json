@@ -1,4 +1,5 @@
 {
+  "concepts/product-boundary": "concepts/#产品边界",
   "getting-started/first-query": "getting-started/first-provider/#4-执行渐进查询",
   "getting-started/next-steps": "getting-started/provider-owned-api/#后续路径",
   "concepts/capability-modeling": "concepts/provider-and-specification/#能力建模",

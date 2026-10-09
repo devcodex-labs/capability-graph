@@ -41,8 +41,41 @@ button.rp-search-button--mobile {
 }
 
 .rp-doc table {
-  display: table;
+  display: block;
   width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cg-sidebar-heading { display: flex; align-items: center; }
+.cg-sidebar-heading > a { flex: 1; min-width: 0; }
+.rp-sidebar-item > span { min-width: 0; overflow-wrap: anywhere; }
+.rp-sidebar-item > .rp-badge { flex-shrink: 0; margin-left: 6px; }
+.cg-sidebar-heading > button, .cg-sidebar-close, .cg-search-clear, .cg-search-retry {
+  padding: 6px 10px; border: 1px solid var(--cg-line); border-radius: 6px;
+  color: var(--cg-ink); background: var(--cg-panel); cursor: pointer;
+}
+.cg-sidebar-heading > button { min-width: 36px; margin-left: 4px; }
+.cg-sidebar-tools { position: sticky; top: 0; z-index: 1; padding: 8px 0; background: var(--rp-c-bg); }
+.cg-sidebar-tools label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.cg-sidebar-tools select { min-width: 0; padding: 6px; color: var(--cg-ink); background: var(--cg-panel); border: 1px solid var(--cg-line); border-radius: 4px; }
+[data-section] { scroll-margin-top: 64px; }
+.cg-sidebar-close { display: none; margin-bottom: 8px; }
+.rp-search-panel__cancel { display: block !important; border: 0; background: transparent; color: var(--cg-ink); cursor: pointer; white-space: nowrap; }
+.rp-search-panel__input { min-width: 0; }
+.rp-search-panel__results > p { padding: 16px; }
+.cg-search-error { padding: 16px; }
+.rp-search-button .rp-search-button__hotkey { color: var(--cg-ink); }
+.rp-badge--info { color: #005bb5 !important; }
+.dark .rp-badge--info { color: #8ac4ff !important; }
+[hidden] { display: none !important; }
+@media (max-width: 768px) {
+  .cg-sidebar-close { display: block; }
+  div.rp-sidebar-menu__mask { display: block; }
+}
+@media (min-width: 769px) {
+  .rp-sidebar-menu .rp-sidebar-menu__left { display: none; }
+  div.rp-sidebar-menu { justify-content: flex-end; }
 }
 
 .rp-doc pre,
@@ -83,13 +116,6 @@ button.rp-search-button--mobile {
   height: 1rem;
   margin: 0 auto;
   background: var(--cg-line);
-}
-
-@media (max-width: 640px) {
-  .rp-doc table {
-    display: block;
-    overflow-x: auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

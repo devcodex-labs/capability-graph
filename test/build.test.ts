@@ -54,7 +54,7 @@ test("deep R6: standard npm test cleans orphaned tests before discovery", async 
   await writeFile(path.join(root, "dist-test/test/deleted.test.js"), "throw new Error('deleted test must not run');\n");
   const npm = process.env.npm_execpath; assert.ok(npm, "Run regression through npm test");
   const output = command([npm, "test"], root);
-  assert.match(output, /active source test/); assert.match(output, /# tests 1\b/);
+  assert.match(output, /active source test/); assert.match(output, /(?:#|ℹ) tests 1\b/); // TAP and Node 24 spec reporter.
   for (const file of ["dist/stale.js", "dist-test/test/deleted.test.js"]) await assert.rejects(lstat(path.join(root, file)), { code: "ENOENT" });
   assert.ok((await lstat(path.join(root, "dist-test/test/active.test.js"))).isFile());
 }));

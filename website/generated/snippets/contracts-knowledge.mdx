@@ -1,0 +1,189 @@
+## 完整签名与字段
+
+以下由公开声明生成。接口继承字段已展开；`?` 表示可省略，**不表示可传 null**。类型不能表达的默认值、值域、预算与失败语义以本页正文为准。类仅列公开方法；绑定对象必须由 forProvider 获取。
+
+### DocumentRead 合同
+
+```ts
+interface DocumentRead {
+  readonly id: CanonicalCapabilityId;
+  readonly knowledgeId: string;
+  readonly contentId: string;
+  readonly source: string;
+  readonly contentType: string;
+  readonly text: string;
+  readonly byteLength: number;
+  readonly role: string;
+  readonly locale?: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly canonicalUrl?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `id` | `CanonicalCapabilityId` | 是 |
+| `knowledgeId` | `string` | 是 |
+| `contentId` | `string` | 是 |
+| `source` | `string` | 是 |
+| `contentType` | `string` | 是 |
+| `text` | `string` | 是 |
+| `byteLength` | `number` | 是 |
+| `role` | `string` | 是 |
+| `locale` | `string` | 否 |
+| `title` | `string` | 否 |
+| `summary` | `string` | 否 |
+| `canonicalUrl` | `string` | 否 |
+
+### DocumentReadBatch 合同
+
+```ts
+export type DocumentReadBatch = BatchResult<DocumentRead> & {
+    readonly knowledgeState: "not_associated" | "filtered_empty" | "matched";
+};
+```
+
+### KnowledgeCollectionRef 合同
+
+```ts
+interface KnowledgeCollectionRef {
+  readonly kind: "collection";
+  readonly knowledgeId: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly members: readonly KnowledgeDocumentRef[];
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `kind` | `"collection"` | 是 |
+| `knowledgeId` | `string` | 是 |
+| `title` | `string` | 否 |
+| `summary` | `string` | 否 |
+| `members` | `readonly KnowledgeDocumentRef[]` | 是 |
+
+### KnowledgeContentId 合同
+
+```ts
+export type KnowledgeContentId = string;
+```
+
+### KnowledgeDocumentRef 合同
+
+```ts
+interface KnowledgeDocumentRef {
+  readonly kind: "document";
+  readonly knowledgeId: string;
+  readonly locator: KnowledgeLocator;
+  readonly role: string;
+  readonly locale?: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly canonicalUrl?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `kind` | `"document"` | 是 |
+| `knowledgeId` | `string` | 是 |
+| `locator` | `KnowledgeLocator` | 是 |
+| `role` | `string` | 是 |
+| `locale` | `string` | 否 |
+| `title` | `string` | 否 |
+| `summary` | `string` | 否 |
+| `canonicalUrl` | `string` | 否 |
+
+### KnowledgeKind 合同
+
+```ts
+export type KnowledgeKind = "document" | "collection";
+```
+
+### KnowledgeLocator 合同
+
+```ts
+export type KnowledgeLocator = {
+    readonly type: "relative-file";
+    readonly path: string;
+} | {
+    readonly type: "http";
+    readonly url: string;
+};
+```
+
+### KnowledgeRef 合同
+
+```ts
+export type KnowledgeRef = KnowledgeDocumentRef | KnowledgeCollectionRef;
+```
+
+### KnowledgeSummary 合同
+
+```ts
+export type KnowledgeSummary = KnowledgeDocumentRef | {
+    readonly kind: "collection";
+    readonly knowledgeId: string;
+    readonly title?: string;
+    readonly summary?: string;
+    readonly memberCount: number;
+};
+```
+
+### ReadDocumentsQuery 合同
+
+```ts
+interface ReadDocumentsQuery {
+  readonly selected: readonly CapabilityRef[];
+  readonly knowledgeIds?: readonly string[];
+  readonly roles?: readonly string[];
+  readonly locales?: readonly string[];
+  readonly requestProviderScope?: readonly string[];
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `selected` | `readonly CapabilityRef[]` | 是 |
+| `knowledgeIds` | `readonly string[]` | 否 |
+| `roles` | `readonly string[]` | 否 |
+| `locales` | `readonly string[]` | 否 |
+| `requestProviderScope` | `readonly string[]` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### ReadSpecificationQuery 合同
+
+```ts
+interface ReadSpecificationQuery {
+  readonly providerId: string;
+  readonly knowledgeIds?: readonly string[];
+  readonly locales?: readonly string[];
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `providerId` | `string` | 是 |
+| `knowledgeIds` | `readonly string[]` | 否 |
+| `locales` | `readonly string[]` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### SpecificationDocumentRead 合同
+
+```ts
+export type SpecificationDocumentRead = Omit<DocumentRead, "id"> & {
+    readonly providerId: string;
+};
+```
+
+### SpecificationReadBatch 合同
+
+```ts
+export type SpecificationReadBatch = BatchResult<SpecificationDocumentRead> & {
+    readonly knowledgeState: "not_associated" | "filtered_empty" | "matched";
+};
+```

@@ -1,0 +1,391 @@
+## 完整签名与字段
+
+以下由公开声明生成。接口继承字段已展开；`?` 表示可省略，**不表示可传 null**。类型不能表达的默认值、值域、预算与失败语义以本页正文为准。类仅列公开方法；绑定对象必须由 forProvider 获取。
+
+### CapabilityDetail 合同
+
+```ts
+interface CapabilityDetail {
+  readonly qualifiedId: string;
+  readonly knowledge: { readonly items: readonly KnowledgeSummary[]; readonly completeness: "complete" | "truncated"; readonly nextCursor?: string; };
+  readonly neighborSummaries: Readonly<Record<NeighborKind, NeighborSummaryGroup>>;
+  readonly id: CanonicalCapabilityId;
+  readonly name: string;
+  readonly description: string;
+  readonly whenToUse: string;
+  readonly distinction?: string;
+  readonly staticRevision: string;
+  readonly examples: readonly string[];
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `qualifiedId` | `string` | 是 |
+| `knowledge` | `{ readonly items: readonly KnowledgeSummary[]; readonly completeness: "complete" \| "truncated"; readonly nextCursor?: string; }` | 是 |
+| `neighborSummaries` | `Readonly<Record<NeighborKind, NeighborSummaryGroup>>` | 是 |
+| `id` | `CanonicalCapabilityId` | 是 |
+| `name` | `string` | 是 |
+| `description` | `string` | 是 |
+| `whenToUse` | `string` | 是 |
+| `distinction` | `string` | 否 |
+| `staticRevision` | `string` | 是 |
+| `examples` | `readonly string[]` | 是 |
+
+### CapabilityDetailQuery 合同
+
+```ts
+interface CapabilityDetailQuery {
+  readonly requiredStaticRevision?: string;
+  readonly neighborLimitPerKind?: number;
+  readonly knowledgeLimit?: number;
+  readonly knowledgeCursors?: Readonly<Record<string, string>>;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `requiredStaticRevision` | `string` | 否 |
+| `neighborLimitPerKind` | `number` | 否 |
+| `knowledgeLimit` | `number` | 否 |
+| `knowledgeCursors` | `Readonly<Record<string, string>>` | 否 |
+
+### CatalogPage 合同
+
+```ts
+interface CatalogPage {
+  readonly items: readonly CatalogRecord[];
+  readonly meta: ResultMeta;
+  readonly nextCursor?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `items` | `readonly CatalogRecord[]` | 是 |
+| `meta` | `ResultMeta` | 是 |
+| `nextCursor` | `string` | 否 |
+
+### CatalogQuery 合同
+
+```ts
+interface CatalogQuery {
+  readonly capabilityIdPrefix?: string;
+  readonly parent?: CapabilityRef;
+  readonly cursor?: string;
+  readonly limit?: number;
+  readonly requestProviderScope?: readonly string[];
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `capabilityIdPrefix` | `string` | 否 |
+| `parent` | `CapabilityRef` | 否 |
+| `cursor` | `string` | 否 |
+| `limit` | `number` | 否 |
+| `requestProviderScope` | `readonly string[]` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### CatalogRecord 合同
+
+```ts
+interface CatalogRecord {
+  readonly qualifiedId: string;
+  readonly providerId: string;
+  readonly id: CanonicalCapabilityId;
+  readonly name: string;
+  readonly description: string;
+  readonly whenToUse: string;
+  readonly distinction?: string;
+  readonly staticRevision: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `qualifiedId` | `string` | 是 |
+| `providerId` | `string` | 是 |
+| `id` | `CanonicalCapabilityId` | 是 |
+| `name` | `string` | 是 |
+| `description` | `string` | 是 |
+| `whenToUse` | `string` | 是 |
+| `distinction` | `string` | 否 |
+| `staticRevision` | `string` | 是 |
+
+### DocumentPageQuery 合同
+
+```ts
+interface DocumentPageQuery {
+  readonly cursor?: string;
+  readonly limit?: number;
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `cursor` | `string` | 否 |
+| `limit` | `number` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### KnowledgeMembersPage 合同
+
+```ts
+interface KnowledgeMembersPage {
+  readonly id: CanonicalCapabilityId;
+  readonly collectionId: string;
+  readonly items: readonly KnowledgeDocumentRef[];
+  readonly completeness: "complete" | "truncated";
+  readonly nextCursor?: string;
+  readonly meta: ResultMeta;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `id` | `CanonicalCapabilityId` | 是 |
+| `collectionId` | `string` | 是 |
+| `items` | `readonly KnowledgeDocumentRef[]` | 是 |
+| `completeness` | `"complete" \| "truncated"` | 是 |
+| `nextCursor` | `string` | 否 |
+| `meta` | `ResultMeta` | 是 |
+
+### KnowledgeMembersQuery 合同
+
+```ts
+interface KnowledgeMembersQuery {
+  readonly capability: CapabilityRef;
+  readonly collectionId: string;
+  readonly cursor?: string;
+  readonly limit?: number;
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `capability` | `CapabilityRef` | 是 |
+| `collectionId` | `string` | 是 |
+| `cursor` | `string` | 否 |
+| `limit` | `number` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### NeighborGroup 合同
+
+```ts
+interface NeighborGroup {
+  readonly items: readonly CatalogRecord[];
+  readonly completeness: "complete" | "truncated" | "partial";
+  readonly nextCursor?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `items` | `readonly CatalogRecord[]` | 是 |
+| `completeness` | `"complete" \| "truncated" \| "partial"` | 是 |
+| `nextCursor` | `string` | 否 |
+
+### NeighborKind 合同
+
+```ts
+export type NeighborKind = "parents" | "children" | "specializes" | "specializedBy" | "related" | "relatedBy" | "requires" | "requiredBy";
+```
+
+### NeighborPage 合同
+
+```ts
+interface NeighborPage {
+  readonly id: CanonicalCapabilityId;
+  readonly groups: Readonly<Record<NeighborKind, NeighborGroup>>;
+  readonly meta: ResultMeta;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `id` | `CanonicalCapabilityId` | 是 |
+| `groups` | `Readonly<Record<NeighborKind, NeighborGroup>>` | 是 |
+| `meta` | `ResultMeta` | 是 |
+
+### NeighborQuery 合同
+
+```ts
+interface NeighborQuery {
+  readonly kinds?: readonly NeighborKind[];
+  readonly limitPerKind?: number;
+  readonly cursors?: Partial<Record<NeighborKind, string>>;
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `kinds` | `readonly NeighborKind[]` | 否 |
+| `limitPerKind` | `number` | 否 |
+| `cursors` | `Partial<Record<NeighborKind, string>>` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### NeighborSummaryGroup 合同
+
+```ts
+interface NeighborSummaryGroup {
+  readonly items: readonly { readonly id: CanonicalCapabilityId; readonly name: string; }[];
+  readonly completeness: "complete" | "truncated";
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `items` | `readonly { readonly id: CanonicalCapabilityId; readonly name: string; }[]` | 是 |
+| `completeness` | `"complete" \| "truncated"` | 是 |
+
+### ProviderListQuery 合同
+
+```ts
+interface ProviderListQuery {
+  readonly requestProviderScope?: readonly string[];
+  readonly requiredStaticRevision?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `requestProviderScope` | `readonly string[]` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+
+### ProviderResult 合同
+
+```ts
+interface ProviderResult {
+  readonly specificationDocuments?: { readonly items: readonly KnowledgeDocumentRef[]; readonly completeness: "complete" | "truncated"; readonly nextCursor?: string; };
+  readonly meta: ResultMeta;
+  readonly specification?: Omit<SpecificationMetadata, "documents"> & { readonly documentCount: number; };
+  readonly staticRevision: string;
+  readonly providerId: string;
+  readonly name: string;
+  readonly version: string;
+  readonly authorityKind: "file" | "database";
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `specificationDocuments` | `{ readonly items: readonly KnowledgeDocumentRef[]; readonly completeness: "complete" \| "truncated"; readonly nextCursor?: string; }` | 否 |
+| `meta` | `ResultMeta` | 是 |
+| `specification` | `Omit<SpecificationMetadata, "documents"> & { readonly documentCount: number; }` | 否 |
+| `staticRevision` | `string` | 是 |
+| `providerId` | `string` | 是 |
+| `name` | `string` | 是 |
+| `version` | `string` | 是 |
+| `authorityKind` | `"file" \| "database"` | 是 |
+
+### ProviderSummary 合同
+
+```ts
+interface ProviderSummary {
+  readonly specification?: Omit<SpecificationMetadata, "documents"> & { readonly documentCount: number; };
+  readonly staticRevision: string;
+  readonly providerId: string;
+  readonly name: string;
+  readonly version: string;
+  readonly authorityKind: "file" | "database";
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `specification` | `Omit<SpecificationMetadata, "documents"> & { readonly documentCount: number; }` | 否 |
+| `staticRevision` | `string` | 是 |
+| `providerId` | `string` | 是 |
+| `name` | `string` | 是 |
+| `version` | `string` | 是 |
+| `authorityKind` | `"file" \| "database"` | 是 |
+
+### ProviderSummaryPage 合同
+
+```ts
+interface ProviderSummaryPage {
+  readonly items: readonly ProviderSummary[];
+  readonly meta: ResultMeta;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `items` | `readonly ProviderSummary[]` | 是 |
+| `meta` | `ResultMeta` | 是 |
+
+### ResolveSelectionQuery 合同
+
+```ts
+interface ResolveSelectionQuery {
+  readonly selected: readonly CanonicalCapabilityId[];
+  readonly requestProviderScope?: readonly string[];
+  readonly requiredStaticRevisionByProvider?: Readonly<Record<string, string>>;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `selected` | `readonly CanonicalCapabilityId[]` | 是 |
+| `requestProviderScope` | `readonly string[]` | 否 |
+| `requiredStaticRevisionByProvider` | `Readonly<Record<string, string>>` | 否 |
+
+### SelectionReason 合同
+
+```ts
+interface SelectionReason {
+  readonly requested: boolean;
+  readonly requiredBy: readonly CanonicalCapabilityId[];
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `requested` | `boolean` | 是 |
+| `requiredBy` | `readonly CanonicalCapabilityId[]` | 是 |
+
+### SelectionResult 合同
+
+```ts
+interface SelectionResult {
+  readonly requested: readonly CanonicalCapabilityId[];
+  readonly resolved: readonly CanonicalCapabilityId[];
+  readonly added: readonly CanonicalCapabilityId[];
+  readonly requiresEdges: readonly { readonly from: CanonicalCapabilityId; readonly to: CanonicalCapabilityId; }[];
+  readonly reasons: readonly { readonly id: CanonicalCapabilityId; readonly reason: SelectionReason; }[];
+  readonly meta: ResultMeta;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `requested` | `readonly CanonicalCapabilityId[]` | 是 |
+| `resolved` | `readonly CanonicalCapabilityId[]` | 是 |
+| `added` | `readonly CanonicalCapabilityId[]` | 是 |
+| `requiresEdges` | `readonly { readonly from: CanonicalCapabilityId; readonly to: CanonicalCapabilityId; }[]` | 是 |
+| `reasons` | `readonly { readonly id: CanonicalCapabilityId; readonly reason: SelectionReason; }[]` | 是 |
+| `meta` | `ResultMeta` | 是 |
+
+### SpecificationDocumentsPage 合同
+
+```ts
+interface SpecificationDocumentsPage {
+  readonly providerId: string;
+  readonly items: readonly KnowledgeDocumentRef[];
+  readonly completeness: "complete" | "truncated";
+  readonly nextCursor?: string;
+  readonly meta: ResultMeta;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `providerId` | `string` | 是 |
+| `items` | `readonly KnowledgeDocumentRef[]` | 是 |
+| `completeness` | `"complete" \| "truncated"` | 是 |
+| `nextCursor` | `string` | 否 |
+| `meta` | `ResultMeta` | 是 |

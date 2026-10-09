@@ -1,5 +1,4 @@
 [
   { "type": "file", "name": "installation", "label": "安装" },
-  { "type": "file", "name": "first-provider", "label": "创建第一个 Provider" },
-  { "type": "file", "name": "provider-owned-api", "label": "Provider 自有 API" }
+  { "type": "file", "name": "first-provider", "label": "创建第一个 Provider" }
 ]

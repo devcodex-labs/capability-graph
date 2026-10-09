@@ -7,9 +7,14 @@ description: 将 Capability Graph 接入 Node.js、Provider-owned MCP 和可插�
 
 集成层由 Provider 所有。它负责协议、认证、工具名称、意图路由和规范投递；Core 只提供可组合的查询与校验原语。
 
-- [Node.js API 接入](./node-api)
-- [Provider 自有 MCP](./provider-owned-mcp)
-- [RuntimeAdapter 接入](./runtime-adapter)
-- [检索 Adapter 接入](./capability-retriever)
-- [KnowledgeReader 接入](./knowledge-reader)
-- [DatabaseAuthorityAdapter 接入](./database-authority-adapter)
+| 目标 | 前置与状态 | 完成后得到什么 |
+|---|---|---|
+| 在进程内调用 Core | 最小 Provider；可用 | [Node.js 中使用 Core](./node-api)：open/query/close 的资源归属，不会启动 HTTP 服务 |
+| 给 Agent 设计分层接口 | 最小 Provider，按需增加 G1–G3；受检 API 示例 | [设计 Provider API](../getting-started/provider-owned-api)：主入口、下钻、详情和显式知识读取 |
+| 用 MCP 暴露自己的 Provider | 自备 MCP SDK；有可运行 stdio Server/Client | [Provider 自有 MCP](./provider-owned-mcp)：工具/Resource、错误映射与进程管理 |
+| 查看真实项目实例 | 自备采集源；合同可用并有真实 HTTP 参考 | [RuntimeAdapter 接入](./runtime-adapter)：带来源、兼容与覆盖证据的有界观察 |
+| 对能力召回或选定知识检索 | 自备检索后端；仅合同 | [检索 Adapter 接入](./capability-retriever)：候选/命中与可校验的修订、内容证据 |
+| 读取非本地文档 | 自备传输、权限与取消；仅合同 | [KnowledgeReader 接入](./knowledge-reader)：严格预算内的 bytes/contentId，不替换 locator |
+| 使用数据库作权威源 | 自备稳定 read view；仅合同 | [DatabaseAuthorityAdapter 接入](./database-authority-adapter)：完整扫描、点读、八类邻居及视图关闭 |
+
+只读本地 Knowledge 不需要自定义 Reader，走[添加本地知识](../guides/add-local-knowledge)即可。“仅合同”表示骨架有类型/合同验证，不表示 npm 安装后已有数据库、网络或检索服务。

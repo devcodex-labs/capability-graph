@@ -11,6 +11,7 @@ const packageVersion = process.env.PACKAGE_VERSION ?? manifest.version;
 const releaseTag = process.env.RELEASE_TAG ?? `v${packageVersion}`;
 const releaseId = process.env.RELEASE_ID ?? `capability-graph-${packageVersion}`;
 const releaseCommit = process.env.RELEASE_COMMIT;
+const documentationCommit = process.env.DOCS_COMMIT;
 const verificationAttempts = Number.parseInt(process.env.VERIFY_ATTEMPTS ?? '12', 10);
 const retryDelayMs = Number.parseInt(process.env.VERIFY_RETRY_DELAY_MS ?? '10000', 10);
 
@@ -39,7 +40,7 @@ async function documentationUrls(root, relative = '') {
 }
 
 function cleanRedirectTarget(target) {
-  return target.replace(/\/(?=#|$)/, '');
+  return target.split('#')[0].split('/').filter(Boolean).length === 1 ? target : target.replace(/\/(?=#|$)/, '');
 }
 
 async function eventually(operation, attempts = verificationAttempts) {
@@ -87,6 +88,7 @@ const publicRelease = await eventually(async () => {
   assert(candidate.releaseId === releaseId, 'public release id mismatch');
   assert(candidate.releaseTag === releaseTag, 'public release tag mismatch');
   assert(candidate.releaseCommit === releaseCommit, 'public release commit mismatch');
+  if (documentationCommit) assert(candidate.documentationCommit === documentationCommit && candidate.documentationDirty === false, 'public documentation checkout mismatch');
   assert(candidate.packageName === packageName && candidate.packageVersion === packageVersion, 'public package identity mismatch');
   return candidate;
 });

@@ -53,11 +53,4 @@ MCP 工具可包装这些查询，但不必为每个能力创建工具。请求�
 
 Runtime Adapter 的概念实现是“读取注册表快照 → 核对项目/环境 → 映射实例及 `instanceOf` → 返回实际构建修订和覆盖说明”。未核对 VextJS 公开采集接口前，不给出虚构导入或采集方法。现在可实跑的是 Seed 的 Node.js HTTP 参考，这里尚无 VextJS 执行证据。
 
-## 变为 Runnable 的条件
-
-- 存在公开 VextJS 示例仓库或本仓库 Fixture；
-- 使用当前公开包入口编译；
-- 真实执行主能力、子能力和错误路径；
-- CI 自动验证且文档片段与源码同源。
-
-在这些条件满足前，请参考 [Seed 端到端示例](./seed-provider)中的 MCP 与 Runtime 可运行结构。
+目前没有可导入的 VextJS Adapter；需要实际运行时，请参考 [Seed 端到端示例](./seed-provider)中的 MCP 与 Runtime 结构，自行对接真实框架接口。

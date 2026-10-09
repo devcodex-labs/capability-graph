@@ -70,4 +70,15 @@ const selectedProvider = graph.forProvider('acme.http');
 const selectedDetail = await selectedProvider.getCapabilities(['route']);
 ```
 
-单个未指定修订的来源故障应被隔离，不清空其他 Provider 的合法候选。指定修订不可读时则明确失败。跨 Provider 组合由 Agent 或上层工作流完成。
+## 来源失效时如何处理
+
+故障隔离不是所有接口统一的部分成功承诺：
+
+| 操作 | 某个来源不可读时 | 调用方处理 |
+|---|---|---|
+| `getCapabilities` / `readDocuments`，未锁定失效修订 | 正常条目保留，失败条目带错误；读取的槽位可能由文档展开生成 | 检查每项 `ok`，按身份关联，不把失败项当空文档 |
+| `retrieveCapabilities`，未指定修订 | 拒绝不合法候选，保留合法候选和原排名，报告 warning/`partial` | 核对来源与完整性，不假定候选连续排名 |
+| 联合 `listCatalog` / `listProviders` | 查询级失败，不提供故障来源之外的成功目录 | 显式告知来源不可用；业务允许时由调用方另发健康 Provider 的窄范围请求 |
+| 指定的权威修订不可读 | 查询级失败 | 按错误动作重新发现或修复来源，不能静默切换修订 |
+
+可复现故障注入见[多 Provider 隔离测试](../examples/multi-provider)。跨 Provider 组合由 Agent 或上层工作流完成，不写入静态关系。

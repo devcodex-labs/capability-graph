@@ -7,11 +7,15 @@ description: 查阅 Capability Graph 的公共 API、定义字段、错误、Ada
 
 本分区给出精确事实，不替代从零教学。公开符号清单由根声明入口提取，语义说明和边界由本分区维护。
 
-- [Core 与生命周期](./capability-graph)
-- [查询接口](./queries-and-results)
-- [定义与身份](./provider-definition)
-- [知识接口](./knowledge)
-- [运行时接口](./runtime)
-- [Adapter 接口](./runtime-adapter)
-- [结果与控制元数据](./result-meta)
-- [错误与恢复动作](./errors)
+| 要查的精确事实 | 入口 | 可用范围 |
+|---|---|---|
+| open/绑定对象/Authority/刷新/关闭 | [Core 与生命周期](./capability-graph) | Core 可用，方法签名与全部配置字段 |
+| Catalog/详情/关系/Selection/文档发现 | [查询接口](./queries-and-results) | Core 可用，输入输出、默认分页与失败边界 |
+| Provider/能力/Specification/身份格式 | [定义与身份](./provider-definition) | 文件及数据库定义校验；不等于允许的任意 JSON |
+| Document/Collection/正文读取 | [知识接口](./knowledge) | 本地可用；远程来源需 Reader |
+| 实例、观察、兼容与 Runtime 请求 | [运行时接口](./runtime) | 需配置 Adapter；真实空观察与不可用不同 |
+| Reader/Runtime/检索/数据库实现方合同 | [Adapter 接口](./runtime-adapter) | 标明可用合同与仅合同后端边界 |
+| meta、批量槽位、修订与预算覆盖 | [结果与控制元数据](./result-meta) | 所有操作共同控制信息；读取结果不按原选择索引对齐 |
+| ErrorCode 与下一步动作 | [错误与恢复动作](./errors) | 完整枚举及调用方恢复建议 |
+
+先知道操作名就直接查表和字段；需要完整执行材料请返回[使用指南](../guides/index)，不需要逐页阅读全部参考。

@@ -18,6 +18,22 @@
 
 ## 验证
 
+文档材料维护：最小 acme.http/route 对照为 website/fixtures/minimal-provider，输入来自公开页面；website/fixtures/first-provider 是独立的关系、知识、Specification 高级回归，不能暗中给最小教程补文件。两者由 check:examples 分别验证，不向读者解释内部夹具组织。
+
+VextJS 仅为概念示例。升级为可运行状态前，需要公开源码/固定材料、公开包入口编译、真实主入口/下钻/错误路径，以及 CI 与页面同源验证；只补代码或标签不能改变状态。
+
+主题覆盖依赖固定的 Rspress 2.0.22 搜索 hook/SuggestItem 内部入口；保留其本地索引和排序，覆盖事件、模态与失败恢复。显式重试或失败后重开须重建失败搜索器及请求缓存，成功搜索器继续复用；不得直接修改 node_modules。侧栏覆盖布局按 ≤768px，目录展开按 ≤1279px，触发器/关闭按钮/模态语义与布局同步，跨断点必须释放滚动和 inert。升级依赖时运行 check:types 与完整浏览器回归，特别是索引 503 恢复、空/关闭搜索 Enter、IME、焦点约束、导航/搜索叠加、跨断点、目录 Escape 和折叠语义。侧栏与分区快速跳转只从同一 _meta 派生，不另建导航配置。
+
+check:reference 独立比较公开声明与生成签名，包括函数、类静态方法、类型别名、接口泛型和字段；共同改错 JSON/MDX 的负例不能被同源一致性检查掩盖。Reader 算法与知识检索错误表由公开页面读取，再通过公共 API 验证，包括逐文档错误、查询级失败、单项 warning/partial 和真正零命中。
+
+## 仅文档部署
+
+合并并确认后，可在 GitHub Actions 手动运行 `Deploy documentation only`，选择 main；它不会发 npm、创建标签或部署 PR。使用 github-pages 环境的审批/保护规则；这些远端配置需由仓库维护者核对，本地测试不证明部署权限已就绪。
+
+门禁冻结实际文档 SHA 与已发布包标签：manifest 必须等于 npm latest，公开 Core/构建输入须与该标签一致，运行页面还原、Registry 实装、类型、合同、AI/HTML/链接/浏览器/包边界检查后才上传同一制品。部署前再次核对 main 和 Registry，并拒绝覆盖更新或分叉的文档；npm 发布流程也共享并发组与防回退门禁。公开 identity 区分 releaseCommit（包基线）与 documentationCommit/Id（实际文档及制品哈希），本地脏工作区标记为 local，不冒充已提交部署。
+
+网络错误、缺失发布标签、版本漂移或未知部署身份都应停止流程并排查，只有明确 404 才作为首次站点部署处理。此工作流落地不等于已上线；需要独立的公网 verify-public 证据。
+
 在 website 执行 npm run build。scripts/lib/tutorial.mjs 是本地、Registry及MCP测试共用的页面还原器，只接受固定检查点/文件白名单。页面是输入真相源，Fixture只对照，不能复制Fixture补文件。check:examples运行helper负例、G0-G4及独立G4四例、页面输出，保留高级Fixture Specification/Reader/API和类型片段回归。安装验证需使用仓库外消费者和独立冻结的期望版本，不以实际读取的版本自证。
 
 维护 First Provider Fixture 时，在仓库根先构建主包，再执行：

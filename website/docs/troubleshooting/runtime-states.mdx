@@ -15,14 +15,14 @@ description: 区分 Runtime 未启用、不可用、观察为空、过期、部�
 | 过期 | `freshness: stale` | 刷新 Adapter 来源或按限制使用 |
 | 不匹配 | `CG_RUNTIME_RESULT_MISMATCH` | 修正 Provider、项目、环境或 instanceOf |
 
-Core 超时只停止等待。当前 Runtime 查询会把 Adapter 抛错和等待超时统一投影为 `CG_RUNTIME_UNAVAILABLE`，不会对外返回 `CG_TIMEOUT`。确认 Adapter 是否仍在运行、是否会消费迟到拒绝，再决定重试；不要假设底层任务已经取消。
+Core 超时只停止等待。当前 Runtime 查询会把 Adapter 抛错和等待超时统一投影为 `CG_RUNTIME_UNAVAILABLE`，不会对外返回 `CG_TIMEOUT`。Core 会处理返回给它的 `query()` Promise 的迟到拒绝；Adapter 仍负责底层任务及另行启动的后台任务。确认任务是否仍在运行，再决定重试，不要假设它已经取消。
 
 ## 超时边界
 
 V1 的 Adapter 合同没有统一 `AbortSignal`。实现方需要：
 
 - 在 Adapter 内设置自己的网络或数据库超时；
-- 消费迟到 resolve/reject，避免未处理拒绝；
+- 处理自行启动的独立后台任务的拒绝与清理；返回给 Core 的查询 Promise 的迟到拒绝已有处理器；
 - 让重复请求具备幂等或明确去重语义；
 - 在 `close()` 或 Adapter 生命周期中回收资源；
 - 记录任务是否仍在运行，而不是把 `Promise.race` 写成取消。

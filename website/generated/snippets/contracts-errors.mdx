@@ -1,0 +1,55 @@
+## 完整签名与字段
+
+以下由公开声明生成。接口继承字段已展开；`?` 表示可省略，**不表示可传 null**。类型不能表达的默认值、值域、预算与失败语义以本页正文为准。类仅列公开方法；绑定对象必须由 forProvider 获取。
+
+### CapabilityGraphError 合同
+
+```ts
+class CapabilityGraphError {
+  constructor(code: ErrorCode, init: {
+    nextAction: NextAction;
+    message?: string;
+    details?: Record<string, unknown>;
+});
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `code` | `ErrorCode` | 是 |
+| `nextAction` | `NextAction` | 是 |
+| `details` | `Readonly<Record<string, unknown>>` | 否 |
+| `name` | `string` | 是 |
+| `message` | `string` | 是 |
+| `stack` | `string` | 否 |
+| `cause` | `unknown` | 否 |
+
+### ErrorCode 合同
+
+```ts
+export type ErrorCode = "CG_CONFIG_INCOMPLETE" | "CG_DUAL_AUTHORITY" | "CG_SCOPE_DENIED" | "CG_IDENTITY_AMBIGUOUS" | "CG_IDENTITY_INVALID" | "CG_NOT_FOUND" | "CG_VALIDATION_FAILED" | "CG_RELATION_CROSS_PROVIDER" | "CG_RELATION_CYCLE" | "CG_LOAD_FAILED" | "CG_NO_ACTIVE_VIEW" | "CG_REVISION_MISMATCH" | "CG_INDEX_STALE" | "CG_INPUT_INVALID" | "CG_RUNTIME_CONTEXT_REQUIRED" | "CG_RUNTIME_DISABLED" | "CG_RUNTIME_UNAVAILABLE" | "CG_RUNTIME_RESULT_MISMATCH" | "CG_ADAPTER_CONTRACT_INVALID" | "CG_KNOWLEDGE_NOT_ASSOCIATED" | "CG_KNOWLEDGE_TYPE_UNSUPPORTED" | "CG_READER_UNCONFIGURED" | "CG_READER_UNAVAILABLE" | "CG_RETRIEVER_UNCONFIGURED" | "CG_RETRIEVER_UNAVAILABLE" | "CG_SOURCE_UNREADABLE" | "CG_PATH_TRAVERSAL" | "CG_BUDGET_EXCEEDED" | "CG_TIMEOUT" | "CG_PARTIAL_ITEM";
+```
+
+### ErrorShape 合同
+
+```ts
+interface ErrorShape {
+  readonly code: ErrorCode;
+  readonly message: string;
+  readonly nextAction: NextAction;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `code` | `ErrorCode` | 是 |
+| `message` | `string` | 是 |
+| `nextAction` | `NextAction` | 是 |
+| `details` | `Readonly<Record<string, unknown>>` | 否 |
+
+### NextAction 合同
+
+```ts
+export type NextAction = "fix_input" | "narrow_scope" | "page_or_filter" | "configure_backend" | "repair_source" | "refresh" | "select_capabilities" | "use_retrieval" | "reduce_document";
+```

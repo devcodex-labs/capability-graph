@@ -1,0 +1,125 @@
+## 完整签名与字段
+
+以下由公开声明生成。接口继承字段已展开；`?` 表示可省略，**不表示可传 null**。类型不能表达的默认值、值域、预算与失败语义以本页正文为准。类仅列公开方法；绑定对象必须由 forProvider 获取。
+
+### QueryRuntimePage 合同
+
+```ts
+interface QueryRuntimePage {
+  readonly items: readonly RuntimeInstance[];
+  readonly observation: RuntimeObservation;
+  readonly meta: ResultMeta;
+  readonly nextCursor?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `items` | `readonly RuntimeInstance[]` | 是 |
+| `observation` | `RuntimeObservation` | 是 |
+| `meta` | `ResultMeta` | 是 |
+| `nextCursor` | `string` | 否 |
+
+### QueryRuntimeQuery 合同
+
+```ts
+interface QueryRuntimeQuery {
+  readonly project: string;
+  readonly environment: string;
+  readonly instanceOf?: CapabilityRef;
+  readonly instanceId?: string;
+  readonly requestProviderScope?: readonly string[];
+  readonly requiredRuntimeRevision?: string;
+  readonly requiredStaticRevision?: string;
+  readonly cursor?: string;
+  readonly limit?: number;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `project` | `string` | 是 |
+| `environment` | `string` | 是 |
+| `instanceOf` | `CapabilityRef` | 否 |
+| `instanceId` | `string` | 否 |
+| `requestProviderScope` | `readonly string[]` | 否 |
+| `requiredRuntimeRevision` | `string` | 否 |
+| `requiredStaticRevision` | `string` | 否 |
+| `cursor` | `string` | 否 |
+| `limit` | `number` | 否 |
+
+### RuntimeAssociation 合同
+
+```ts
+interface RuntimeAssociation {
+  readonly kind: string;
+  readonly targetInstanceId?: string;
+  readonly facts?: Readonly<Record<string, unknown>>;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `kind` | `string` | 是 |
+| `targetInstanceId` | `string` | 否 |
+| `facts` | `Readonly<Record<string, unknown>>` | 否 |
+
+### RuntimeCompatibility 合同
+
+```ts
+export type RuntimeCompatibility = "compatible" | "unknown" | "refresh_required";
+```
+
+### RuntimeInstance 合同
+
+```ts
+interface RuntimeInstance {
+  readonly instanceId: string;
+  readonly providerId: string;
+  readonly project: string;
+  readonly environment: string;
+  readonly instanceOf: CanonicalCapabilityId;
+  readonly facts: Readonly<Record<string, unknown>>;
+  readonly associations?: readonly RuntimeAssociation[];
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `instanceId` | `string` | 是 |
+| `providerId` | `string` | 是 |
+| `project` | `string` | 是 |
+| `environment` | `string` | 是 |
+| `instanceOf` | `CanonicalCapabilityId` | 是 |
+| `facts` | `Readonly<Record<string, unknown>>` | 是 |
+| `associations` | `readonly RuntimeAssociation[]` | 否 |
+
+### RuntimeObservation 合同
+
+```ts
+interface RuntimeObservation {
+  readonly source: string;
+  readonly observedAt: string;
+  readonly sourceIdentity?: string;
+  readonly runtimeRevision: string;
+  readonly observedAgainstStaticRevision: string;
+  readonly compatibility: RuntimeCompatibility;
+  readonly availability: "partial" | "available" | "empty";
+  readonly freshness: "current" | "stale";
+  readonly coverage?: string;
+  readonly freshnessLimit?: string;
+}
+```
+
+| 字段/方法 | 类型 | 必填 |
+|---|---|---|
+| `source` | `string` | 是 |
+| `observedAt` | `string` | 是 |
+| `sourceIdentity` | `string` | 否 |
+| `runtimeRevision` | `string` | 是 |
+| `observedAgainstStaticRevision` | `string` | 是 |
+| `compatibility` | `RuntimeCompatibility` | 是 |
+| `availability` | `"partial" \| "available" \| "empty"` | 是 |
+| `freshness` | `"current" \| "stale"` | 是 |
+| `coverage` | `string` | 否 |
+| `freshnessLimit` | `string` | 否 |

@@ -13,5 +13,7 @@ export function Layout(props: LayoutProps) {
 }
 
 export { SearchButton } from './SearchButton';
+export { SearchPanel } from './SearchPanel';
+export { Sidebar } from './Sidebar';
 
 export * from '@rspress/core/theme-original';

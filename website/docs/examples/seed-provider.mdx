@@ -104,6 +104,4 @@ node --test dist-test/test/real-runtime.test.js
 
 手动运行服务前，必须从实际部署的 Provider 取得 Static Revision，按[服务 README](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/README.md)传入项目、环境和构建参数。不要把请求端最新修订填成旧服务的部署修订。
 
-## 文档入门 Fixture
-
-最小页只有 acme.http 的 route，对照目录是 website/fixtures/minimal-provider；文件和脚本来自公开页面，不需下载 Fixture 才能运行。G1-G4 在[进阶教程](../guides/progressive-discovery)按任务添加。旧 website/fixtures/first-provider 保留关系、知识和 Specification 的高级回归，不能拿它给最小教程暗中补文件。源码贡献者在 website 执行 npm run check:examples，执行页面还原与旧合同两条独立路径。
+只需首次发现时，使用[最小 Provider](../getting-started/first-provider)，不必克隆 Seed；关系、知识和规范可在[进阶教程](../guides/progressive-discovery)按需添加。

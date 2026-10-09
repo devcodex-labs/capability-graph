@@ -109,4 +109,6 @@ export function createKnowledgeRetriever(
 
 零命中有两种可能：确实没有匹配，或索引根本没覆盖最新知识。Evidence 用来区分两者；不能只返回 `hits: []`。`access` 在 `retrieve()` settle 后失效，不得保存到后台任务继续读取。Adapter 管理网络/索引资源及取消，Core 不提供实际 RAG 后端。
 
-成功检索的 `knowledgeState` 为 `searched`，零命中时仍有有效 `indexStatus`；过期证据为 `CG_INDEX_STALE`，指定来源修订不可读为 `CG_REVISION_MISMATCH`。接入后用“有命中、真实零命中、旧映射、正文已更新、中文多字节偏移、尝试读取未选知识”分别验证，合同测试样本不代表生产检索质量。
+有最终 targets 且成功调用 Retriever 时，`knowledgeState` 为 `searched`，零命中也有有效 `indexStatus`。证据中的 `staticRevisionByProvider` 不匹配为 `CG_REVISION_MISMATCH`；mapping/config/content 身份、freshness 或证据结构无效为 `CG_INDEX_STALE`。非法返回页使整次查询失败，非法单项命中则被剔除并产生 warning/partial，详见[知识检索失败层级](../reference/runtime-adapter#knowledge-retrieval-failures)。展开后无 targets 的 empty_collection/filtered_empty 由 Core 直接返回，不调用 Retriever。
+
+接入后用“有命中、真实零命中、旧静态修订、旧映射、正文已更新、非法证据、中文多字节偏移、尝试读取未选知识”分别验证，合同测试样本不代表生产检索质量。

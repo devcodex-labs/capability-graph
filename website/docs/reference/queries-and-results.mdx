@@ -3,6 +3,8 @@ title: 查询接口
 description: Catalog、Detail、Neighbor、Selection 与文档发现的输入、分页和修订参考。
 ---
 
+import Contracts from '../../generated/snippets/contracts-queries-and-results.mdx';
+
 # 查询接口
 
 <span className="cg-status">可用</span>
@@ -36,3 +38,24 @@ Selection 不规划执行顺序，仅读取前补齐必要上下文。绑定对�
 ## 文档发现
 
 `DocumentPageQuery` 以修订、页大小和游标绑定一次分页。`KnowledgeMembersQuery` 需要能力身份和 Collection ID，`KnowledgeMembersPage` 返回成员的完整路由元数据；`SpecificationDocumentsPage` 只返回该 Provider 的规范文档元数据。默认 20 项、最大 100 项，须检查 `completeness` 和 `nextCursor`。
+
+## 调用、缺省与限制
+
+下面的请求/返回类型在本页完整展开；方法本身的绑定和未绑定签名见[Core 与生命周期](./capability-graph#完整签名与字段)。`query?` 缺省为 `{}`；省略 scope 使用宿主与集成交集，指定修订要求恰好一个有效 Provider（Selection 使用逐 Provider 映射）。
+
+| 调用 | 输入 → 输出 | 缺省/上限 | 失败及截断边界 |
+|---|---|---|---|
+| `listProviders(query?)` | ProviderListQuery → ProviderSummaryPage | 不读正文、不分页，省略修订用 current | 任一列出来源不可读整次失败 |
+| `getProvider(providerId, query?)` | providerId、requiredStaticRevision? → ProviderResult | 规范元数据首屏 20 项；继续用 listSpecificationDocuments | 未找到/范围拒绝/指定修订不可读，整次失败 |
+| `listCatalog(query?)` | CatalogQuery → CatalogPage | limit 默认/最大 200；页 24,576 字节，单项 2,048 字节 | 可按字节截断；无法前进为 CG_BUDGET_EXCEEDED；来源不可读整次失败 |
+| `getCapabilities(ids, query?)` | CapabilityRef[]、CapabilityDetailQuery → BatchResult&lt;CapabilityDetail&gt; | 每次最多 20 能力；neighborLimitPerKind 默认 50、可为 0；knowledgeLimit 默认 20、最大 100 | 条目失败保留原索引，详情/知识摘要可截断；指定修订不可读整次失败 |
+| `getNeighbors(ref, query?)` | CapabilityRef、NeighborQuery → NeighborPage | kinds 省略取八类；limitPerKind 默认 50、最大 100 | 各组独立游标，整页共享 24,576 字节；检查组与 meta 完整性 |
+| `listKnowledgeMembers(query)` | KnowledgeMembersQuery → KnowledgeMembersPage | limit 默认 20、最大 100 | 必须提供已存在 Collection；只发现路由，不读取成员正文 |
+| `listSpecificationDocuments(query)` | providerId + DocumentPageQuery → SpecificationDocumentsPage | limit 默认 20、最大 100；页 131,072、单项 16,384 字节 | 无规范可返回空页；检查 completeness/nextCursor |
+| `resolveSelection(query)` | ResolveSelectionQuery → SelectionResult | 非空 selected；32 原始项、128 节点、256 边 | 超限或任一依赖无效整次失败，无半闭包/分页 |
+
+限制来自默认预算，合法覆盖会改变实际值，见[完整预算](./result-meta#预算字段与默认值)。`limit` 必须是正的安全整数，超过有效最大值会收敛到最大值，而不是报错；`neighborLimitPerKind` 特别允许 0，最大值为有效 neighbors.maxPageSize。`capabilityIdPrefix` 只是字符串前缀过滤，不要求是完整 ID；parent 与当前范围必须匹配。
+
+`knowledgeCursors` 以 qualifiedId 为键，续取详情的顶层知识摘要；Collection 成员单独用 listKnowledgeMembers。所有游标保留原范围、过滤、页大小与修订，不可换过滤继续使用。Selection 的 requested 去重但保留首次出现顺序，resolved/added 与依赖边确定性排序，reasons 中 requiredBy 是本次闭包的直接原因。
+
+<Contracts />

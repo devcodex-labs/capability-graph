@@ -5,103 +5,803 @@
   "symbols": [
     {
       "name": "AuthoritySpec",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type AuthoritySpec = {\n    readonly kind: \"file\";\n    readonly rootDir: string;\n} | {\n    readonly kind: \"database\";\n    readonly adapter: DatabaseAuthorityAdapter;\n};"
     },
     {
       "name": "BatchItem",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type BatchItem<T> = {\n    readonly inputIndex: number;\n    readonly ok: true;\n    readonly value: T;\n} | {\n    readonly inputIndex: number;\n    readonly ok: false;\n    readonly error: ErrorShape;\n};"
     },
     {
       "name": "BatchResult",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "results",
+          "optional": false,
+          "type": "readonly BatchItem<T>[]"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface BatchResult<T> {\n  readonly results: readonly BatchItem<T>[];\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "BoundProviderGraph",
-      "kind": "class"
+      "kind": "class",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "getProvider",
+          "optional": false,
+          "type": "(query?: { requiredStaticRevision?: string; }) => Promise<ProviderResult>"
+        },
+        {
+          "name": "listSpecificationDocuments",
+          "optional": false,
+          "type": "(query?: DocumentPageQuery) => Promise<SpecificationDocumentsPage>"
+        },
+        {
+          "name": "listCatalog",
+          "optional": false,
+          "type": "(query?: Omit<CatalogQuery, \"requestProviderScope\">) => Promise<CatalogPage>"
+        },
+        {
+          "name": "getCapabilities",
+          "optional": false,
+          "type": "(ids: readonly string[], query?: CapabilityDetailQuery) => Promise<BatchResult<CapabilityDetail>>"
+        },
+        {
+          "name": "listKnowledgeMembers",
+          "optional": false,
+          "type": "(query: Omit<KnowledgeMembersQuery, \"capability\"> & { readonly capabilityId: string; }) => Promise<KnowledgeMembersPage>"
+        },
+        {
+          "name": "getNeighbors",
+          "optional": false,
+          "type": "(capabilityId: string, query?: NeighborQuery) => Promise<NeighborPage>"
+        },
+        {
+          "name": "resolveSelection",
+          "optional": false,
+          "type": "(query: { readonly selected: readonly string[]; readonly requiredStaticRevision?: string; }) => Promise<SelectionResult>"
+        },
+        {
+          "name": "readDocuments",
+          "optional": false,
+          "type": "(query: Omit<ReadDocumentsQuery, \"requestProviderScope\" | \"selected\"> & { readonly selected: readonly string[]; }) => Promise<DocumentReadBatch>"
+        },
+        {
+          "name": "readSpecification",
+          "optional": false,
+          "type": "(query?: Omit<ReadSpecificationQuery, \"providerId\">) => Promise<SpecificationReadBatch>"
+        },
+        {
+          "name": "retrieveCapabilities",
+          "optional": false,
+          "type": "(query: Omit<RetrieveCapabilitiesQuery, \"requestProviderScope\">) => Promise<RetrieveCapabilitiesPage>"
+        },
+        {
+          "name": "queryKnowledge",
+          "optional": false,
+          "type": "(query: Omit<QueryKnowledgeQuery, \"requestProviderScope\">) => Promise<QueryKnowledgePage>"
+        },
+        {
+          "name": "queryRuntime",
+          "optional": false,
+          "type": "(query: Omit<QueryRuntimeQuery, \"requestProviderScope\">) => Promise<QueryRuntimePage>"
+        }
+      ],
+      "signature": "class BoundProviderGraph {\n  getProvider(query?: { requiredStaticRevision?: string; }): Promise<ProviderResult>;\n  listSpecificationDocuments(query?: DocumentPageQuery): Promise<SpecificationDocumentsPage>;\n  listCatalog(query?: Omit<CatalogQuery, \"requestProviderScope\">): Promise<CatalogPage>;\n  getCapabilities(ids: readonly string[], query?: CapabilityDetailQuery): Promise<BatchResult<CapabilityDetail>>;\n  listKnowledgeMembers(query: Omit<KnowledgeMembersQuery, \"capability\"> & { readonly capabilityId: string; }): Promise<KnowledgeMembersPage>;\n  getNeighbors(capabilityId: string, query?: NeighborQuery): Promise<NeighborPage>;\n  resolveSelection(query: { readonly selected: readonly string[]; readonly requiredStaticRevision?: string; }): Promise<SelectionResult>;\n  readDocuments(query: Omit<ReadDocumentsQuery, \"requestProviderScope\" | \"selected\"> & { readonly selected: readonly string[]; }): Promise<DocumentReadBatch>;\n  readSpecification(query?: Omit<ReadSpecificationQuery, \"providerId\">): Promise<SpecificationReadBatch>;\n  retrieveCapabilities(query: Omit<RetrieveCapabilitiesQuery, \"requestProviderScope\">): Promise<RetrieveCapabilitiesPage>;\n  queryKnowledge(query: Omit<QueryKnowledgeQuery, \"requestProviderScope\">): Promise<QueryKnowledgePage>;\n  queryRuntime(query: Omit<QueryRuntimeQuery, \"requestProviderScope\">): Promise<QueryRuntimePage>;\n}"
     },
     {
       "name": "BudgetConfig",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "catalog",
+          "optional": false,
+          "type": "{ readonly maxBytes: number; readonly maxItems: number; readonly maxItemBytes: number; }"
+        },
+        {
+          "name": "neighbors",
+          "optional": false,
+          "type": "{ readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number; }"
+        },
+        {
+          "name": "detail",
+          "optional": false,
+          "type": "{ readonly maxCapabilities: number; readonly maxItemBytes: number; readonly maxBytes: number; readonly defaultKnowledgePageSize: number; readonly maxKnowledgePageSize: number; }"
+        },
+        {
+          "name": "specification",
+          "optional": false,
+          "type": "{ readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number; }"
+        },
+        {
+          "name": "selection",
+          "optional": false,
+          "type": "{ readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number; }"
+        },
+        {
+          "name": "read",
+          "optional": false,
+          "type": "{ readonly maxBytes: number; readonly maxDocumentsPerCall: number; }"
+        },
+        {
+          "name": "retrieveCapabilities",
+          "optional": false,
+          "type": "{ readonly maxCandidates: number; readonly maxCandidateBytes: number; }"
+        },
+        {
+          "name": "queryKnowledge",
+          "optional": false,
+          "type": "{ readonly maxHits: number; readonly maxSnippetBytes: number; readonly maxSelected: number; readonly maxFilterValuesPerDimension: number; readonly maxTargets: number; readonly maxTargetBytes: number; }"
+        },
+        {
+          "name": "runtime",
+          "optional": false,
+          "type": "{ readonly defaultPageSize: number; readonly maxPageSize: number; readonly timeoutMs: number; readonly maxFactsBytes: number; readonly maxAssociationBytes: number; }"
+        }
+      ],
+      "signature": "interface BudgetConfig {\n  readonly catalog: { readonly maxBytes: number; readonly maxItems: number; readonly maxItemBytes: number; };\n  readonly neighbors: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number; };\n  readonly detail: { readonly maxCapabilities: number; readonly maxItemBytes: number; readonly maxBytes: number; readonly defaultKnowledgePageSize: number; readonly maxKnowledgePageSize: number; };\n  readonly specification: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number; };\n  readonly selection: { readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number; };\n  readonly read: { readonly maxBytes: number; readonly maxDocumentsPerCall: number; };\n  readonly retrieveCapabilities: { readonly maxCandidates: number; readonly maxCandidateBytes: number; };\n  readonly queryKnowledge: { readonly maxHits: number; readonly maxSnippetBytes: number; readonly maxSelected: number; readonly maxFilterValuesPerDimension: number; readonly maxTargets: number; readonly maxTargetBytes: number; };\n  readonly runtime: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly timeoutMs: number; readonly maxFactsBytes: number; readonly maxAssociationBytes: number; };\n}"
     },
     {
       "name": "BudgetOverrides",
-      "kind": "type"
+      "kind": "type",
+      "fields": [
+        {
+          "name": "catalog",
+          "optional": true,
+          "type": "Partial<{ readonly maxBytes: number; readonly maxItems: number; readonly maxItemBytes: number; }>"
+        },
+        {
+          "name": "neighbors",
+          "optional": true,
+          "type": "Partial<{ readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number; }>"
+        },
+        {
+          "name": "detail",
+          "optional": true,
+          "type": "Partial<{ readonly maxCapabilities: number; readonly maxItemBytes: number; readonly maxBytes: number; readonly defaultKnowledgePageSize: number; readonly maxKnowledgePageSize: number; }>"
+        },
+        {
+          "name": "specification",
+          "optional": true,
+          "type": "Partial<{ readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number; }>"
+        },
+        {
+          "name": "selection",
+          "optional": true,
+          "type": "Partial<{ readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number; }>"
+        },
+        {
+          "name": "read",
+          "optional": true,
+          "type": "Partial<{ readonly maxBytes: number; readonly maxDocumentsPerCall: number; }>"
+        },
+        {
+          "name": "retrieveCapabilities",
+          "optional": true,
+          "type": "Partial<{ readonly maxCandidates: number; readonly maxCandidateBytes: number; }>"
+        },
+        {
+          "name": "queryKnowledge",
+          "optional": true,
+          "type": "Partial<{ readonly maxHits: number; readonly maxSnippetBytes: number; readonly maxSelected: number; readonly maxFilterValuesPerDimension: number; readonly maxTargets: number; readonly maxTargetBytes: number; }>"
+        },
+        {
+          "name": "runtime",
+          "optional": true,
+          "type": "Partial<{ readonly defaultPageSize: number; readonly maxPageSize: number; readonly timeoutMs: number; readonly maxFactsBytes: number; readonly maxAssociationBytes: number; }>"
+        }
+      ],
+      "signature": "export type BudgetOverrides = {\n    readonly [K in keyof BudgetConfig]?: Partial<BudgetConfig[K]>;\n};"
     },
     {
       "name": "CanonicalCapabilityId",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "capabilityId",
+          "optional": false,
+          "type": "string"
+        }
+      ],
+      "signature": "interface CanonicalCapabilityId {\n  readonly providerId: string;\n  readonly capabilityId: string;\n}"
     },
     {
       "name": "CapabilityCandidate",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "qualifiedId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "score",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "rank",
+          "optional": false,
+          "type": "number"
+        }
+      ],
+      "signature": "interface CapabilityCandidate {\n  readonly id: CanonicalCapabilityId;\n  readonly qualifiedId: string;\n  readonly score?: number;\n  readonly rank: number;\n}"
     },
     {
       "name": "CapabilityDetail",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "qualifiedId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "knowledge",
+          "optional": false,
+          "type": "{ readonly items: readonly KnowledgeSummary[]; readonly completeness: \"complete\" | \"truncated\"; readonly nextCursor?: string; }"
+        },
+        {
+          "name": "neighborSummaries",
+          "optional": false,
+          "type": "Readonly<Record<NeighborKind, NeighborSummaryGroup>>"
+        },
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "whenToUse",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "distinction",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "staticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "examples",
+          "optional": false,
+          "type": "readonly string[]"
+        }
+      ],
+      "signature": "interface CapabilityDetail {\n  readonly qualifiedId: string;\n  readonly knowledge: { readonly items: readonly KnowledgeSummary[]; readonly completeness: \"complete\" | \"truncated\"; readonly nextCursor?: string; };\n  readonly neighborSummaries: Readonly<Record<NeighborKind, NeighborSummaryGroup>>;\n  readonly id: CanonicalCapabilityId;\n  readonly name: string;\n  readonly description: string;\n  readonly whenToUse: string;\n  readonly distinction?: string;\n  readonly staticRevision: string;\n  readonly examples: readonly string[];\n}"
     },
     {
       "name": "CapabilityDetailQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "neighborLimitPerKind",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "knowledgeLimit",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "knowledgeCursors",
+          "optional": true,
+          "type": "Readonly<Record<string, string>>"
+        }
+      ],
+      "signature": "interface CapabilityDetailQuery {\n  readonly requiredStaticRevision?: string;\n  readonly neighborLimitPerKind?: number;\n  readonly knowledgeLimit?: number;\n  readonly knowledgeCursors?: Readonly<Record<string, string>>;\n}"
     },
     {
       "name": "CapabilityGraph",
-      "kind": "class"
+      "kind": "class",
+      "fields": [
+        {
+          "name": "reload",
+          "optional": false,
+          "type": "(options?: { providerId?: string; }) => Promise<ReloadResult>"
+        },
+        {
+          "name": "close",
+          "optional": false,
+          "type": "() => Promise<void>"
+        },
+        {
+          "name": "forProvider",
+          "optional": false,
+          "type": "(providerId: string) => BoundProviderGraph"
+        },
+        {
+          "name": "listProviders",
+          "optional": false,
+          "type": "(query?: ProviderListQuery) => Promise<{ items: ProviderSummary[]; meta: ResultMeta; }>"
+        },
+        {
+          "name": "getProvider",
+          "optional": false,
+          "type": "(providerId: string, query?: { requiredStaticRevision?: string; }) => Promise<ProviderResult>"
+        },
+        {
+          "name": "listSpecificationDocuments",
+          "optional": false,
+          "type": "(query: DocumentPageQuery & { readonly providerId: string; }) => Promise<SpecificationDocumentsPage>"
+        },
+        {
+          "name": "listCatalog",
+          "optional": false,
+          "type": "(query?: CatalogQuery) => Promise<CatalogPage>"
+        },
+        {
+          "name": "getCapabilities",
+          "optional": false,
+          "type": "(ids: readonly CapabilityRef[], query?: CapabilityDetailQuery) => Promise<BatchResult<CapabilityDetail>>"
+        },
+        {
+          "name": "listKnowledgeMembers",
+          "optional": false,
+          "type": "(query: KnowledgeMembersQuery) => Promise<KnowledgeMembersPage>"
+        },
+        {
+          "name": "getNeighbors",
+          "optional": false,
+          "type": "(ref: CapabilityRef, query?: NeighborQuery) => Promise<NeighborPage>"
+        },
+        {
+          "name": "resolveSelection",
+          "optional": false,
+          "type": "(query: ResolveSelectionQuery) => Promise<SelectionResult>"
+        },
+        {
+          "name": "readDocuments",
+          "optional": false,
+          "type": "(query: ReadDocumentsQuery) => Promise<DocumentReadBatch>"
+        },
+        {
+          "name": "readSpecification",
+          "optional": false,
+          "type": "(query: ReadSpecificationQuery) => Promise<SpecificationReadBatch>"
+        },
+        {
+          "name": "retrieveCapabilities",
+          "optional": false,
+          "type": "(query: RetrieveCapabilitiesQuery) => Promise<RetrieveCapabilitiesPage>"
+        },
+        {
+          "name": "queryKnowledge",
+          "optional": false,
+          "type": "(query: QueryKnowledgeQuery) => Promise<QueryKnowledgePage>"
+        },
+        {
+          "name": "queryRuntime",
+          "optional": false,
+          "type": "(query: QueryRuntimeQuery) => Promise<QueryRuntimePage>"
+        }
+      ],
+      "signature": "class CapabilityGraph {\n  static open(config: OpenConfig): Promise<CapabilityGraph>;\n  reload(options?: { providerId?: string; }): Promise<ReloadResult>;\n  close(): Promise<void>;\n  forProvider(providerId: string): BoundProviderGraph;\n  listProviders(query?: ProviderListQuery): Promise<{ items: ProviderSummary[]; meta: ResultMeta; }>;\n  getProvider(providerId: string, query?: { requiredStaticRevision?: string; }): Promise<ProviderResult>;\n  listSpecificationDocuments(query: DocumentPageQuery & { readonly providerId: string; }): Promise<SpecificationDocumentsPage>;\n  listCatalog(query?: CatalogQuery): Promise<CatalogPage>;\n  getCapabilities(ids: readonly CapabilityRef[], query?: CapabilityDetailQuery): Promise<BatchResult<CapabilityDetail>>;\n  listKnowledgeMembers(query: KnowledgeMembersQuery): Promise<KnowledgeMembersPage>;\n  getNeighbors(ref: CapabilityRef, query?: NeighborQuery): Promise<NeighborPage>;\n  resolveSelection(query: ResolveSelectionQuery): Promise<SelectionResult>;\n  readDocuments(query: ReadDocumentsQuery): Promise<DocumentReadBatch>;\n  readSpecification(query: ReadSpecificationQuery): Promise<SpecificationReadBatch>;\n  retrieveCapabilities(query: RetrieveCapabilitiesQuery): Promise<RetrieveCapabilitiesPage>;\n  queryKnowledge(query: QueryKnowledgeQuery): Promise<QueryKnowledgePage>;\n  queryRuntime(query: QueryRuntimeQuery): Promise<QueryRuntimePage>;\n}"
     },
     {
       "name": "CapabilityGraphError",
-      "kind": "class"
+      "kind": "class",
+      "fields": [
+        {
+          "name": "code",
+          "optional": false,
+          "type": "ErrorCode"
+        },
+        {
+          "name": "nextAction",
+          "optional": false,
+          "type": "NextAction"
+        },
+        {
+          "name": "details",
+          "optional": true,
+          "type": "Readonly<Record<string, unknown>>"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "stack",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "cause",
+          "optional": true,
+          "type": "unknown"
+        }
+      ],
+      "signature": "class CapabilityGraphError {\n  constructor(code: ErrorCode, init: {\n    nextAction: NextAction;\n    message?: string;\n    details?: Record<string, unknown>;\n});\n}"
     },
     {
       "name": "CapabilityRef",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type CapabilityRef = CanonicalCapabilityId | {\n    readonly capabilityId: string;\n};"
     },
     {
       "name": "CapabilityRetriever",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "retrieve",
+          "optional": false,
+          "type": "(input: { text: string; providerIds: readonly string[]; staticRevisionByProvider: Readonly<Record<string, StaticRevision>>; limit: number; }) => Promise<{ candidates: readonly { id: CanonicalCapabilityId; score?: number; sourceStaticRevision: StaticRevision; }[]; }>"
+        },
+        {
+          "name": "invalidate",
+          "optional": true,
+          "type": "(change: SourceChange) => Promise<void>"
+        }
+      ],
+      "signature": "interface CapabilityRetriever {\n  readonly id: string;\n  readonly retrieve: (input: { text: string; providerIds: readonly string[]; staticRevisionByProvider: Readonly<Record<string, StaticRevision>>; limit: number; }) => Promise<{ candidates: readonly { id: CanonicalCapabilityId; score?: number; sourceStaticRevision: StaticRevision; }[]; }>;\n  readonly invalidate?: (change: SourceChange) => Promise<void>;\n}"
     },
     {
       "name": "CatalogPage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly CatalogRecord[]"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface CatalogPage {\n  readonly items: readonly CatalogRecord[];\n  readonly meta: ResultMeta;\n  readonly nextCursor?: string;\n}"
     },
     {
       "name": "CatalogQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "capabilityIdPrefix",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "parent",
+          "optional": true,
+          "type": "CapabilityRef"
+        },
+        {
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface CatalogQuery {\n  readonly capabilityIdPrefix?: string;\n  readonly parent?: CapabilityRef;\n  readonly cursor?: string;\n  readonly limit?: number;\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "CatalogRecord",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "qualifiedId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "whenToUse",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "distinction",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "staticRevision",
+          "optional": false,
+          "type": "string"
+        }
+      ],
+      "signature": "interface CatalogRecord {\n  readonly qualifiedId: string;\n  readonly providerId: string;\n  readonly id: CanonicalCapabilityId;\n  readonly name: string;\n  readonly description: string;\n  readonly whenToUse: string;\n  readonly distinction?: string;\n  readonly staticRevision: string;\n}"
     },
     {
       "name": "CurrentCapabilityView",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "capabilities",
+          "optional": false,
+          "type": "readonly { readonly id: CanonicalCapabilityId; readonly staticRevision: StaticRevision; }[]"
+        },
+        {
+          "name": "runtime",
+          "optional": true,
+          "type": "{ readonly runtimeRevision: RuntimeRevision; readonly observedAgainstStaticRevision: StaticRevision; readonly queriedStaticRevision: StaticRevision; readonly compatibility: RuntimeCompatibility; }"
+        },
+        {
+          "name": "knowledge",
+          "optional": true,
+          "type": "readonly { readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly contentId: KnowledgeContentId; }[]"
+        }
+      ],
+      "signature": "interface CurrentCapabilityView {\n  readonly capabilities: readonly { readonly id: CanonicalCapabilityId; readonly staticRevision: StaticRevision; }[];\n  readonly runtime?: { readonly runtimeRevision: RuntimeRevision; readonly observedAgainstStaticRevision: StaticRevision; readonly queriedStaticRevision: StaticRevision; readonly compatibility: RuntimeCompatibility; };\n  readonly knowledge?: readonly { readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly contentId: KnowledgeContentId; }[];\n}"
     },
     {
       "name": "DatabaseAuthorityAdapter",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "openView",
+          "optional": false,
+          "type": "(providerId: string) => Promise<DatabaseReadView>"
+        }
+      ],
+      "signature": "interface DatabaseAuthorityAdapter {\n  readonly id: string;\n  readonly openView: (providerId: string) => Promise<DatabaseReadView>;\n}"
     },
     {
       "name": "DatabaseReadView",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "provider",
+          "optional": false,
+          "type": "UnvalidatedProviderRecord"
+        },
+        {
+          "name": "sourceRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "knowledgeRootDir",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "getCapability",
+          "optional": false,
+          "type": "(capabilityId: string) => Promise<UnvalidatedCapabilityRecord | undefined>"
+        },
+        {
+          "name": "scanCapabilities",
+          "optional": false,
+          "type": "(page: StorePageRequest) => Promise<StorePage<UnvalidatedCapabilityRecord>>"
+        },
+        {
+          "name": "neighbors",
+          "optional": false,
+          "type": "(capabilityId: string, kind: NeighborKind, page: StorePageRequest) => Promise<StorePage<CanonicalCapabilityId>>"
+        },
+        {
+          "name": "close",
+          "optional": false,
+          "type": "() => Promise<void>"
+        }
+      ],
+      "signature": "interface DatabaseReadView {\n  readonly provider: UnvalidatedProviderRecord;\n  readonly sourceRevision: string;\n  readonly knowledgeRootDir?: string;\n  readonly getCapability: (capabilityId: string) => Promise<UnvalidatedCapabilityRecord | undefined>;\n  readonly scanCapabilities: (page: StorePageRequest) => Promise<StorePage<UnvalidatedCapabilityRecord>>;\n  readonly neighbors: (capabilityId: string, kind: NeighborKind, page: StorePageRequest) => Promise<StorePage<CanonicalCapabilityId>>;\n  readonly close: () => Promise<void>;\n}"
     },
     {
       "name": "DiscoveryAdapter",
-      "kind": "type"
+      "kind": "type",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "retrieve",
+          "optional": false,
+          "type": "(input: { text: string; providerIds: readonly string[]; staticRevisionByProvider: Readonly<Record<string, StaticRevision>>; limit: number; }) => Promise<{ candidates: readonly { id: CanonicalCapabilityId; score?: number; sourceStaticRevision: StaticRevision; }[]; }>"
+        },
+        {
+          "name": "invalidate",
+          "optional": true,
+          "type": "(change: SourceChange) => Promise<void>"
+        }
+      ],
+      "signature": "export type DiscoveryAdapter = CapabilityRetriever;"
     },
     {
       "name": "DocumentPageQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface DocumentPageQuery {\n  readonly cursor?: string;\n  readonly limit?: number;\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "DocumentRead",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "knowledgeId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "contentId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "source",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "contentType",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "byteLength",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "role",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "locale",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "summary",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "canonicalUrl",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface DocumentRead {\n  readonly id: CanonicalCapabilityId;\n  readonly knowledgeId: string;\n  readonly contentId: string;\n  readonly source: string;\n  readonly contentType: string;\n  readonly text: string;\n  readonly byteLength: number;\n  readonly role: string;\n  readonly locale?: string;\n  readonly title?: string;\n  readonly summary?: string;\n  readonly canonicalUrl?: string;\n}"
     },
     {
       "name": "DocumentReadBatch",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type DocumentReadBatch = BatchResult<DocumentRead> & {\n    readonly knowledgeState: \"not_associated\" | \"filtered_empty\" | \"matched\";\n};"
     },
     {
       "name": "equalId",
-      "kind": "function"
+      "kind": "function",
+      "fields": [],
+      "signature": "export declare function equalId(a: CanonicalCapabilityId, b: CanonicalCapabilityId): boolean;"
     },
     {
       "name": "ErrorCode",
@@ -137,55 +837,246 @@
         "CG_BUDGET_EXCEEDED",
         "CG_TIMEOUT",
         "CG_PARTIAL_ITEM"
-      ]
+      ],
+      "fields": [],
+      "signature": "export type ErrorCode = \"CG_CONFIG_INCOMPLETE\" | \"CG_DUAL_AUTHORITY\" | \"CG_SCOPE_DENIED\" | \"CG_IDENTITY_AMBIGUOUS\" | \"CG_IDENTITY_INVALID\" | \"CG_NOT_FOUND\" | \"CG_VALIDATION_FAILED\" | \"CG_RELATION_CROSS_PROVIDER\" | \"CG_RELATION_CYCLE\" | \"CG_LOAD_FAILED\" | \"CG_NO_ACTIVE_VIEW\" | \"CG_REVISION_MISMATCH\" | \"CG_INDEX_STALE\" | \"CG_INPUT_INVALID\" | \"CG_RUNTIME_CONTEXT_REQUIRED\" | \"CG_RUNTIME_DISABLED\" | \"CG_RUNTIME_UNAVAILABLE\" | \"CG_RUNTIME_RESULT_MISMATCH\" | \"CG_ADAPTER_CONTRACT_INVALID\" | \"CG_KNOWLEDGE_NOT_ASSOCIATED\" | \"CG_KNOWLEDGE_TYPE_UNSUPPORTED\" | \"CG_READER_UNCONFIGURED\" | \"CG_READER_UNAVAILABLE\" | \"CG_RETRIEVER_UNCONFIGURED\" | \"CG_RETRIEVER_UNAVAILABLE\" | \"CG_SOURCE_UNREADABLE\" | \"CG_PATH_TRAVERSAL\" | \"CG_BUDGET_EXCEEDED\" | \"CG_TIMEOUT\" | \"CG_PARTIAL_ITEM\";"
     },
     {
       "name": "ErrorShape",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "code",
+          "optional": false,
+          "type": "ErrorCode"
+        },
+        {
+          "name": "message",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "nextAction",
+          "optional": false,
+          "type": "NextAction"
+        },
+        {
+          "name": "details",
+          "optional": true,
+          "type": "Readonly<Record<string, unknown>>"
+        }
+      ],
+      "signature": "interface ErrorShape {\n  readonly code: ErrorCode;\n  readonly message: string;\n  readonly nextAction: NextAction;\n  readonly details?: Readonly<Record<string, unknown>>;\n}"
     },
     {
       "name": "formatQualifiedId",
-      "kind": "function"
+      "kind": "function",
+      "fields": [],
+      "signature": "export declare function formatQualifiedId(id: CanonicalCapabilityId): QualifiedCapabilityId;"
     },
     {
       "name": "ID_PATTERN",
-      "kind": "value"
+      "kind": "value",
+      "fields": [],
+      "signature": "const ID_PATTERN: RegExp;"
     },
     {
       "name": "idKey",
-      "kind": "function"
+      "kind": "function",
+      "fields": [],
+      "signature": "export declare function idKey(id: CanonicalCapabilityId): string;"
     },
     {
       "name": "isId",
-      "kind": "function"
+      "kind": "function",
+      "fields": [],
+      "signature": "export declare function isId(value: string): boolean;"
     },
     {
       "name": "isKnowledgeId",
-      "kind": "function"
+      "kind": "function",
+      "fields": [],
+      "signature": "export declare function isKnowledgeId(value: string): boolean;"
     },
     {
       "name": "KNOWLEDGE_ID_PATTERN",
-      "kind": "value"
+      "kind": "value",
+      "fields": [],
+      "signature": "const KNOWLEDGE_ID_PATTERN: RegExp;"
     },
     {
       "name": "KnowledgeCollectionRef",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "kind",
+          "optional": false,
+          "type": "\"collection\""
+        },
+        {
+          "name": "knowledgeId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "summary",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "members",
+          "optional": false,
+          "type": "readonly KnowledgeDocumentRef[]"
+        }
+      ],
+      "signature": "interface KnowledgeCollectionRef {\n  readonly kind: \"collection\";\n  readonly knowledgeId: string;\n  readonly title?: string;\n  readonly summary?: string;\n  readonly members: readonly KnowledgeDocumentRef[];\n}"
     },
     {
       "name": "KnowledgeContentId",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type KnowledgeContentId = string;"
     },
     {
       "name": "KnowledgeDocumentRef",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "kind",
+          "optional": false,
+          "type": "\"document\""
+        },
+        {
+          "name": "knowledgeId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "locator",
+          "optional": false,
+          "type": "KnowledgeLocator"
+        },
+        {
+          "name": "role",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "locale",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "summary",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "canonicalUrl",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface KnowledgeDocumentRef {\n  readonly kind: \"document\";\n  readonly knowledgeId: string;\n  readonly locator: KnowledgeLocator;\n  readonly role: string;\n  readonly locale?: string;\n  readonly title?: string;\n  readonly summary?: string;\n  readonly canonicalUrl?: string;\n}"
     },
     {
       "name": "KnowledgeHit",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "knowledgeId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "contentId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "source",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "startOffset",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "endOffset",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "snippet",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "score",
+          "optional": true,
+          "type": "number"
+        }
+      ],
+      "signature": "interface KnowledgeHit {\n  readonly id: CanonicalCapabilityId;\n  readonly knowledgeId: string;\n  readonly contentId: string;\n  readonly source: string;\n  readonly startOffset: number;\n  readonly endOffset: number;\n  readonly snippet: string;\n  readonly score?: number;\n}"
     },
     {
       "name": "KnowledgeIndexEvidence",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "staticRevisionByProvider",
+          "optional": false,
+          "type": "Readonly<Record<string, string>>"
+        },
+        {
+          "name": "mappingRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "observedAt",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "freshness",
+          "optional": false,
+          "type": "\"current\" | \"unknown\" | \"stale\""
+        },
+        {
+          "name": "sourceConfigRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "indexedConfigRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "documents",
+          "optional": false,
+          "type": "readonly { readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly sourceContentId: KnowledgeContentId; readonly indexedContentId: KnowledgeContentId; }[]"
+        }
+      ],
+      "signature": "interface KnowledgeIndexEvidence {\n  readonly staticRevisionByProvider: Readonly<Record<string, string>>;\n  readonly mappingRevision: string;\n  readonly observedAt: string;\n  readonly freshness: \"current\" | \"unknown\" | \"stale\";\n  readonly sourceConfigRevision: string;\n  readonly indexedConfigRevision: string;\n  readonly documents: readonly { readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly sourceContentId: KnowledgeContentId; readonly indexedContentId: KnowledgeContentId; }[];\n}"
     },
     {
       "name": "KnowledgeKind",
@@ -193,55 +1084,320 @@
       "literals": [
         "document",
         "collection"
-      ]
+      ],
+      "fields": [],
+      "signature": "export type KnowledgeKind = \"document\" | \"collection\";"
     },
     {
       "name": "KnowledgeLocator",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type KnowledgeLocator = {\n    readonly type: \"relative-file\";\n    readonly path: string;\n} | {\n    readonly type: \"http\";\n    readonly url: string;\n};"
     },
     {
       "name": "KnowledgeMembersPage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "collectionId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly KnowledgeDocumentRef[]"
+        },
+        {
+          "name": "completeness",
+          "optional": false,
+          "type": "\"complete\" | \"truncated\""
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface KnowledgeMembersPage {\n  readonly id: CanonicalCapabilityId;\n  readonly collectionId: string;\n  readonly items: readonly KnowledgeDocumentRef[];\n  readonly completeness: \"complete\" | \"truncated\";\n  readonly nextCursor?: string;\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "KnowledgeMembersQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "capability",
+          "optional": false,
+          "type": "CapabilityRef"
+        },
+        {
+          "name": "collectionId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface KnowledgeMembersQuery {\n  readonly capability: CapabilityRef;\n  readonly collectionId: string;\n  readonly cursor?: string;\n  readonly limit?: number;\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "KnowledgeReadContext",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "staticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "sourceContext",
+          "optional": false,
+          "type": "ProviderSourceContext"
+        }
+      ],
+      "signature": "interface KnowledgeReadContext {\n  readonly providerId: string;\n  readonly staticRevision: string;\n  readonly sourceContext: ProviderSourceContext;\n}"
     },
     {
       "name": "KnowledgeReader",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "canRead",
+          "optional": false,
+          "type": "(ref: KnowledgeRef) => boolean"
+        },
+        {
+          "name": "read",
+          "optional": false,
+          "type": "(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, budget: { maxBytes: number; }) => Promise<{ bytes: Uint8Array; contentType: string; contentId: KnowledgeContentId; source: string; }>"
+        }
+      ],
+      "signature": "interface KnowledgeReader {\n  readonly id: string;\n  readonly canRead: (ref: KnowledgeRef) => boolean;\n  readonly read: (ref: KnowledgeDocumentRef, context: KnowledgeReadContext, budget: { maxBytes: number; }) => Promise<{ bytes: Uint8Array; contentType: string; contentId: KnowledgeContentId; source: string; }>;\n}"
     },
     {
       "name": "KnowledgeRef",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type KnowledgeRef = KnowledgeDocumentRef | KnowledgeCollectionRef;"
     },
     {
       "name": "KnowledgeResultHit",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "role",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "locale",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "summary",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "canonicalUrl",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "knowledgeId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "contentId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "source",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "startOffset",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "endOffset",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "snippet",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "score",
+          "optional": true,
+          "type": "number"
+        }
+      ],
+      "signature": "interface KnowledgeResultHit {\n  readonly role: string;\n  readonly locale?: string;\n  readonly title?: string;\n  readonly summary?: string;\n  readonly canonicalUrl?: string;\n  readonly id: CanonicalCapabilityId;\n  readonly knowledgeId: string;\n  readonly contentId: string;\n  readonly source: string;\n  readonly startOffset: number;\n  readonly endOffset: number;\n  readonly snippet: string;\n  readonly score?: number;\n}"
     },
     {
       "name": "KnowledgeRetrievalAccess",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "read",
+          "optional": false,
+          "type": "(target: Pick<KnowledgeSearchTarget, \"id\" | \"knowledgeId\">, budget: { maxBytes: number; }) => ReturnType<KnowledgeReader[\"read\"]>"
+        }
+      ],
+      "signature": "interface KnowledgeRetrievalAccess {\n  readonly read: (target: Pick<KnowledgeSearchTarget, \"id\" | \"knowledgeId\">, budget: { maxBytes: number; }) => ReturnType<KnowledgeReader[\"read\"]>;\n}"
     },
     {
       "name": "KnowledgeRetriever",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "retrieve",
+          "optional": false,
+          "type": "(input: { text: string; staticRevisionByProvider: Readonly<Record<string, StaticRevision>>; mappingRevision: string; targets: readonly KnowledgeSearchTarget[]; limit: number; }, access: KnowledgeRetrievalAccess) => Promise<{ hits: readonly KnowledgeHit[]; evidence: KnowledgeIndexEvidence; }>"
+        },
+        {
+          "name": "invalidate",
+          "optional": true,
+          "type": "(change: SourceChange) => Promise<void>"
+        }
+      ],
+      "signature": "interface KnowledgeRetriever {\n  readonly id: string;\n  readonly retrieve: (input: { text: string; staticRevisionByProvider: Readonly<Record<string, StaticRevision>>; mappingRevision: string; targets: readonly KnowledgeSearchTarget[]; limit: number; }, access: KnowledgeRetrievalAccess) => Promise<{ hits: readonly KnowledgeHit[]; evidence: KnowledgeIndexEvidence; }>;\n  readonly invalidate?: (change: SourceChange) => Promise<void>;\n}"
     },
     {
       "name": "KnowledgeSearchTarget",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "knowledgeId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "locator",
+          "optional": false,
+          "type": "KnowledgeLocator"
+        },
+        {
+          "name": "viaCollectionIds",
+          "optional": false,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "role",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "locale",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "summary",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "canonicalUrl",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface KnowledgeSearchTarget {\n  readonly id: CanonicalCapabilityId;\n  readonly knowledgeId: string;\n  readonly locator: KnowledgeLocator;\n  readonly viaCollectionIds: readonly string[];\n  readonly role: string;\n  readonly locale?: string;\n  readonly title?: string;\n  readonly summary?: string;\n  readonly canonicalUrl?: string;\n}"
     },
     {
       "name": "KnowledgeSummary",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type KnowledgeSummary = KnowledgeDocumentRef | {\n    readonly kind: \"collection\";\n    readonly knowledgeId: string;\n    readonly title?: string;\n    readonly summary?: string;\n    readonly memberCount: number;\n};"
     },
     {
       "name": "NeighborGroup",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly CatalogRecord[]"
+        },
+        {
+          "name": "completeness",
+          "optional": false,
+          "type": "\"complete\" | \"truncated\" | \"partial\""
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface NeighborGroup {\n  readonly items: readonly CatalogRecord[];\n  readonly completeness: \"complete\" | \"truncated\" | \"partial\";\n  readonly nextCursor?: string;\n}"
     },
     {
       "name": "NeighborKind",
@@ -255,19 +1411,75 @@
         "relatedBy",
         "requires",
         "requiredBy"
-      ]
+      ],
+      "fields": [],
+      "signature": "export type NeighborKind = \"parents\" | \"children\" | \"specializes\" | \"specializedBy\" | \"related\" | \"relatedBy\" | \"requires\" | \"requiredBy\";"
     },
     {
       "name": "NeighborPage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "groups",
+          "optional": false,
+          "type": "Readonly<Record<NeighborKind, NeighborGroup>>"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface NeighborPage {\n  readonly id: CanonicalCapabilityId;\n  readonly groups: Readonly<Record<NeighborKind, NeighborGroup>>;\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "NeighborQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "kinds",
+          "optional": true,
+          "type": "readonly NeighborKind[]"
+        },
+        {
+          "name": "limitPerKind",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "cursors",
+          "optional": true,
+          "type": "Partial<Record<NeighborKind, string>>"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface NeighborQuery {\n  readonly kinds?: readonly NeighborKind[];\n  readonly limitPerKind?: number;\n  readonly cursors?: Partial<Record<NeighborKind, string>>;\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "NeighborSummaryGroup",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly { readonly id: CanonicalCapabilityId; readonly name: string; }[]"
+        },
+        {
+          "name": "completeness",
+          "optional": false,
+          "type": "\"complete\" | \"truncated\""
+        }
+      ],
+      "signature": "interface NeighborSummaryGroup {\n  readonly items: readonly { readonly id: CanonicalCapabilityId; readonly name: string; }[];\n  readonly completeness: \"complete\" | \"truncated\";\n}"
     },
     {
       "name": "NextAction",
@@ -282,99 +1494,647 @@
         "select_capabilities",
         "use_retrieval",
         "reduce_document"
-      ]
+      ],
+      "fields": [],
+      "signature": "export type NextAction = \"fix_input\" | \"narrow_scope\" | \"page_or_filter\" | \"configure_backend\" | \"repair_source\" | \"refresh\" | \"select_capabilities\" | \"use_retrieval\" | \"reduce_document\";"
     },
     {
       "name": "OpenConfig",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "runtimeAdapters",
+          "optional": true,
+          "type": "readonly RuntimeAdapter[]"
+        },
+        {
+          "name": "readers",
+          "optional": true,
+          "type": "readonly KnowledgeReader[]"
+        },
+        {
+          "name": "knowledgeRetriever",
+          "optional": true,
+          "type": "KnowledgeRetriever"
+        },
+        {
+          "name": "capabilityRetriever",
+          "optional": true,
+          "type": "CapabilityRetriever"
+        },
+        {
+          "name": "hostAllowedProviders",
+          "optional": false,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "integrationEnabledProviders",
+          "optional": false,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "providers",
+          "optional": false,
+          "type": "readonly ProviderLoadSpec[]"
+        },
+        {
+          "name": "budgets",
+          "optional": true,
+          "type": "BudgetOverrides"
+        }
+      ],
+      "signature": "interface OpenConfig {\n  readonly runtimeAdapters?: readonly RuntimeAdapter[];\n  readonly readers?: readonly KnowledgeReader[];\n  readonly knowledgeRetriever?: KnowledgeRetriever;\n  readonly capabilityRetriever?: CapabilityRetriever;\n  readonly hostAllowedProviders: readonly string[];\n  readonly integrationEnabledProviders: readonly string[];\n  readonly providers: readonly ProviderLoadSpec[];\n  readonly budgets?: BudgetOverrides;\n}"
     },
     {
       "name": "parseQualifiedId",
-      "kind": "function"
+      "kind": "function",
+      "fields": [],
+      "signature": "export declare function parseQualifiedId(value: string): CanonicalCapabilityId;"
     },
     {
       "name": "ProviderListQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface ProviderListQuery {\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "ProviderLoadSpec",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "authority",
+          "optional": false,
+          "type": "AuthoritySpec"
+        }
+      ],
+      "signature": "interface ProviderLoadSpec {\n  readonly providerId: string;\n  readonly authority: AuthoritySpec;\n}"
     },
     {
       "name": "ProviderResult",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "specificationDocuments",
+          "optional": true,
+          "type": "{ readonly items: readonly KnowledgeDocumentRef[]; readonly completeness: \"complete\" | \"truncated\"; readonly nextCursor?: string; }"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        },
+        {
+          "name": "specification",
+          "optional": true,
+          "type": "Omit<SpecificationMetadata, \"documents\"> & { readonly documentCount: number; }"
+        },
+        {
+          "name": "staticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "authorityKind",
+          "optional": false,
+          "type": "\"file\" | \"database\""
+        }
+      ],
+      "signature": "interface ProviderResult {\n  readonly specificationDocuments?: { readonly items: readonly KnowledgeDocumentRef[]; readonly completeness: \"complete\" | \"truncated\"; readonly nextCursor?: string; };\n  readonly meta: ResultMeta;\n  readonly specification?: Omit<SpecificationMetadata, \"documents\"> & { readonly documentCount: number; };\n  readonly staticRevision: string;\n  readonly providerId: string;\n  readonly name: string;\n  readonly version: string;\n  readonly authorityKind: \"file\" | \"database\";\n}"
     },
     {
       "name": "ProviderSummary",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "specification",
+          "optional": true,
+          "type": "Omit<SpecificationMetadata, \"documents\"> & { readonly documentCount: number; }"
+        },
+        {
+          "name": "staticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "authorityKind",
+          "optional": false,
+          "type": "\"file\" | \"database\""
+        }
+      ],
+      "signature": "interface ProviderSummary {\n  readonly specification?: Omit<SpecificationMetadata, \"documents\"> & { readonly documentCount: number; };\n  readonly staticRevision: string;\n  readonly providerId: string;\n  readonly name: string;\n  readonly version: string;\n  readonly authorityKind: \"file\" | \"database\";\n}"
     },
     {
       "name": "ProviderSummaryPage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly ProviderSummary[]"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface ProviderSummaryPage {\n  readonly items: readonly ProviderSummary[];\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "QUALIFIED_SEPARATOR",
-      "kind": "value"
+      "kind": "value",
+      "fields": [],
+      "signature": "const QUALIFIED_SEPARATOR: \"::\";"
     },
     {
       "name": "QualifiedCapabilityId",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type QualifiedCapabilityId = string;"
     },
     {
       "name": "QueryKnowledgePage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly KnowledgeResultHit[]"
+        },
+        {
+          "name": "knowledgeState",
+          "optional": false,
+          "type": "\"searched\" | \"empty_collection\" | \"filtered_empty\""
+        },
+        {
+          "name": "indexStatus",
+          "optional": true,
+          "type": "{ readonly mappingRevision: string; readonly observedAt: string; readonly freshness: \"current\"; readonly validatedDocuments: number; }"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface QueryKnowledgePage {\n  readonly items: readonly KnowledgeResultHit[];\n  readonly knowledgeState: \"searched\" | \"empty_collection\" | \"filtered_empty\";\n  readonly indexStatus?: { readonly mappingRevision: string; readonly observedAt: string; readonly freshness: \"current\"; readonly validatedDocuments: number; };\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "QueryKnowledgeQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "selected",
+          "optional": false,
+          "type": "readonly CapabilityRef[]"
+        },
+        {
+          "name": "knowledgeIds",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "roles",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "locales",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "text",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface QueryKnowledgeQuery {\n  readonly selected: readonly CapabilityRef[];\n  readonly knowledgeIds?: readonly string[];\n  readonly roles?: readonly string[];\n  readonly locales?: readonly string[];\n  readonly text: string;\n  readonly limit?: number;\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "QueryRuntimePage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly RuntimeInstance[]"
+        },
+        {
+          "name": "observation",
+          "optional": false,
+          "type": "RuntimeObservation"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface QueryRuntimePage {\n  readonly items: readonly RuntimeInstance[];\n  readonly observation: RuntimeObservation;\n  readonly meta: ResultMeta;\n  readonly nextCursor?: string;\n}"
     },
     {
       "name": "QueryRuntimeQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "project",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "environment",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "instanceOf",
+          "optional": true,
+          "type": "CapabilityRef"
+        },
+        {
+          "name": "instanceId",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredRuntimeRevision",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "optional": true,
+          "type": "number"
+        }
+      ],
+      "signature": "interface QueryRuntimeQuery {\n  readonly project: string;\n  readonly environment: string;\n  readonly instanceOf?: CapabilityRef;\n  readonly instanceId?: string;\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredRuntimeRevision?: string;\n  readonly requiredStaticRevision?: string;\n  readonly cursor?: string;\n  readonly limit?: number;\n}"
     },
     {
       "name": "ReadDocumentsQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "selected",
+          "optional": false,
+          "type": "readonly CapabilityRef[]"
+        },
+        {
+          "name": "knowledgeIds",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "roles",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "locales",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface ReadDocumentsQuery {\n  readonly selected: readonly CapabilityRef[];\n  readonly knowledgeIds?: readonly string[];\n  readonly roles?: readonly string[];\n  readonly locales?: readonly string[];\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "ReadSpecificationQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "knowledgeIds",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "locales",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface ReadSpecificationQuery {\n  readonly providerId: string;\n  readonly knowledgeIds?: readonly string[];\n  readonly locales?: readonly string[];\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "ReloadResult",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "ok",
+          "optional": false,
+          "type": "boolean"
+        },
+        {
+          "name": "providers",
+          "optional": false,
+          "type": "readonly { readonly providerId: string; readonly staticRevision?: StaticRevision; readonly servedFrom: \"current\" | \"previous\" | \"none\"; readonly refreshFailed?: boolean; readonly error?: ErrorShape; }[]"
+        }
+      ],
+      "signature": "interface ReloadResult {\n  readonly ok: boolean;\n  readonly providers: readonly { readonly providerId: string; readonly staticRevision?: StaticRevision; readonly servedFrom: \"current\" | \"previous\" | \"none\"; readonly refreshFailed?: boolean; readonly error?: ErrorShape; }[];\n}"
     },
     {
       "name": "ResolveSelectionQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "selected",
+          "optional": false,
+          "type": "readonly CanonicalCapabilityId[]"
+        },
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevisionByProvider",
+          "optional": true,
+          "type": "Readonly<Record<string, string>>"
+        }
+      ],
+      "signature": "interface ResolveSelectionQuery {\n  readonly selected: readonly CanonicalCapabilityId[];\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredStaticRevisionByProvider?: Readonly<Record<string, string>>;\n}"
     },
     {
       "name": "ResultMeta",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "completeness",
+          "optional": false,
+          "type": "\"complete\" | \"truncated\" | \"partial\""
+        },
+        {
+          "name": "compositeStaticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "staticRevision",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "staticRevisionByProvider",
+          "optional": true,
+          "type": "Readonly<Record<string, string>>"
+        },
+        {
+          "name": "servedFrom",
+          "optional": false,
+          "type": "\"current\" | \"previous\" | \"mixed\""
+        },
+        {
+          "name": "servedFromByProvider",
+          "optional": true,
+          "type": "Readonly<Record<string, \"current\" | \"previous\">>"
+        },
+        {
+          "name": "refreshFailed",
+          "optional": true,
+          "type": "boolean"
+        },
+        {
+          "name": "scope",
+          "optional": false,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "filter",
+          "optional": true,
+          "type": "Readonly<Record<string, unknown>>"
+        },
+        {
+          "name": "view",
+          "optional": true,
+          "type": "CurrentCapabilityView"
+        },
+        {
+          "name": "warnings",
+          "optional": false,
+          "type": "readonly { readonly code: string; readonly message: string; readonly details?: Readonly<Record<string, unknown>>; }[]"
+        },
+        {
+          "name": "budgets",
+          "optional": true,
+          "type": "Readonly<Record<string, number>>"
+        }
+      ],
+      "signature": "interface ResultMeta {\n  readonly completeness: \"complete\" | \"truncated\" | \"partial\";\n  readonly compositeStaticRevision: string;\n  readonly staticRevision?: string;\n  readonly staticRevisionByProvider?: Readonly<Record<string, string>>;\n  readonly servedFrom: \"current\" | \"previous\" | \"mixed\";\n  readonly servedFromByProvider?: Readonly<Record<string, \"current\" | \"previous\">>;\n  readonly refreshFailed?: boolean;\n  readonly scope: readonly string[];\n  readonly filter?: Readonly<Record<string, unknown>>;\n  readonly view?: CurrentCapabilityView;\n  readonly warnings: readonly { readonly code: string; readonly message: string; readonly details?: Readonly<Record<string, unknown>>; }[];\n  readonly budgets?: Readonly<Record<string, number>>;\n}"
     },
     {
       "name": "RetrieveCapabilitiesPage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly CapabilityCandidate[]"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface RetrieveCapabilitiesPage {\n  readonly items: readonly CapabilityCandidate[];\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "RetrieveCapabilitiesQuery",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "text",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "optional": true,
+          "type": "number"
+        },
+        {
+          "name": "requestProviderScope",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "requiredStaticRevision",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface RetrieveCapabilitiesQuery {\n  readonly text: string;\n  readonly limit?: number;\n  readonly requestProviderScope?: readonly string[];\n  readonly requiredStaticRevision?: string;\n}"
     },
     {
       "name": "RuntimeAdapter",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "id",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "query",
+          "optional": false,
+          "type": "(input: { project: string; environment: string; instanceOf?: CanonicalCapabilityId; instanceId?: string; currentStaticRevision: string; limit: number; cursor?: string; }) => Promise<RuntimeAdapterResult>"
+        },
+        {
+          "name": "invalidate",
+          "optional": true,
+          "type": "(change: SourceChange) => Promise<void>"
+        }
+      ],
+      "signature": "interface RuntimeAdapter {\n  readonly id: string;\n  readonly providerId: string;\n  readonly query: (input: { project: string; environment: string; instanceOf?: CanonicalCapabilityId; instanceId?: string; currentStaticRevision: string; limit: number; cursor?: string; }) => Promise<RuntimeAdapterResult>;\n  readonly invalidate?: (change: SourceChange) => Promise<void>;\n}"
     },
     {
       "name": "RuntimeAdapterResult",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "instances",
+          "optional": false,
+          "type": "readonly RuntimeInstance[]"
+        },
+        {
+          "name": "observation",
+          "optional": false,
+          "type": "RuntimeObservation"
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface RuntimeAdapterResult {\n  readonly instances: readonly RuntimeInstance[];\n  readonly observation: RuntimeObservation;\n  readonly nextCursor?: string;\n}"
     },
     {
       "name": "RuntimeAssociation",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "kind",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "targetInstanceId",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "facts",
+          "optional": true,
+          "type": "Readonly<Record<string, unknown>>"
+        }
+      ],
+      "signature": "interface RuntimeAssociation {\n  readonly kind: string;\n  readonly targetInstanceId?: string;\n  readonly facts?: Readonly<Record<string, unknown>>;\n}"
     },
     {
       "name": "RuntimeCompatibility",
@@ -383,67 +2143,395 @@
         "compatible",
         "unknown",
         "refresh_required"
-      ]
+      ],
+      "fields": [],
+      "signature": "export type RuntimeCompatibility = \"compatible\" | \"unknown\" | \"refresh_required\";"
     },
     {
       "name": "RuntimeInstance",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "instanceId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "project",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "environment",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "instanceOf",
+          "optional": false,
+          "type": "CanonicalCapabilityId"
+        },
+        {
+          "name": "facts",
+          "optional": false,
+          "type": "Readonly<Record<string, unknown>>"
+        },
+        {
+          "name": "associations",
+          "optional": true,
+          "type": "readonly RuntimeAssociation[]"
+        }
+      ],
+      "signature": "interface RuntimeInstance {\n  readonly instanceId: string;\n  readonly providerId: string;\n  readonly project: string;\n  readonly environment: string;\n  readonly instanceOf: CanonicalCapabilityId;\n  readonly facts: Readonly<Record<string, unknown>>;\n  readonly associations?: readonly RuntimeAssociation[];\n}"
     },
     {
       "name": "RuntimeObservation",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "source",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "observedAt",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "sourceIdentity",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "runtimeRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "observedAgainstStaticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "compatibility",
+          "optional": false,
+          "type": "RuntimeCompatibility"
+        },
+        {
+          "name": "availability",
+          "optional": false,
+          "type": "\"partial\" | \"available\" | \"empty\""
+        },
+        {
+          "name": "freshness",
+          "optional": false,
+          "type": "\"current\" | \"stale\""
+        },
+        {
+          "name": "coverage",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "freshnessLimit",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface RuntimeObservation {\n  readonly source: string;\n  readonly observedAt: string;\n  readonly sourceIdentity?: string;\n  readonly runtimeRevision: string;\n  readonly observedAgainstStaticRevision: string;\n  readonly compatibility: RuntimeCompatibility;\n  readonly availability: \"partial\" | \"available\" | \"empty\";\n  readonly freshness: \"current\" | \"stale\";\n  readonly coverage?: string;\n  readonly freshnessLimit?: string;\n}"
     },
     {
       "name": "RuntimeRevision",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type RuntimeRevision = string;"
     },
     {
       "name": "SelectionReason",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "requested",
+          "optional": false,
+          "type": "boolean"
+        },
+        {
+          "name": "requiredBy",
+          "optional": false,
+          "type": "readonly CanonicalCapabilityId[]"
+        }
+      ],
+      "signature": "interface SelectionReason {\n  readonly requested: boolean;\n  readonly requiredBy: readonly CanonicalCapabilityId[];\n}"
     },
     {
       "name": "SelectionResult",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "requested",
+          "optional": false,
+          "type": "readonly CanonicalCapabilityId[]"
+        },
+        {
+          "name": "resolved",
+          "optional": false,
+          "type": "readonly CanonicalCapabilityId[]"
+        },
+        {
+          "name": "added",
+          "optional": false,
+          "type": "readonly CanonicalCapabilityId[]"
+        },
+        {
+          "name": "requiresEdges",
+          "optional": false,
+          "type": "readonly { readonly from: CanonicalCapabilityId; readonly to: CanonicalCapabilityId; }[]"
+        },
+        {
+          "name": "reasons",
+          "optional": false,
+          "type": "readonly { readonly id: CanonicalCapabilityId; readonly reason: SelectionReason; }[]"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface SelectionResult {\n  readonly requested: readonly CanonicalCapabilityId[];\n  readonly resolved: readonly CanonicalCapabilityId[];\n  readonly added: readonly CanonicalCapabilityId[];\n  readonly requiresEdges: readonly { readonly from: CanonicalCapabilityId; readonly to: CanonicalCapabilityId; }[];\n  readonly reasons: readonly { readonly id: CanonicalCapabilityId; readonly reason: SelectionReason; }[];\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "SourceChange",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "staticRevision",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "reason",
+          "optional": false,
+          "type": "\"runtime\" | \"metadata\" | \"relations\" | \"knowledge_body\" | \"knowledge_mapping\" | \"configuration\" | \"identity_replaced\""
+        }
+      ],
+      "signature": "interface SourceChange {\n  readonly providerId: string;\n  readonly staticRevision: string;\n  readonly reason: \"runtime\" | \"metadata\" | \"relations\" | \"knowledge_body\" | \"knowledge_mapping\" | \"configuration\" | \"identity_replaced\";\n}"
     },
     {
       "name": "SpecificationDocumentRead",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type SpecificationDocumentRead = Omit<DocumentRead, \"id\"> & {\n    readonly providerId: string;\n};"
     },
     {
       "name": "SpecificationDocumentsPage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly KnowledgeDocumentRef[]"
+        },
+        {
+          "name": "completeness",
+          "optional": false,
+          "type": "\"complete\" | \"truncated\""
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "meta",
+          "optional": false,
+          "type": "ResultMeta"
+        }
+      ],
+      "signature": "interface SpecificationDocumentsPage {\n  readonly providerId: string;\n  readonly items: readonly KnowledgeDocumentRef[];\n  readonly completeness: \"complete\" | \"truncated\";\n  readonly nextCursor?: string;\n  readonly meta: ResultMeta;\n}"
     },
     {
       "name": "SpecificationMetadata",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "specificationId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "appliesTo",
+          "optional": true,
+          "type": "{ readonly software?: string; readonly versionRange?: string; readonly conditions?: string; }"
+        },
+        {
+          "name": "documents",
+          "optional": false,
+          "type": "readonly KnowledgeDocumentRef[]"
+        }
+      ],
+      "signature": "interface SpecificationMetadata {\n  readonly specificationId: string;\n  readonly version: string;\n  readonly appliesTo?: { readonly software?: string; readonly versionRange?: string; readonly conditions?: string; };\n  readonly documents: readonly KnowledgeDocumentRef[];\n}"
     },
     {
       "name": "SpecificationReadBatch",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type SpecificationReadBatch = BatchResult<SpecificationDocumentRead> & {\n    readonly knowledgeState: \"not_associated\" | \"filtered_empty\" | \"matched\";\n};"
     },
     {
       "name": "StaticRevision",
-      "kind": "type"
+      "kind": "type",
+      "fields": [],
+      "signature": "export type StaticRevision = string;"
     },
     {
       "name": "StorePage",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "items",
+          "optional": false,
+          "type": "readonly T[]"
+        },
+        {
+          "name": "nextCursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface StorePage<T> {\n  readonly items: readonly T[];\n  readonly nextCursor?: string;\n}"
     },
     {
       "name": "StorePageRequest",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "limit",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "maxBytes",
+          "optional": false,
+          "type": "number"
+        },
+        {
+          "name": "cursor",
+          "optional": true,
+          "type": "string"
+        }
+      ],
+      "signature": "interface StorePageRequest {\n  readonly limit: number;\n  readonly maxBytes: number;\n  readonly cursor?: string;\n}"
     },
     {
       "name": "UnvalidatedCapabilityRecord",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "capabilityId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "whenToUse",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "distinction",
+          "optional": true,
+          "type": "string"
+        },
+        {
+          "name": "examples",
+          "optional": true,
+          "type": "readonly string[]"
+        },
+        {
+          "name": "parents",
+          "optional": true,
+          "type": "readonly unknown[]"
+        },
+        {
+          "name": "specializes",
+          "optional": true,
+          "type": "readonly unknown[]"
+        },
+        {
+          "name": "related",
+          "optional": true,
+          "type": "readonly unknown[]"
+        },
+        {
+          "name": "requires",
+          "optional": true,
+          "type": "readonly unknown[]"
+        },
+        {
+          "name": "knowledge",
+          "optional": true,
+          "type": "readonly unknown[]"
+        }
+      ],
+      "signature": "interface UnvalidatedCapabilityRecord {\n  readonly capabilityId: string;\n  readonly name: string;\n  readonly description: string;\n  readonly whenToUse: string;\n  readonly distinction?: string;\n  readonly examples?: readonly string[];\n  readonly parents?: readonly unknown[];\n  readonly specializes?: readonly unknown[];\n  readonly related?: readonly unknown[];\n  readonly requires?: readonly unknown[];\n  readonly knowledge?: readonly unknown[];\n}"
     },
     {
       "name": "UnvalidatedProviderRecord",
-      "kind": "interface"
+      "kind": "interface",
+      "fields": [
+        {
+          "name": "providerId",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "optional": false,
+          "type": "string"
+        },
+        {
+          "name": "specification",
+          "optional": true,
+          "type": "{ readonly specificationId: string; readonly version: string; readonly appliesTo?: { readonly software?: string; readonly versionRange?: string; readonly conditions?: string; }; readonly documents: readonly KnowledgeDocumentRef[]; }"
+        }
+      ],
+      "signature": "interface UnvalidatedProviderRecord {\n  readonly providerId: string;\n  readonly name: string;\n  readonly version: string;\n  readonly specification?: { readonly specificationId: string; readonly version: string; readonly appliesTo?: { readonly software?: string; readonly versionRange?: string; readonly conditions?: string; }; readonly documents: readonly KnowledgeDocumentRef[]; };\n}"
     }
   ]
 }

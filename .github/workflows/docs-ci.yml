@@ -11,6 +11,7 @@ on:
       - "package-lock.json"
       - "README.md"
       - ".github/workflows/docs-ci.yml"
+      - ".github/workflows/docs-deploy.yml"
       - ".github/workflows/release.yml"
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - "package-lock.json"
       - "README.md"
       - ".github/workflows/docs-ci.yml"
+      - ".github/workflows/docs-deploy.yml"
       - ".github/workflows/release.yml"
   workflow_dispatch:
 
@@ -49,6 +51,10 @@ jobs:
         working-directory: website
       - run: npm run check:content
         working-directory: website
+      - run: npm run check:types
+        working-directory: website
+      - run: npm run check:deployment
+        working-directory: website
       - run: npm run check:reference
         working-directory: website
       - run: npm run check:examples
@@ -59,7 +65,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["20.19.0", "22.12.0"]
+        node: ["20.19.0", "22.12.0", "24.19.0"]
     steps:
       - uses: actions/checkout@v7
         with:

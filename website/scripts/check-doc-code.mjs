@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { CapabilityGraph } from '../../dist/index.js';
 import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
 import { verifyTutorialSuite } from './lib/tutorial.mjs';
+import { verifyLifecycleExample } from './lib/lifecycle.mjs';
 
 const docsRoot = path.join(websiteRoot, 'docs');
 const readPage = (name) => readFile(path.join(docsRoot, `${name}.mdx`), 'utf8');
@@ -30,13 +31,14 @@ try {
     cwd: scratch, encoding: 'utf8', timeout: 30_000
   }).trim(), 'function');
 
+  await verifyLifecycleExample(scratch);
+
   const bound = "import type { BoundProviderGraph } from '@devcodex/capability-graph';\ndeclare const provider: BoundProviderGraph;\n";
   const pages = new Map([
     ['getting-started/provider-owned-api', ''],
     ['guides/design-relations', bound],
     ['guides/add-local-knowledge', bound],
     ['guides/errors-and-partial-results', bound],
-    ['guides/lifecycle-and-reload', ''],
     ['guides/multiple-providers', ''],
     ['guides/use-runtime', "import { CapabilityGraph, type RuntimeAdapter } from '@devcodex/capability-graph';\ndeclare const runtimeAdapter: RuntimeAdapter;\n"],
     ['integrations/node-api', '']
@@ -103,7 +105,7 @@ try {
   } finally {
     await remote.close();
   }
-  console.log(`document code check passed: ${tutorialChecks.checkpoints.join('/')}, ${tutorialChecks.g4Cases.join('/')}, ${sources.length} typed examples, legacy API/Reader contracts`);
+  console.log(`document code check passed: ${tutorialChecks.checkpoints.join('/')}, ${tutorialChecks.g4Cases.join('/')}, ${sources.length} typed examples, lifecycle revision/recovery, legacy API/Reader contracts`);
 } finally {
   // Only remove the exact temporary directory allocated above.
   assert.equal(path.dirname(scratch), repositoryRoot);

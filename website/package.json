@@ -16,18 +16,22 @@
     "pregenerate": "npm --prefix .. run build",
     "generate": "node scripts/generate.mjs",
     "check:content": "node scripts/check-content.mjs",
-    "check:reference": "node scripts/check-reference-coverage.mjs",
+    "check:types": "tsc --noEmit",
+    "check:deployment": "node scripts/check-deployment.test.mjs",
+    "check:reference": "node scripts/check-reference-coverage.mjs && node scripts/check-contract-negatives.mjs",
     "check:examples": "node scripts/check-examples.mjs",
     "check:release-order": "node scripts/check-release-order.test.mjs",
     "check:package": "node scripts/check-package-boundary.mjs",
     "check:build": "node scripts/check-build-output.mjs",
     "test:site": "playwright test",
-    "check": "npm run check:release-order && npm run build && npm run check:build && npm run test:site && npm run check:package"
+    "check": "npm run check:release-order && npm run check:deployment && npm run check:types && npm run build && npm run build:ai && npm run test:site && npm run check:build && npm run check:package"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@rspress/core": "2.0.22",
     "@rspress/plugin-sitemap": "2.0.22",
-    "typescript": "5.9.2"
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.2",
+    "yaml": "2.8.2"
   }
 }

@@ -52,6 +52,8 @@ Runtime 观察会记录依据的静态修订。仅身份相同但修订变化，
 | `truncated` | 命中数量或页预算上限 | 使用 `nextCursor` 续页或收窄过滤 |
 | `partial` | 某些来源、分组或条目失败 | 保留正常项，检查 warning 和逐项错误 |
 
-批量查询保留输入槽位，每个 `BatchItem` 都要检查 `ok`。单个 Provider 离线不应清空其他来源的合法结果；指定权威修订不可读则是查询级失败。
+`getCapabilities(ids)` 保留原始输入槽位，包括重复 ID 和失败项；每个 `BatchItem` 都要检查 `ok`。`readDocuments` 会展开、过滤和去重文档，`readSpecification` 也不保证与 `knowledgeIds` 输入顺序对应；两者的 `inputIndex` 是生成结果槽位，不能用它回查原选择数组。成功项按 `id`/`knowledgeId` 关联，详见[批量结果](../reference/result-meta#批量结果)。
+
+来源故障的边界取决于操作：批量详情和文档点读可保留正常项并逐项报错；Retriever 可剔除失效候选并报告 `partial`；联合 `listCatalog`/`listProviders` 遇到不可读来源会查询级失败。显式指定的权威修订不可读也会使整次查询失败，不能用旧视图或空结果冒充成功。
 
 预算不会通过静默删除 `whenToUse` 或 `distinction` 制造“成功”。无法取得任何进展时返回 `CG_BUDGET_EXCEEDED`。实践见 [处理错误与部分结果](../guides/errors-and-partial-results)。

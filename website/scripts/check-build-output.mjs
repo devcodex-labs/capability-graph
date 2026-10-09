@@ -31,7 +31,7 @@ function canonicalForHtml(file) {
 }
 
 function cleanRedirectTarget(target) {
-  return target.replace(/\/(?=#|$)/, '');
+  return target.split('#')[0].split('/').filter(Boolean).length === 1 ? target : target.replace(/\/(?=#|$)/, '');
 }
 
 const files = await filesUnder(outputRoot);
@@ -51,8 +51,8 @@ const expectedRedirectFiles = Object.keys(redirects)
 assert(JSON.stringify(redirectHtmlFiles) === JSON.stringify(expectedRedirectFiles), 'compatibility redirect files do not match route-redirects.json');
 for (const [source, target] of Object.entries(redirects)) {
   const targetUrl = new URL(`/capability-graph/${cleanRedirectTarget(target)}`, 'https://devcodex-labs.github.io').href;
-  const [targetRoute, fragment] = target.split('#');
-  const targetFile = `${targetRoute.replace(/\/$/, '')}.html`;
+  const [targetRoute, fragment] = cleanRedirectTarget(target).split('#');
+  const targetFile = targetRoute.endsWith('/') ? `${targetRoute}index.html` : `${targetRoute}.html`;
   const targetHtml = await readFile(path.join(outputRoot, targetFile), 'utf8');
   if (fragment) assert(targetHtml.includes(`id="${fragment}"`), `${source} redirect fragment does not exist in ${targetFile}`);
   for (const file of [`${source}.html`, `${source}/index.html`]) {
@@ -127,6 +127,11 @@ assert(release.releaseId === `capability-graph-${manifest.version}`, 'public rel
 assert(release.releaseTag === `v${manifest.version}`, 'public release tag mismatch');
 assert(release.packageName === manifest.name && release.packageVersion === manifest.version, 'public package identity mismatch');
 assert(/^[0-9a-f]{40}$/i.test(release.releaseCommit), 'public release commit is invalid');
+assert(/^[0-9a-f]{40}$/i.test(release.documentationCommit), 'documentation commit is invalid');
+assert(typeof release.documentationDirty === 'boolean', 'documentation dirty state missing');
+assert(['local', 'documentation', 'package-release'].includes(release.deploymentKind), 'deployment kind missing');
+assert(release.deploymentKind === 'local' || !release.documentationDirty, 'published documentation cannot be a dirty worktree');
+assert(release.documentationId === `capability-graph-docs-${manifest.version}-${release.documentationCommit}-${hash(JSON.stringify({ pages: release.pages, redirects: release.redirects })).slice(0, 12)}`, 'documentation artifact identity mismatch');
 assert(JSON.stringify(release.pages) === JSON.stringify(Object.fromEntries(Object.entries(pageHashes).sort(([left], [right]) => left.localeCompare(right)))), 'public page hashes do not match the final build');
 const expectedReleaseRedirects = {};
 for (const [source, target] of Object.entries(redirects)) {

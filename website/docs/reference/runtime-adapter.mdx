@@ -3,6 +3,8 @@ title: Adapter 接口
 description: Runtime、能力检索、知识检索、Reader 与数据库 Authority Adapter 的统一合同参考。
 ---
 
+import Contracts from '../../generated/snippets/contracts-runtime-adapter.mdx';
+
 # Adapter 接口
 
 <span className="cg-status">可用</span> <span className="cg-status">仅合同</span>
@@ -19,7 +21,7 @@ Core 验证：
 - observation 的修订、兼容、availability 和 freshness 合法；
 - `requiredRuntimeRevision` 不被静默切换。
 
-Adapter 自己管理连接、取消、重试和清理。Core 的 5 秒默认超时只停止等待；迟到拒绝必须由 Adapter 消费，不能形成未处理 Promise rejection。
+Adapter 自己管理连接、取消、重试和清理。Core 的 5 秒默认超时只停止等待，并处理返回给 Core 的 `query()` Promise 的迟到拒绝。Adapter 另行启动的后台任务仍须自行处理拒绝与资源释放；不能把超时视为底层任务已经取消。
 
 ## CapabilityRetriever
 
@@ -37,7 +39,7 @@ Core 按 Adapter 原始顺序生成一基 `rank`。候选被拒绝时保留排�
 
 `retrieve(input, access)` 只处理 Core 展开的最终 targets。每个 target 含能力身份、`knowledgeId`、声明 locator 和经过的 Collection IDs，不含绝对知识根或 `readContext`。
 
-命中必须提供能力身份、`knowledgeId`、`contentId`、source、UTF-8 `startOffset`/`endOffset`、snippet 和可选 score。索引证据必须精确覆盖最终 targets Provider，证明每个文档的 source/indexed contentId、mapping/config revision、观察时间和 freshness；零命中也必须返回证据和明确 `knowledgeState`。
+命中必须提供能力身份、`knowledgeId`、`contentId`、source、UTF-8 `startOffset`/`endOffset`、snippet 和可选 score。索引证据必须精确覆盖最终 targets Provider，证明每个文档的 source/indexed contentId、mapping/config revision、观察时间和 freshness；零命中也必须返回证据，Core 成功投影后给出明确 `knowledgeState`。
 
 Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期证据不会降级为成功空结果。
 
@@ -49,6 +51,8 @@ Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期�
 
 `read(ref, context, { maxBytes })` 返回精确 bytes、contentType、contentId 和 source。Reader 不得替换声明 locator，必须遵守最大字节并保证 `contentId` 对应真实 bytes；`sourceContext.knowledgeRootDir` 不能进入公共响应。无匹配 Reader 使用 `CG_READER_UNCONFIGURED`，执行失败使用 `CG_READER_UNAVAILABLE` 或 Core 投影的读取错误。
 
+context 的 sourceContext 仅供本地进程 Reader 使用，其结构包含必填 `providerId: string`、`authorityKind: 'file' | 'database'`、`sourceRevision: string`，以及可选 `knowledgeRootDir: string`（此 view 固定的私有绝对根）。它不是额外的公共导出，不应序列化到 Retriever 请求、模型上下文或文档查询结果。
+
 ## DatabaseAuthorityAdapter
 
 <span className="cg-status">仅合同</span>
@@ -58,3 +62,37 @@ Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期�
 同一 view 的 Provider、知识根、sourceRevision 和记录必须稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。Core 先完整扫描和收集 ID，再进行端点检查和 `parents`/`specializes`/`requires` 三类无环检查，不能边扫边判不存在。随后交叉验证完整的 `requires`/`requiredBy` 流，缺失或伪造的反向依赖也必须使装载失败。Static Revision 使用与文件模式相同的规范序列化算法。
 
 Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有查询 pin 时延迟关闭。Adapter 不提供通用写入、CRUD 或迁移能力。
+
+## 调用默认值、预算和失败方式
+
+| 合同/调用 | 输入与输出边界 | 默认限制与失败方式 |
+|---|---|---|
+| retrieveCapabilities | 非空 text，允许 scope 与当前静态修订 → 候选身份/score/sourceStaticRevision，再投影 CapabilityCandidate | limit 默认/最大 20，单候选 512 字节；未配置 CG_RETRIEVER_UNCONFIGURED，后端异常 CG_RETRIEVER_UNAVAILABLE；不合法候选剔除并 warning/partial |
+| queryKnowledge | 非空 text、非空 selected，knowledgeIds/roles/locales 可选 → QueryKnowledgePage | limit 默认/最大 8，snippet 2,048 UTF-8 字节；原始 selected 32、每维过滤 128、最终 targets 128/131,072 字节，检索前校验 |
+| KnowledgeReader.read | 必填 Document、只在 Reader 内可用的 context、maxBytes → bytes/contentType/contentId/source | 默认每篇 32,768 字节；bytes 为 Uint8Array，contentId 为 k: 加原始 bytes 的 SHA-256 小写十六进制前 16 位，source 精确等于 locator；错误逐文档返回，不拼接 Collection |
+| RuntimeAdapter.query | 必填 project/environment/currentStaticRevision/limit，可选 instanceOf/instanceId/cursor → RuntimeAdapterResult | 输入 limit 来自 runtime 有效预算；Core 默认等 5,000ms，不发送 AbortSignal；完整校验见[Runtime](./runtime) |
+| DatabaseReadView 扫描/邻居 | StorePageRequest 必填 limit/maxBytes，cursor 可选 → StorePage&lt;T&gt; | 按收到的数量/字节预算返回严格有序且有进展的页；坏页/漂移使验证或查询失败，不以空页绕过合同 |
+
+查询输入的所有字段/输出形状与 Adapter 方法参数在下方展开。limit 必须是正的安全整数，超过有效最大值时收敛到最大值；检索没有默认目录替代。queryKnowledge 的 selected 仍为 CapabilityRef 对象数组（包括绑定对象调用），不能照搬 readDocuments 的绑定字符串数组。
+
+Reader 的精确表达式是 `contentId = 'k:' + createHash('sha256').update(bytes).digest('hex').slice(0, 16)`。对正文原始字节计算，不先解码、规范化换行或截取正文；完整 64 位哈希也会被 Core 判为内容身份不匹配。最小实现见 [KnowledgeReader 接入](../integrations/knowledge-reader#http-reader-骨架)。
+
+queryKnowledge 只在最终选定文档内检索。有最终 targets 时，Retriever 返回零命中也需有效 evidence，knowledgeState 为 searched；展开后的空集合或过滤为空由 Core 返回 empty_collection/filtered_empty，不调用 Retriever。无关联知识为 CG_KNOWLEDGE_NOT_ASSOCIATED，不是成功空检索。KnowledgeHit 的偏移是 UTF-8 字节、end-exclusive，score 可选且须有限数值。命中附加 role/locale 等由 Core 从映射补全，不信任后端随意改写。
+
+<a id="knowledge-retrieval-failures"></a>
+
+## 知识检索失败层级
+
+| 场景 | 对外结果 | 层级与处理 |
+|---|---|---|
+| Static Revision 证据不匹配 | `CG_REVISION_MISMATCH` | 查询级失败；refresh，重新发现并核对最终 targets 的修订 |
+| 索引证据无效或过期 | `CG_INDEX_STALE` | 查询级失败；refresh，重建受影响映射/配置/内容索引；包括缺失或非法 documents、非 current freshness |
+| 原始检索页违反合同 | `CG_ADAPTER_CONTRACT_INVALID` | 查询级失败；例如 hits 不是数组或数量超过本次 limit，修复 Adapter 返回页 |
+| 单项命中违反合同 | warning 中的 `CG_ADAPTER_CONTRACT_INVALID` | 剔除坏项，保留合法命中；meta.completeness 为 partial。身份范围或预算违规可使用对应 warning 码 |
+| 有效证据、零命中 | `searched` | 成功，items 为空且有 indexStatus；不要将证据失败转换为此状态 |
+
+evidence 的 staticRevisionByProvider 必须精确覆盖最终 targets；mapping/config/content revision 对齐，freshness 必须 current 才能成功。KnowledgeRetrievalAccess 只能读本次列出的身份/knowledgeId 对，maxBytes 仍受 Core 限制；retrieve 结束后保存的 access 不可再发起读取。
+
+所有 id 为非空实现标识，不代表授权。可选 invalidate(change) 使用 SourceChange 的明确 reason 枚举；V1 Core **不自动调度 invalidate**。Runtime/Reader/Retriever 自己拥有连接、重试、取消与清理，只有数据库 view.close 的调用归 Core。实现步骤与骨架见[集成](../integrations/index)。
+
+<Contracts />

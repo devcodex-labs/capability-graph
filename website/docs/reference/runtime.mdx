@@ -3,6 +3,8 @@ title: 运行时接口
 description: QueryRuntimeQuery、RuntimeInstance、RuntimeObservation 和 QueryRuntimePage 参考。
 ---
 
+import Contracts from '../../generated/snippets/contracts-runtime.mdx';
+
 # 运行时接口
 
 <span className="cg-status">可用</span>
@@ -22,3 +24,27 @@ description: QueryRuntimeQuery、RuntimeInstance、RuntimeObservation 和 QueryR
 ## QueryRuntimePage
 
 返回实例、观察、`ResultMeta` 和可选续页游标。真实空观察必须使用 `availability: 'empty'` 且不带实例或续页游标；`available + []` 会被判为 `CG_ADAPTER_CONTRACT_INVALID`。`CG_RUNTIME_DISABLED` 表示未配置 Adapter，`CG_RUNTIME_UNAVAILABLE` 表示已配置来源当前不可用或 Core 等待超时，两者不能混用。
+
+## 请求值域与缺省
+
+`graph.queryRuntime(query)` 返回 Promise&lt;QueryRuntimePage&gt;；`graph.forProvider(id).queryRuntime(query)` 的输入省去 requestProviderScope，instanceOf 可用 `{ capabilityId }`。绑定并不绑定修订，project/environment 仍必填。
+
+| 字段 | 缺省/值约束 | 影响 |
+|---|---|---|
+| project / environment | 非空、去空白后仍有内容的 string | Adapter 必须精确匹配，不是自动授权 |
+| requestProviderScope | 未提供时可由 instanceOf 的 Provider 推导，否则使用有效 scope | **最终有效范围必须恰好一个 Provider**；多个或零个为 CG_INPUT_INVALID |
+| instanceOf / instanceId | 可选；前者必须是真实同 Provider 能力，后者为非空 string | 收窄实例结果，不执行能力 |
+| requiredStaticRevision | 缺省 current，可指定保留的 previous | 不可读时 CG_REVISION_MISMATCH，不切换视图 |
+| requiredRuntimeRevision | 可选非空 string | 与观察/游标不一致为 CG_REVISION_MISMATCH |
+| limit | 默认 50，正的安全整数，超过最大 100 时收敛到 100 | 使用有效 runtime 页预算 |
+| cursor | 可选，Core 签发的有界游标 | 绑定 Provider、project/environment、实例过滤、limit 及两类修订 |
+
+## 观察和结果校验
+
+必填字段和枚举在下方合同展开。observedAt 必须是可被 Date.parse 解析的时间字符串；source、runtimeRevision、observedAgainstStaticRevision 与可选说明字段都必须非空。availability 是 `available/empty/partial`，freshness 是 `current/stale`，compatibility 是 `compatible/unknown/refresh_required`；不因静态 ID 相同自动判断兼容。
+
+实例的二元类型必须存在，provider/project/environment 和请求匹配。facts 为可序列化对象，默认每实例最多 4,096 UTF-8 字节；整组 associations 默认最多 2,048 字节，不进入静态关系。单项非法可被剔除并产生 warning/partial；非空实例全部被剔除会 CG_ADAPTER_CONTRACT_INVALID，不伪装为 empty。重复实例、无效观察、超页数量及循环游标属于整次合同错误。
+
+availability: partial 或剔除条目使 meta.completeness 为 partial；仅有续页为 truncated；无遗漏为 complete。Core 默认等待 5,000ms，超时为 CG_RUNTIME_UNAVAILABLE，**不取消 Adapter 的执行或网络请求**；连接、取消和清理由实现方负责。演练见[使用运行时](../guides/use-runtime)。
+
+<Contracts />

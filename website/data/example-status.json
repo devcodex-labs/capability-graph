@@ -60,6 +60,18 @@
     "claims": ["first provider tutorial"]
   },
   {
+    "id": "lifecycle-example",
+    "status": "Runnable",
+    "source": "docs/guides/lifecycle-and-reload.mdx",
+    "verify": "npm run check:examples",
+    "runDir": "website",
+    "prerequisites": ["root: npm run build", "website: npm ci"],
+    "entry": "页面还原的 lifecycle-demo.mjs",
+    "proof": "真实定义更新、previous 查询和失败保留 current；亦经 Registry 实装验证",
+    "userResponsibilities": ["接入方管理自己的共享 graph 与实际 Authority 生命周期"],
+    "claims": ["reload lifecycle", "page-only revision and recovery"]
+  },
+  {
     "id": "multi-provider",
     "status": "Runnable",
     "source": "../test/provider-isolation.test.ts",

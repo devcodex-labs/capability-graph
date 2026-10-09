@@ -43,6 +43,7 @@ if (process.env.GITHUB_OUTPUT) {
     `release_id=${releaseId}`,
     `release_tag=${releaseTag}`,
     `release_commit=${releaseCommit}`,
+    `documentation_commit=${execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim()}`,
     `package_version=${manifest.version}`,
     ''
   ].join('\n'), 'utf8');

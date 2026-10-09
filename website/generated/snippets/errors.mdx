@@ -15,8 +15,8 @@
 | `CG_RELATION_CYCLE` | 分类或特化关系形成环。 | parents、specializes 或 requires 的独立全图验证发现环。 | `repair_source` | 调整关系方向或移除闭环边，再刷新来源。 |
 | `CG_LOAD_FAILED` | Provider 权威来源加载失败。 | 文件、数据库扫描或视图清理无法完成。 | `repair_source` | 检查来源可读性与后端状态；恢复后重新加载。 |
 | `CG_NO_ACTIVE_VIEW` | 当前没有已验证且可读的 Provider 视图。 | 实例已关闭，或刷新失败且不存在可继续服务的旧视图。 | `refresh` | 恢复来源后刷新；实例已关闭时创建新实例。 |
-| `CG_REVISION_MISMATCH` | 请求的修订或游标不再对应当前可读视图。 | 分页、检索或 Runtime 请求携带了过期修订。 | `refresh` | 放弃旧游标，从首个请求重新获取当前修订。 |
-| `CG_INDEX_STALE` | 检索索引与当前来源身份不一致。 | Retriever 返回的来源修订或能力身份已过期。 | `refresh` | 刷新或重建索引，再从新的发现请求开始。 |
+| `CG_REVISION_MISMATCH` | 请求的修订或游标不再对应当前可读视图。 | 分页、检索或 Runtime 的指定修订不匹配，或知识检索证据中的 Static Revision 不匹配。 | `refresh` | 放弃旧游标，从首个请求重新获取当前修订。 |
+| `CG_INDEX_STALE` | 检索索引与当前来源身份不一致。 | 能力召回的来源已过期，或知识索引的 mapping/config/content 身份、freshness 或证据结构无效。 | `refresh` | 刷新或重建索引，再从新的发现请求开始。 |
 | `CG_INPUT_INVALID` | 查询参数或参数组合无效。 | 必需字段缺失、游标非法或互斥参数同时出现。 | `fix_input` | 修正输入；以错误实例携带的 nextAction 为最终准则。 |
 | `CG_RUNTIME_CONTEXT_REQUIRED` | Runtime 查询缺少项目或环境上下文。 | 未提供非空 project 与 environment。 | `fix_input` | 同时补充项目和环境，再发起 Runtime 查询。 |
 | `CG_RUNTIME_DISABLED` | Provider 未启用 Runtime Adapter。 | 对只有静态能力的 Provider 发起 Runtime 查询。 | `configure_backend` | 配置 Runtime Adapter，或停止对该 Provider 请求运行态。 |
