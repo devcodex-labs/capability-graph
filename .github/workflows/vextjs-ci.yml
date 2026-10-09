@@ -21,7 +21,7 @@ jobs:
         node: ['20.19.0', '22.12.0', '24.19.0']
     env:
       VEXT_SOURCE_COMMIT: ef926649926e17543562b8169982fa1786285ecf
-      VEXT_ROOT: ${{ runner.temp }}/capability-graph-vextjs-fixed
+      VEXT_ROOT: ${{ github.workspace }}/../capability-graph-artifacts/sources/vextjs-fixed
       CG_ARTIFACTS_DIR: ${{ github.workspace }}/../capability-graph-artifacts
     steps:
       - uses: actions/checkout@v7
