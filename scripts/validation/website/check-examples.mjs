@@ -40,7 +40,7 @@ for (const entry of statuses) {
   assert((await stat(source)).isFile() || (await stat(source)).isDirectory(), `${entry.id} source is not readable`);
 }
 const vextjs = statuses.find(({ id }) => id === 'vextjs-integration');
-assert(vextjs?.status === 'Conceptual', 'VextJS must remain Conceptual in V1');
+assert(vextjs?.status === 'Contract-only' && vextjs.source === '../examples/vextjs', 'VextJS must disclose its fixed-source opt-in verification boundary');
 
 const fixtureRoot = path.join(websiteFixtureRoot, 'advanced-provider');
 const fixtureFiles = ['provider.json', 'route.capability.json', 'route-http.capability.json'];

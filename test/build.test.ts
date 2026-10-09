@@ -40,11 +40,12 @@ function command(args: string[], cwd: string) {
 }
 
 test("deep R6: standard npm test cleans orphaned tests before discovery", async () => fixture(async (root, links) => {
-  for (const file of ["scripts/build.mjs", "scripts/build-tests.mjs", "scripts/clean-output.mjs", "scripts/run-tests.mjs"]) await copyScript(root, file);
+  for (const file of ["scripts/build.mjs", "scripts/lib/build-state.mjs", "scripts/build-tests.mjs", "scripts/clean-output.mjs", "scripts/run-tests.mjs"]) await copyScript(root, file);
   for (const directory of ["src", "test/validation", "dist", "dist-test/test"]) await mkdir(path.join(root, directory), { recursive: true });
   await dependencies(root, links);
   const metadata = JSON.parse(await readFile(path.join(repository, "package.json"), "utf8"));
   await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "build-fixture", private: true, type: "module", scripts: metadata.scripts }));
+  await writeFile(path.join(root, "package-lock.json"), JSON.stringify({ name: "build-fixture", lockfileVersion: 3 }));
   await writeFile(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { ...compilerOptions, rootDir: "src", outDir: "dist" }, include: ["src"] }));
   await writeFile(path.join(root, "tsconfig.test.json"), JSON.stringify({ compilerOptions: { ...compilerOptions, rootDir: ".", outDir: "dist-test" }, include: ["test"] }));
   await writeFile(path.join(root, "tsconfig.consumer.json"), JSON.stringify({ compilerOptions: { ...compilerOptions, noEmit: true }, include: ["src"] }));

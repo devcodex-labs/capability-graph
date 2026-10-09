@@ -75,15 +75,15 @@ test("read input boundaries preserve deterministic failure slots and filtered-em
   } finally { await f.graph.close(); }
 });
 
-test("expanded document limit rejects without Reader I/O and per-document byte overflow stays an item error", async () => {
+test("expanded document limit rejects without Reader I/O; page size does not gate full documents", async () => {
   const f = await open({ read: { maxDocumentsPerCall: 1, maxBytes: 4, maxSelected: 2 } }, 2);
   try {
     await assert.rejects(f.graph.readDocuments({ selected: [id("a")] }), { code: "CG_BUDGET_EXCEEDED" });
     assert.equal(f.calls(), 0);
     const response = await f.graph.readDocuments({ selected: [id("a")], knowledgeIds: ["D-0"] });
     const slot = response.results[0]!;
-    assert.ok(!slot.ok); assert.equal(slot.error.code, "CG_BUDGET_EXCEEDED");
-    assert.equal(response.meta.completeness, "partial");
+    assert.ok(slot.ok); assert.equal(slot.value.text, "guide");
+    assert.equal(response.meta.completeness, "complete");
   } finally { await f.graph.close(); }
 });
 

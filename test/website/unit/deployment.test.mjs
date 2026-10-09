@@ -44,7 +44,7 @@ for (const file of ['ci', 'docs-ci', 'docs-deploy', 'release']) {
 }
 assert(!/npm publish|NPM_TOKEN|pull_request:/.test(workflow), 'documentation deploy must not publish packages or consume PR authority');
 assert(workflow.includes('workflow_dispatch:') && workflow.includes('capability-graph-production') && workflow.includes('name: github-pages'));
-for (const gate of ['check-docs-deployment.mjs', 'check-pages-advance.mjs', 'check-registry-install.mjs', 'npm run build', 'test:site', 'check:build']) {
+for (const gate of ['check-docs-deployment.mjs', 'check-pages-advance.mjs', 'check-registry-install.mjs', 'npm run build:built', 'test:site', 'check:package']) {
   assert(workflow.includes(gate), `documentation workflow omitted ${gate}`);
 }
 console.log('deployment contracts passed: baseline/staleness/rollback/network failures and manual protected workflow');

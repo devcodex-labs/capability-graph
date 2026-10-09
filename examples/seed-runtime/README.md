@@ -8,7 +8,7 @@
 
 `knowledge-reader.ts` 限制来源 origin、并发数、总时限和原始响应字节，拒绝重定向与压缩；超时及关闭都会销毁请求并等待连接关闭。`text-retrieval.ts` 是确定性的内存词项索引，使用有限缓存，按已选 targets 重查内容身份；零命中也需要有效证据。静态定义、正文或分块配置变更后，由接入方显式重建或调用 invalidate，Core 不自动刷新。
 
-分块保留 UTF-8 BOM 和补充字符，偏移对应原始正文的字节。缓存按选择做 LRU 淘汰；即便正文和静态修订相同，切换知识根目录仍须失效旧映射。来源读取失败不会伪装成缓存成功，能力索引重建超容量也不会发布半个索引。这些边界分别由根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts` 通过真实来源验收。
+分块保留 UTF-8 BOM 和补充字符，偏移对应原始正文的字节。缓存按选择做 LRU 淘汰；即便正文和静态修订相同，切换知识根目录仍须失效旧映射。每次检索固定读取预算、分块和停用词配置；invalidate 按 Provider 标记在途请求，旧请求可以完成原来的快照，但不能在失效后回填旧缓存或覆盖新缓存。无关 Provider 的失效保持隔离，查询结束时释放在途标记。来源读取失败不会伪装成缓存成功，能力索引重建超容量也不会发布半个索引。这些边界分别由根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts` 通过真实来源验收。
 
 这条路径使用零次模型调用，证明本机 HTTP 和检索链路，不证明语义搜索质量或 Agent 任务成功率。临时 Provider 位于仓库同级 `capability-graph-artifacts`，结束后关闭 Reader、graph、HTTP 服务并清理自建目录。正式回归位于根 `test/http-retrieval.test.ts`。
 
@@ -35,3 +35,5 @@ node dist-test/examples/seed-runtime/main.js '{"project":"sample-app","environme
 ## 验证
 
 `test/real-runtime.test.ts` 启动独立子进程，实际请求业务路由并沿 API 完成目录、关系、实例和知识流程；随后核对项目/环境隔离、源变化、旧构建、失联/恢复及分页。进程 PID 与端口在测试诊断中输出，结束后验证进程不存在且监听端口可重新绑定。IPC 注册只供这个可控制参考应用演示动态注册，不暴露为 HTTP 管理入口。
+
+Reader 可实现 `stream`：Core 计算全文哈希，页只保留所选范围，单块大小有界。HTTP 参考支持无 Range 来源、完整转移期限和 AbortSignal 终止真实请求。TextKnowledgeRetriever 用 scan 消费大正文；configure 的 pageBytes 是页大小，maxDocumentBytes 保留为旧名称。仅提供 read 的旧宿主仍使用有界全文回退。

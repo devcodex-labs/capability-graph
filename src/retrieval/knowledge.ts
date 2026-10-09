@@ -5,6 +5,8 @@ import { CapabilityGraphError, type ErrorShape } from "../errors.js";
 import { canonicalJson } from "../hash.js";
 import { formatQualifiedId, isKnowledgeId } from "../identity.js";
 import { locatorSource, readContext, readDocument, validateDocumentFilters, validateSelection } from "../knowledge/read.js";
+import { scanDocument, documentRanges } from "../knowledge/stream.js";
+import type { KnowledgeScanResult } from "../knowledge/types.js";
 import type { KnowledgeIndexEvidence, KnowledgeReader, KnowledgeReadContext, KnowledgeResultHit, KnowledgeRetriever, KnowledgeRetrievalAccess, KnowledgeSearchTarget } from "../knowledge/types.js";
 import { bytes, capability, identity, inputInvalid, limit } from "../query/common.js";
 import type { KnowledgeDocumentRef, ResultMeta, StaticCapability } from "../types.js";
@@ -113,8 +115,9 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
     targets, limit: count });
   let active = true;
   const accessErrors = new WeakMap<object, CapabilityGraphError>();
-  const pending = new Set<ReturnType<KnowledgeReader["read"]>>();
+  const pending = new Set<Promise<unknown>>();
   const observed = new Map<string, Awaited<ReturnType<KnowledgeReader["read"]>>>();
+  const scanned = new Map<string, KnowledgeScanResult>();
   const access: KnowledgeRetrievalAccess = Object.freeze({ read: (target: Pick<KnowledgeSearchTarget, "id" | "knowledgeId">, budget: { maxBytes: number }) => {
     let relativePath: string | undefined;
     const task = (async () => {
@@ -126,7 +129,7 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
       const targetKey = key({ id, knowledgeId: target.knowledgeId });
       const entry = allowed.get(targetKey); if (!entry) contract("retrieval_target_not_selected");
       if (entry.ref.locator.type === "relative-file") relativePath = entry.ref.locator.path;
-      const result = await readDocument(entry.ref, entry.context, Math.min(budget.maxBytes, budgets.read.maxBytes), readers);
+      const result = await readDocument(entry.ref, entry.context, Math.min(budget.maxBytes, budgets.read.maxResponseBytes ?? 4_194_304), readers);
       observed.set(targetKey, result); return { ...result, bytes: Uint8Array.from(result.bytes) };
     })().catch((error: unknown) => {
       if (error instanceof CapabilityGraphError) {
@@ -140,6 +143,37 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
         accessErrors.set(error, new CapabilityGraphError(error.code, { nextAction: error.nextAction,
           ...(Object.keys(details).length ? { details } : {}) }));
       }
+      throw error;
+    });
+    pending.add(task); void task.then(() => pending.delete(task), () => pending.delete(task)); return task;
+  }, scan: (target: Pick<KnowledgeSearchTarget, "id" | "knowledgeId">,
+    consume: (bytes: Uint8Array, offset: number) => void | Promise<void>, options: { chunkBytes?: number; signal?: AbortSignal } = {}) => {
+    const task = (async () => {
+      if (!active) contract("retrieval_access_expired");
+      if (!target || !isKnowledgeId(target.knowledgeId) || typeof consume !== "function" || !options || typeof options !== "object" ||
+          (options.signal !== undefined && !(options.signal instanceof AbortSignal))) inputInvalid();
+      if (Object.keys(target).some((field) => !["id", "knowledgeId"].includes(field))) contract("retrieval_target_override");
+      const id = identity(target.id);
+      if (!context.scope.has(id.providerId)) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
+      const targetKey = key({ id, knowledgeId: target.knowledgeId });
+      const entry = allowed.get(targetKey); if (!entry) contract("retrieval_target_not_selected");
+      const chunkBytes = options.chunkBytes ?? budgets.read.maxBytes;
+      if (!Number.isSafeInteger(chunkBytes) || chunkBytes < 1) inputInvalid();
+      // Small sources retain a bounded exact query snapshot. Large sources are verified by range below.
+      let snapshot: Uint8Array[] | undefined = []; let snapshotBytes = 0;
+      const result = await scanDocument(entry.ref, entry.context, readers, async (bytes, offset) => {
+        snapshotBytes += bytes.length;
+        if (snapshotBytes > budgets.read.maxBytes) snapshot = undefined;
+        snapshot?.push(Uint8Array.from(bytes));
+        await consume(bytes, offset);
+      },
+        { chunkBytes: Math.min(chunkBytes, budgets.read.maxBytes), fallbackMaxBytes: budgets.read.maxResponseBytes ?? 4_194_304,
+          ...(options.signal ? { signal: options.signal } : {}) });
+      scanned.set(targetKey, result);
+      if (snapshot) observed.set(targetKey, { bytes: Buffer.concat(snapshot, snapshotBytes), contentId: result.contentId, contentType: result.contentType, source: result.source });
+      return result;
+    })().catch((error: unknown) => {
+      if (error instanceof CapabilityGraphError) accessErrors.set(error, new CapabilityGraphError(error.code, { nextAction: error.nextAction }));
       throw error;
     });
     pending.add(task); void task.then(() => pending.delete(task), () => pending.delete(task)); return task;
@@ -164,7 +198,8 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
     for (const document of evidence.documents) {
       const id = key(document);
       if (!allowed.has(id) || evidenceIds.has(id) || typeof document.sourceContentId !== "string" || !/^k:[a-f0-9]{16}$/.test(document.sourceContentId) ||
-          document.sourceContentId !== document.indexedContentId || (observed.has(id) && observed.get(id)!.contentId !== document.sourceContentId)) stale();
+          document.sourceContentId !== document.indexedContentId || (observed.has(id) && observed.get(id)!.contentId !== document.sourceContentId) ||
+          (scanned.has(id) && scanned.get(id)!.contentId !== document.sourceContentId)) stale();
       evidenceIds.set(id, document);
     }
   } catch (error) {
@@ -172,6 +207,7 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
     stale();
   }
   const items: KnowledgeResultHit[] = [];
+  const verifiedDocuments = new Map<string, Promise<Map<number, boolean>>>();
   for (const [index, hit] of raw.hits.entries()) {
     try {
       if (!hit || typeof hit.snippet !== "string") contract("knowledge_hit_invalid");
@@ -186,6 +222,29 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
       const observedDocument = observed.get(hitKey);
       if (observedDocument && (hit.endOffset > observedDocument.bytes.length ||
           !Buffer.from(observedDocument.bytes.subarray(hit.startOffset, hit.endOffset)).equals(Buffer.from(hit.snippet)))) contract("knowledge_hit_content_mismatch");
+      if (scanned.has(hitKey) && !observedDocument) {
+        let verification = verifiedDocuments.get(hitKey);
+        if (!verification) {
+          // Validate byte bounds before retaining any other hit. One invalid hit cannot expand this read.
+          const candidates = raw.hits.flatMap((candidate, candidateIndex) => {
+            try {
+              if (!candidate || key(candidate) !== hitKey || candidate.contentId !== proof.indexedContentId || candidate.source !== hit.source ||
+                  typeof candidate.snippet !== "string" || Buffer.byteLength(candidate.snippet) > budgets.queryKnowledge.maxSnippetBytes ||
+                  !Number.isSafeInteger(candidate.startOffset) || !Number.isSafeInteger(candidate.endOffset) || candidate.startOffset < 0 ||
+                  candidate.endOffset < candidate.startOffset || candidate.endOffset - candidate.startOffset !== Buffer.byteLength(candidate.snippet)) return [];
+              return [{ hit: candidate, index: candidateIndex }];
+            } catch { return []; }
+          });
+          verification = (async () => {
+            const verified = await documentRanges(entry.ref, entry.context, readers, candidates.map(({ hit }) => hit), budgets.read.maxResponseBytes ?? 4_194_304, budgets.read.maxBytes);
+            if (verified.contentId !== proof.indexedContentId) stale();
+            return new Map(candidates.map(({ hit: candidate, index: candidateIndex }, rangeIndex) => [candidateIndex,
+              candidate.endOffset <= verified.totalBytes && verified.ranges[rangeIndex]!.equals(Buffer.from(candidate.snippet))]));
+          })();
+          verifiedDocuments.set(hitKey, verification);
+        }
+        if (!(await verification).get(index)) contract("knowledge_hit_content_mismatch");
+      }
       items.push({ id, knowledgeId: hit.knowledgeId, contentId: hit.contentId, source: hit.source,
         startOffset: hit.startOffset, endOffset: hit.endOffset, snippet: hit.snippet, ...(hit.score === undefined ? {} : { score: hit.score }),
         role: entry.ref.role, ...(entry.ref.locale === undefined ? {} : { locale: entry.ref.locale }),

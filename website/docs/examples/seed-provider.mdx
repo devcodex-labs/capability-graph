@@ -81,7 +81,7 @@ npm test
 
 先完成根目录的 `npm test`，再运行上面的 MCP 命令。预期私有包测试通过，并能发现十二个查询工具和 Specification Resource；默认 Runtime/检索未配置的调用应返回明确错误。
 
-手动连接原 Seed 时，让客户端以 stdio 启动 node，参数为 examples/seed-mcp/dist/src/main.js 的绝对路径。它没有 HTTP URL，由客户端管理子进程停止。原 Seed 保持十二工具及五能力平坦 Catalog；只从 route 主入口开始的完整 server/client 示例另见[Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。两者不混称同一个默认工具集。
+手动连接原 Seed 时，让客户端以 stdio 启动 node，参数为 examples/seed-mcp/dist/src/main.js 的绝对路径。它没有 HTTP URL，由客户端管理子进程停止。原 Seed 保持十四工具及五能力平坦 Catalog；只从 route 主入口开始的完整 server/client 示例另见[Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。两者不混称同一个默认工具集。
 
 ## 真实 Runtime
 
@@ -114,7 +114,7 @@ npm run demo:http
 
 该入口启动真实 HTTP 文档来源与业务服务，从公开 Catalog 建立有限的能力词项索引，再由调用方显式选择 `route.validation`。Selection 的 requires 闭包包含 `schema.request`，文档检索仍只针对明确传入的 selected 和 knowledgeIds。
 
-预期 JSON 包含 `document: "HTTP-GUIDE"`、大于零的 `knowledgeHits`、`zeroHits: 0`、`staleRejected: true`、大于零的 `recoveredHits`、`businessStatus: 201` 和 `modelCalls: 0`。HTTP Reader 读取实际中文正文；片段偏移按 UTF-8 字节计算。正文改变后旧索引被拒绝，由接入方显式 invalidate 后恢复。根 `test/http-retrieval.test.ts` 同时覆盖超时、响应超限、重定向、连接关闭、配置和静态修订变更。
+预期 JSON 包含 `document: "HTTP-GUIDE"`、大于零的 `knowledgeHits`、`zeroHits: 0`、`staleRejected: true`、大于零的 `recoveredHits`、`businessStatus: 201` 和 `modelCalls: 0`。HTTP Reader 读取实际中文正文；片段偏移按 UTF-8 字节计算。正文改变后旧索引被拒绝，由接入方显式 invalidate 后恢复。每次检索固定自己的配置；invalidate 返回后，已失效的在途请求即使完成也不能回填旧缓存。根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts` 同时覆盖超时、响应超限、重定向、连接关闭、配置和静态修订变更，以及旧请求完成顺序与失效竞争。
 
 这是本机词项检索参考，没有模型或向量数据库，不能据此推断语义搜索质量、Agent 修改代码的成功率或生产容量。临时材料在仓库同级目录，结束时释放两个 HTTP 端口及 Reader 连接。[查看源码](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/retrieval-demo.ts)
 

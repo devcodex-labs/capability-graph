@@ -1,6 +1,10 @@
 {
   "schemaVersion": "CapabilityGraphReferenceCoverageV1",
   "entries": [
+    { "symbol": "DocumentBodyQuery", "page": "reference/knowledge.mdx", "status": "Available" },
+    { "symbol": "SpecificationBodyQuery", "page": "reference/knowledge.mdx", "status": "Available" },
+    { "symbol": "DocumentBodyPage", "page": "reference/knowledge.mdx", "status": "Available" },
+    { "symbol": "KnowledgeScanResult", "page": "reference/runtime-adapter.mdx", "status": "Contract-only" },
     { "symbol": "AuthoritySpec", "page": "reference/capability-graph.mdx", "status": "Available" },
     { "symbol": "BatchItem", "page": "reference/result-meta.mdx", "status": "Available" },
     { "symbol": "BatchResult", "page": "reference/result-meta.mdx", "status": "Available" },

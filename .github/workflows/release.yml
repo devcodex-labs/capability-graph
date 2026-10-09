@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.release_tag) || github.ref }}
           fetch-depth: 0
           persist-credentials: false
       - id: target
@@ -73,7 +73,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+          ref: ${{ needs.freeze.outputs.release_commit }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -84,8 +84,8 @@ jobs:
             website/package-lock.json
       - run: npm ci
       - run: npm test
-      - run: npm run test:package
-      - run: npm run evaluate
+      - run: npm run test:package:built
+      - run: npm run evaluate:built
       - run: npm ci --ignore-scripts
         working-directory: examples/seed-mcp
       - run: npm test
@@ -93,7 +93,7 @@ jobs:
       - run: npm ci
         working-directory: website
       - run: npx playwright install --with-deps chromium
-      - run: npm run check
+      - run: npm run check:built
         working-directory: website
 
   package:
@@ -108,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+          ref: ${{ needs.freeze.outputs.release_commit }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -116,7 +116,6 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: npm install --global npm@11.15.0
       - run: npm ci
-      - run: npm run build
       - id: pack
         name: Build the immutable package artifact
         shell: bash
@@ -232,7 +231,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+          ref: ${{ needs.freeze.outputs.release_commit }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -254,7 +253,7 @@ jobs:
             echo "npm latest is $latest, not $PACKAGE_VERSION" >&2
             exit 1
           }
-      - run: npm run build
+      - run: npm run build:built
         working-directory: website
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
@@ -306,7 +305,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref }}
+          ref: ${{ needs.freeze.outputs.release_commit }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:

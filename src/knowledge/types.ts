@@ -13,6 +13,14 @@ export interface KnowledgeReader {
   read(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, budget: { maxBytes: number }): Promise<{
     bytes: Uint8Array; contentType: string; contentId: KnowledgeContentId; source: string;
   }>;
+  /** Optional bounded-memory transport. Core hashes the entire stream; total document size is not capped.
+   * Each chunk must fit chunkBytes. Abort must stop I/O, and iterator return must release owned resources. */
+  stream?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, options: {
+    chunkBytes: number; signal?: AbortSignal;
+  }): AsyncIterable<{ bytes: Uint8Array; contentType: string; source: string }>;
+}
+export interface KnowledgeScanResult {
+  readonly contentId: KnowledgeContentId; readonly totalBytes: number; readonly contentType: string; readonly source: string;
 }
 /** Invalidation contract for integrations; Core does not automatically dispatch invalidate callbacks in V1. */
 export interface SourceChange {
@@ -28,6 +36,11 @@ export interface KnowledgeSearchTarget {
 export interface KnowledgeRetrievalAccess {
   /** Read only a listed identity/knowledgeId pair, without replacing its locator; maxBytes is capped by Core. */
   read(target: Pick<KnowledgeSearchTarget, "id" | "knowledgeId">, budget: { maxBytes: number }): ReturnType<KnowledgeReader["read"]>;
+  /** Consume the complete source in bounded chunks. Callback offsets are absolute UTF-8 byte offsets.
+   * Optional for older host integrations. Completion proves the full-document hash, including zero-hit queries. */
+  scan?(target: Pick<KnowledgeSearchTarget, "id" | "knowledgeId">,
+    consume: (bytes: Uint8Array, startOffset: number) => void | Promise<void>,
+    options?: { chunkBytes?: number; signal?: AbortSignal }): Promise<KnowledgeScanResult>;
 }
 /** Prove mapping, configuration and content freshness for all targets, including queries returning zero hits. */
 export interface KnowledgeIndexEvidence {

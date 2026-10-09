@@ -51,7 +51,7 @@ export async function readDocument(ref: KnowledgeDocumentRef, context: Knowledge
   if (!raw || !(raw.bytes instanceof Uint8Array) || typeof raw.contentType !== "string" || !raw.contentType.trim() || raw.source !== locatorSource(ref)) {
     throw new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source", details: { reason: "reader_result_invalid" } });
   }
-  if (raw.bytes.byteLength > maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "reduce_document" });
+  if (raw.bytes.byteLength > maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
   const bytes = Uint8Array.from(raw.bytes);
   const computed = contentId(bytes);
   if (computed !== raw.contentId) throw new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source", details: { reason: "reader_content_identity_mismatch" } });
@@ -116,7 +116,7 @@ function matches(ref: KnowledgeDocumentRef, filters: ReturnType<typeof validateD
 
 async function readValue(ref: KnowledgeDocumentRef, providerId: string, context: QueryContext,
   budgets: BudgetConfig, readers: readonly KnowledgeReader[]): Promise<Omit<DocumentRead, "id">> {
-  const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxBytes, readers);
+  const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxResponseBytes ?? 4_194_304, readers);
   let text: string;
   try { text = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes); }
   catch { throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { reason: "invalid_utf8" } }); }

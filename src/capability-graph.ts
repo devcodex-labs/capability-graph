@@ -3,6 +3,7 @@ import { CapabilityGraphError } from "./errors.js";
 import { documents, readSpecification, validateDocumentFilters, validateSelection, validateReadBudgetInput,
   type ReadDocumentsQuery, type ReadSpecificationQuery } from "./knowledge/read.js";
 import type { KnowledgeReader, KnowledgeRetriever, CapabilityRetriever } from "./knowledge/types.js";
+import { documentBody, specificationBody, validateBodyQuery, type DocumentBodyQuery, type SpecificationBodyQuery } from "./knowledge/pages.js";
 import { retrieveCapabilities } from "./retrieval/capabilities.js";
 import { queryKnowledge } from "./retrieval/knowledge.js";
 import type { QueryKnowledgeQuery, RetrieveCapabilitiesQuery } from "./retrieval/types.js";
@@ -31,7 +32,8 @@ interface Extensions {
 function extensions(config: OpenConfig): Extensions {
   const invalid = () => { throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" }); };
   if (!config || typeof config !== "object" || (config.readers !== undefined && !Array.isArray(config.readers))) invalid();
-  for (const reader of config.readers ?? []) if (!reader || typeof reader.id !== "string" || !reader.id || typeof reader.canRead !== "function" || typeof reader.read !== "function") invalid();
+  for (const reader of config.readers ?? []) if (!reader || typeof reader.id !== "string" || !reader.id || typeof reader.canRead !== "function" || typeof reader.read !== "function" ||
+    (reader.stream !== undefined && typeof reader.stream !== "function")) invalid();
   for (const retriever of [config.knowledgeRetriever, config.capabilityRetriever]) if (retriever !== undefined &&
     (!retriever || typeof retriever.id !== "string" || !retriever.id || typeof retriever.retrieve !== "function")) invalid();
   if (config.runtimeAdapters !== undefined && !Array.isArray(config.runtimeAdapters)) invalid();
@@ -134,6 +136,19 @@ export class CapabilityGraph {
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
       (ctx) => documents(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
   }
+  /** Read a selected document range; continue with its version-bound cursor. Total document size is unlimited. */
+  readDocumentPage(query: DocumentBodyQuery) {
+    queryObject(query); validateBodyQuery(query, this.host.budgets);
+    const id = identity(query.capability);
+    return this.host.query([id.providerId], query.requiredStaticRevision,
+      (ctx) => documentBody(ctx, query, this.host.budgets, this.extensions.readers));
+  }
+  /** Page an explicitly selected Specification document without reading unrelated bodies. */
+  readSpecificationPage(query: SpecificationBodyQuery) {
+    queryObject(query); validateBodyQuery(query, this.host.budgets); this.host.assertAllowed(query.providerId);
+    return this.host.query([query.providerId], query.requiredStaticRevision,
+      (ctx) => specificationBody(ctx, query, this.host.budgets, this.extensions.readers));
+  }
   /** Explicitly read selected Provider Specification documents; discovery never triggers this call. */
   readSpecification(query: ReadSpecificationQuery) {
     queryObject(query); this.host.assertAllowed(query.providerId);
@@ -228,6 +243,18 @@ export class BoundProviderGraph {
     validateSelection(normalized);
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => documents(ctx, normalized, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever, this.providerId));
+  }
+  /** Read a provider-local document page with the same source/version checks as the graph API. */
+  readDocumentPage(query: Omit<DocumentBodyQuery, "capability"> & { readonly capabilityId: string }) {
+    boundQuery(query); validateBodyQuery(query, this.host.budgets);
+    return this.host.query([this.providerId], query.requiredStaticRevision,
+      (ctx) => documentBody(ctx, { ...query, capability: { capabilityId: query.capabilityId } }, this.host.budgets, this.extensions.readers, this.providerId));
+  }
+  /** Page this Provider's explicitly identified Specification document. */
+  readSpecificationPage(query: Omit<SpecificationBodyQuery, "providerId">) {
+    boundQuery(query); validateBodyQuery(query, this.host.budgets);
+    return this.host.query([this.providerId], query.requiredStaticRevision,
+      (ctx) => specificationBody(ctx, { ...query, providerId: this.providerId }, this.host.budgets, this.extensions.readers));
   }
   /** Read this Provider's Specification only when explicitly requested. */
   readSpecification(query: Omit<ReadSpecificationQuery, "providerId"> = {}) {

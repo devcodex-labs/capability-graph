@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, rm, realpath, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile, symlink } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { FileAuthorityStore } from "../src/store/file-authority-store.js";
@@ -9,6 +8,7 @@ import { validateCapability, validateProvider } from "../src/validate/schema.js"
 import { RECORD_MAX_BYTES } from "../src/validate/values.js";
 import { assertProviderRelative, resolveProviderRelative } from "../src/knowledge/path-guard.js";
 import type { UnvalidatedCapabilityRecord, UnvalidatedProviderSnapshot } from "../src/store/types.js";
+import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 const provider = { providerId: "seed.http", name: "Seed", version: "1" };
 const row = (id: string, extra: object = {}): UnvalidatedCapabilityRecord => ({
@@ -22,13 +22,9 @@ const snapshot = (capabilities: readonly UnvalidatedCapabilityRecord[], root = p
 });
 
 async function fixture(run: (root: string) => Promise<void>): Promise<void> {
-  const parent = await realpath(tmpdir());
-  const root = await mkdtemp(path.join(parent, "capability-graph-definitions-"));
+  const root = await createTestDirectory("capability-graph-definitions-");
   try { await run(root); } finally {
-    assert.equal(path.dirname(root), parent);
-    assert.ok(path.basename(root).startsWith("capability-graph-definitions-"));
-    assert.equal(await realpath(root), root);
-    await rm(root, { recursive: true, force: true });
+    await removeTestDirectory(root);
   }
 }
 

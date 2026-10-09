@@ -45,7 +45,7 @@ jobs:
       - run: npm ci
         working-directory: website
       - run: npx playwright install --with-deps chromium
-      - run: npm run check:deployment && npm run check:types && npm run build && npm run test:site && npm run check:build && npm run check:package
+      - run: npm run check:deployment && npm run check:types && npm run build:built && npm run test:site && npm run check:package
         working-directory: website
         env:
           DEPLOYMENT_KIND: documentation

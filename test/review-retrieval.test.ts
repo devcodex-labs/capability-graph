@@ -1,23 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
-import os from "node:os";
+import { mkdir, symlink } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph, CapabilityGraphError, type KnowledgeRetriever, type OpenConfig } from "../src/index.js";
 import { seedProviderRoot } from "../examples/seed-api/main.js";
 import { FakeDatabase, record } from "./contract/fake-database.js";
+import { createTestDirectory, removeTestDirectory as removeTemporary } from "./contract/temporary-directory.js";
 
 const id = { providerId: "seed", capabilityId: "a" };
 const local = { providerId: "seed.http", capabilityId: "route.http" };
 const code = (expected: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === expected;
-async function removeTemporary(directory: string): Promise<void> {
-  const resolved = await realpath(directory);
-  assert.equal(path.dirname(resolved), await realpath(os.tmpdir()));
-  assert.ok(path.basename(resolved).startsWith("cg-review-"));
-  await rm(resolved, { recursive: true, force: true });
-  await assert.rejects(realpath(resolved), { code: "ENOENT" });
-}
 const config = (db: FakeDatabase, extra: Partial<OpenConfig> = {}): OpenConfig => ({
   hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
   providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => db } } }], ...extra,
@@ -97,7 +90,7 @@ test("S1: Core access errors retain safe diagnostics even if the retriever mutat
 });
 
 test("S1: local read failures retain the declared relative path at the public query boundary", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "cg-review-read-"));
+  const root = await createTestDirectory("cg-review-read-");
   const db = new FakeDatabase([record("a", { knowledge: [{ kind: "document", knowledgeId: "intro", role: "guide", locator: { type: "relative-file", path: "missing.md" } }] })]);
   db.knowledgeRootDir = root;
   let graph: CapabilityGraph | undefined;
@@ -113,7 +106,7 @@ test("S1: local read failures retain the declared relative path at the public qu
 });
 
 test("S1: a post-load junction escape retains only its declared relative path", async () => {
-  const temporary = await mkdtemp(path.join(os.tmpdir(), "cg-review-jail-"));
+  const temporary = await createTestDirectory("cg-review-jail-");
   const root = path.join(temporary, "root"); const outside = path.join(temporary, "outside");
   let graph: CapabilityGraph | undefined;
   try {

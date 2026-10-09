@@ -14,6 +14,7 @@ export interface BudgetConfig {
   readonly specification: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number };
   readonly selection: { readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number };
   readonly read: {
+    /** Maximum bytes in a page/stream chunk, NOT an admission limit on the document's total size. */
     readonly maxBytes: number;
     readonly maxDocumentsPerCall: number;
     /** Raw selection count, before deduplication. Omission inherits the default. */

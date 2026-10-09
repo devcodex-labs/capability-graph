@@ -140,18 +140,18 @@
   },
   {
     "id": "vextjs-integration",
-    "status": "Conceptual",
-    "source": null,
-    "verify": null,
-    "runDir": null,
-    "prerequisites": [],
-    "entry": null,
-    "proof": "职责与推荐组合，无执行证据",
+    "status": "Contract-only",
+    "source": "../examples/vextjs",
+    "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["固定安装的 VextJS schema 2 快照", "位于仓库外的实际项目", "真实验证另传框架根、项目根和来源身份"],
+    "entry": "scripts/validation/vextjs.mjs",
+    "proof": "默认自动回归覆盖 Provider/Runtime 接入合同；固定来源的真实 MCP、Redis、MongoDB、浏览器及 Session 验证独立运行，不代表通用生产认证或 Agent 成功率",
     "userResponsibilities": [
-      "实现并验证对应Adapter"
+      "固定来源并准备实际项目及外部服务；区分公开 HTTP 契约、启动快照与存活证据"
     ],
     "claims": [
-      "recommended integration shape only"
+      "native schema 2 Provider and runtime evidence contracts; opt-in real framework validation"
     ]
   },
   {

@@ -14,6 +14,9 @@
     "preview": "rspress preview",
     "pregenerate": "npm --prefix .. run build",
     "generate": "node scripts/generate.mjs",
+    "generate:built": "node ../scripts/validation/assert-current-build.mjs && node scripts/generate.mjs",
+    "build:built": "npm run generate:built && npm run check:content && npm run check:reference && npm run check:examples && node scripts/build-site.mjs && npm run check:build",
+    "check:built": "npm run check:release-order && npm run check:deployment && npm run check:types && npm run build:built && npm run test:site && npm run check:package",
     "check:content": "node ../scripts/validation/website/check-content.mjs",
     "check:types": "tsc --noEmit && tsc -p ../test/website/tsconfig.json --noEmit",
     "check:deployment": "node --test ../test/website/unit/artifact-paths.test.mjs ../test/website/unit/deployment.test.mjs",
@@ -23,7 +26,7 @@
     "check:package": "node ../scripts/validation/website/check-package-boundary.mjs",
     "check:build": "node ../scripts/validation/website/check-build-output.mjs",
     "test:site": "npm --prefix .. run test:site",
-    "check": "npm run check:release-order && npm run check:deployment && npm run check:types && npm run build && npm run test:site && npm run check:build && npm run check:package"
+    "check": "npm run check:release-order && npm run check:deployment && npm run check:types && npm run build && npm run test:site && npm run check:package"
   },
   "devDependencies": {
     "@rspress/core": "2.0.22",

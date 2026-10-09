@@ -19,20 +19,36 @@ export class FileAuthorityStore {
         }
         const handle = await open(resolved, "r");
         try {
-          // Read one byte beyond the record budget so oversized definitions fail before JSON parsing or allocation growth.
-          const bytes = Buffer.allocUnsafe(RECORD_MAX_BYTES + 1);
+          const before = await handle.stat({ bigint: true });
+          if (!before.isFile()) throw new Error("Definition must be a file");
+          if (before.size > BigInt(RECORD_MAX_BYTES)) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", {
+            nextAction: "repair_source", details: { file, maxBytes: RECORD_MAX_BYTES },
+          });
+          const verifiedPath = await realpath(path.join(root, file));
+          const verifiedRelative = path.relative(await realpath(root), verifiedPath);
+          if (verifiedRelative === ".." || verifiedRelative.startsWith(`..${path.sep}`) || path.isAbsolute(verifiedRelative)) throw new Error("Definition outside provider root");
+          const check = await open(verifiedPath, "r");
+          try {
+            const verified = await check.stat({ bigint: true });
+            if (before.dev !== verified.dev || before.ino !== verified.ino) throw new Error("Definition changed");
+          } finally { await check.close(); }
+          const bytes = Buffer.allocUnsafe(Math.max(1, Math.min(Number(before.size) + 1, 16384)));
+          const chunks: Buffer[] = [];
           let length = 0;
-          while (length < bytes.length) {
-            const result = await handle.read(bytes, length, bytes.length - length, length);
+          while (length <= RECORD_MAX_BYTES) {
+            const result = await handle.read(bytes, 0, Math.min(bytes.length, RECORD_MAX_BYTES + 1 - length), length);
             if (!result.bytesRead) break;
             length += result.bytesRead;
+            chunks.push(Buffer.from(bytes.subarray(0, result.bytesRead)));
           }
           if (length > RECORD_MAX_BYTES) {
             throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", {
               nextAction: "repair_source", details: { file, maxBytes: RECORD_MAX_BYTES },
             });
           }
-          return JSON.parse(bytes.subarray(0, length).toString("utf8")) as unknown;
+          const after = await handle.stat({ bigint: true });
+          if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs || BigInt(length) !== after.size) throw new Error("Definition changed");
+          return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, length))) as unknown;
         } finally { await handle.close(); }
       } catch (error) {
         if (error instanceof CapabilityGraphError) throw error;
@@ -54,8 +70,18 @@ export class FileAuthorityStore {
         throw new CapabilityGraphError("CG_LOAD_FAILED", { nextAction: "repair_source", details: { file: current || "." } });
       }
     }
-    const capabilities: UnvalidatedCapabilityRecord[] = [];
-    for (const file of files.sort()) capabilities.push(await read(file) as UnvalidatedCapabilityRecord);
+    files.sort();
+    const capabilities: UnvalidatedCapabilityRecord[] = new Array(files.length);
+    const failures: { index: number; error: unknown }[] = []; let next = 0;
+    // A shared load has at most eight reads. Stop dispatching after failure and join all started I/O.
+    await Promise.all(Array.from({ length: Math.min(8, files.length) }, async () => {
+      while (!failures.length && next < files.length) {
+        const index = next++;
+        try { capabilities[index] = await read(files[index]!) as UnvalidatedCapabilityRecord; }
+        catch (error) { failures.push({ index, error }); }
+      }
+    }));
+    if (failures.length) throw failures.sort((a, b) => a.index - b.index)[0]!.error;
     return { source: { kind: "file", rootDir: root }, provider, capabilities, knowledgeRootDir: root };
   }
 }

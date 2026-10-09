@@ -16,7 +16,7 @@ description: 诊断知识关联、Reader、路径、Retriever、索引证据和 
 
 批量读取逐项返回错误。保留成功文档，不要把混合结果统一改成 `not found`。知识正文不在 Static Revision 中，每次读取使用新的 contentId。
 
-`readDocuments()` 和 `readSpecification()` 还会检查整次请求预算：默认最多 32 个原始 selected、每种过滤最多 128 个值、最多读取 8 篇文档、每篇 32768 字节，完整 JSON 响应最多 4194304 个 UTF-8 字节。原始数量在去重前检查；缺失身份及失败槽位也占响应空间。数量、展开文档数或完整响应超限会以查询级 `CG_BUDGET_EXCEEDED` 失败，按更小的选择和过滤拆分请求；单篇正文超限仍保留逐项错误。`queryKnowledge()` 使用自己的预算，见[结果元数据与预算](../reference/result-meta)。
+全文接口默认最多 32 个原始 selected、每种过滤最多 128 个值、最多读取 8 篇文档，完整 JSON 响应最多 4194304 个 UTF-8 字节。原始数量在去重前检查；缺失身份及失败槽位也占响应空间。数量或整次响应超限时拆批或过滤；大正文使用 `readDocumentPage()` 或 `readSpecificationPage()`，默认每页 32768 字节，模型决定是否继续。文档总大小不是拒绝来源的理由。旧 Reader 未实现 stream 时，其全文回退仍受单次容量保护；实现流式协议即可读取任意大小来源。`queryKnowledge()` 使用自己的预算，见[结果元数据与预算](../reference/result-meta)。
 
 ## 检索与 Adapter
 

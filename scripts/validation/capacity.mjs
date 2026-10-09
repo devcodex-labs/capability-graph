@@ -6,9 +6,9 @@ import { setImmediate as nextTurn } from 'node:timers/promises';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 import { createTemporaryDirectory } from '../lib/website-paths.mjs';
 
-const defaults = { nodes: 10000, providers: 2, concurrency: 10, operations: 1000, durationMs: 0, reloadEvery: 500 };
+const defaults = { nodes: 10000, providers: 2, concurrency: 10, operations: 1000, durationMs: 0, reloadEvery: 500, reloadRounds: 2 };
 const names = { '--nodes': 'nodes', '--providers': 'providers', '--concurrency': 'concurrency',
-  '--operations': 'operations', '--duration-ms': 'durationMs', '--reload-every': 'reloadEvery' };
+  '--operations': 'operations', '--duration-ms': 'durationMs', '--reload-every': 'reloadEvery', '--reload-rounds': 'reloadRounds' };
 const kinds = ['catalog', 'filteredCatalog', 'details', 'neighbors', 'selection', 'documents', 'specification'];
 const id = (index) => `c${String(index).padStart(6, '0')}`;
 const maxLatencySamples = 4096;
@@ -39,7 +39,8 @@ export function normalizeCapacityOptions(options = {}) {
     if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`Invalid capacity option: ${key}`);
   }
   if (resolved.nodes < resolved.providers * 2) throw new Error('Each Provider needs a root and a child');
-  if (resolved.operations < kinds.length) throw new Error('Operations must cover every query kind');
+  if (resolved.operations < kinds.length * resolved.providers) throw new Error('Operations must cover every Provider and query kind');
+  if (resolved.reloadRounds < 2) throw new Error('At least two reload rounds per Provider are required');
   return resolved;
 }
 
@@ -66,6 +67,10 @@ export async function runCapacity(options = {}, progress = () => {}) {
     version: '1', reloads: 0 }));
   const latencies = Object.fromEntries(kinds.map((kind) => [kind, { count: 0, values: [], maxMs: 0, seed: 12345 }]));
   const reloads = [];
+  const retirementChecks = [];
+  const providerQueries = Object.fromEntries(sources.map((source) => [source.providerId,
+    Object.fromEntries(kinds.map((kind) => [kind, 0]))]));
+  const catalogCoverage = { pages: 0, items: 0, itemsByProvider: Object.fromEntries(sources.map((source) => [source.providerId, 0])) };
   const memory = { samples: 0, sampledPeakHeapBytes: 0, sampledPeakRssBytes: 0, sampledPeakExternalBytes: 0 };
   const sample = () => {
     const usage = process.memoryUsage();
@@ -77,7 +82,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
   const begun = performance.now();
   const sampler = setInterval(sample, 250);
   let graph, reloadTask, failure, inFlight = 0, peakInFlight = 0, nextOperation = 0, cursorRestarts = 0;
-  let setupMs, openMs, workloadMs, closeMs, pinnedReadsCompleted = 0;
+  let setupMs, openMs, correctnessMs, workloadMs, closeMs, pinnedReadsCompleted = 0, pinBarrier;
   try {
     for (const source of sources) {
       await mkdir(source.root);
@@ -100,30 +105,108 @@ export async function runCapacity(options = {}, progress = () => {}) {
     const opening = performance.now();
     graph = await CapabilityGraph.open({ hostAllowedProviders: sources.map((source) => source.providerId),
       integrationEnabledProviders: sources.map((source) => source.providerId),
-      providers: sources.map((source) => ({ providerId: source.providerId, authority: { kind: 'file', rootDir: source.root } })) });
+      providers: sources.map((source) => ({ providerId: source.providerId, authority: { kind: 'file', rootDir: source.root } })),
+      knowledgeRetriever: { id: 'capacity-pin', retrieve: async (input, access) => {
+        assert(pinBarrier, 'only retirement probes use the controlled retriever');
+        pinBarrier.entered.resolve();
+        await pinBarrier.resume.promise;
+        const documents = [];
+        for (const target of input.targets) {
+          const body = await access.read({ id: target.id, knowledgeId: target.knowledgeId }, { maxBytes: 32768 });
+          assert.equal(new TextDecoder().decode(body.bytes), 'Capacity guide 正文\n');
+          documents.push({ id: target.id, knowledgeId: target.knowledgeId,
+            sourceContentId: body.contentId, indexedContentId: body.contentId });
+        }
+        return { hits: [], evidence: { staticRevisionByProvider: input.staticRevisionByProvider,
+          mappingRevision: input.mappingRevision, observedAt: new Date().toISOString(), freshness: 'current',
+          sourceConfigRevision: 'capacity-pin:1', indexedConfigRevision: 'capacity-pin:1', documents } };
+      } } });
     openMs = performance.now() - opening;
     sample(); progress({ phase: 'open', openMs });
+    const correctnessStart = performance.now();
+    // A single uninterrupted walk proves every expected identity exactly once,
+    // regardless of how far any individual load worker advances its cursor.
+    const orderedSources = [...sources].sort((a, b) => a.providerId < b.providerId ? -1 : 1);
+    let catalogCursor, providerIndex = 0, capabilityIndex = 0;
+    do {
+      const page = await graph.listCatalog({ limit: 100, ...(catalogCursor ? { cursor: catalogCursor } : {}) });
+      assert(page.items.length > 0 && page.items.length <= 100, 'Catalog must make progress');
+      assert.equal(page.meta.warnings.length, 0);
+      assert(Buffer.byteLength(JSON.stringify(page)) <= 24576);
+      for (const item of page.items) {
+        const source = orderedSources[providerIndex];
+        assert(source, 'Catalog returned an unexpected identity');
+        assert.deepEqual(item.id, { providerId: source.providerId, capabilityId: id(capabilityIndex) });
+        catalogCoverage.itemsByProvider[source.providerId]++;
+        catalogCoverage.items++;
+        if (++capabilityIndex === source.nodes) { providerIndex++; capabilityIndex = 0; }
+      }
+      catalogCoverage.pages++;
+      catalogCursor = page.nextCursor;
+    } while (catalogCursor);
+    assert.equal(catalogCoverage.items, config.nodes, 'Catalog omitted expected identities');
+    assert.equal(providerIndex, sources.length);
+    progress({ phase: 'catalog-coverage', ...catalogCoverage });
+
+    const reloadProvider = async (source, phase) => {
+      const before = (await graph.getProvider(source.providerId)).staticRevision;
+      const expired = source.previousRevision;
+      source.version = String(++source.reloads + 1);
+      await writeFile(path.join(source.root, 'provider.json'), JSON.stringify(manifest(source.providerId, source.version)));
+      const overlap = inFlight;
+      const started = performance.now();
+      const result = await graph.reload({ providerId: source.providerId });
+      assert(result.ok, 'reload must publish a validated file view');
+      const current = await graph.getProvider(source.providerId);
+      assert.notEqual(current.staticRevision, before);
+      const retained = await graph.getProvider(source.providerId, { requiredStaticRevision: before });
+      assert.equal(retained.meta.servedFrom, 'previous');
+      if (expired) await assert.rejects(graph.getProvider(source.providerId, { requiredStaticRevision: expired }), { code: 'CG_REVISION_MISMATCH' });
+      source.previousRevision = before;
+      const event = { providerId: source.providerId, phase, durationMs: performance.now() - started, inFlightAtStart: overlap,
+        pinnedQueryActive: Boolean(pinBarrier), revisionChanged: true, previousReadable: true, previousRetired: Boolean(expired) };
+      reloads.push(event);
+      progress({ ...event, reloadPhase: phase, phase: 'reload' });
+    };
+    const deferred = () => {
+      let resolve, reject;
+      const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+      return { promise, resolve, reject };
+    };
+    // Force multiple swaps for every Provider while a real public query holds
+    // its original view. New queries must lose the oldest slot; the pin survives.
+    for (const source of sources) {
+      const pinnedRevision = (await graph.getProvider(source.providerId)).staticRevision;
+      const barrier = { entered: deferred(), resume: deferred() };
+      pinBarrier = barrier;
+      const pending = graph.forProvider(source.providerId).queryKnowledge({ selected: [{ capabilityId: id(1) }],
+        knowledgeIds: ['GUIDE'], text: 'no-match' });
+      pending.then(() => barrier.entered.reject(new Error('Query did not reach the pin barrier')),
+        (error) => barrier.entered.reject(error));
+      try {
+        await barrier.entered.promise;
+        for (let round = 0; round < config.reloadRounds; round++) await reloadProvider(source, 'retirement');
+        await assert.rejects(graph.getProvider(source.providerId, { requiredStaticRevision: pinnedRevision }), { code: 'CG_REVISION_MISMATCH' });
+        barrier.resume.resolve();
+        const page = await pending;
+        assert.equal(page.meta.staticRevision, pinnedRevision);
+        assert.equal(page.meta.completeness, 'complete');
+        retirementChecks.push({ providerId: source.providerId, rounds: config.reloadRounds, previousRetired: true, pinnedQueryCompleted: true });
+      } finally {
+        barrier.resume.resolve();
+        await Promise.allSettled([pending]);
+        pinBarrier = undefined;
+      }
+    }
+    assert.equal(retirementChecks.length, sources.length);
+    correctnessMs = performance.now() - correctnessStart;
+    sample(); progress({ phase: 'correctness', correctnessMs, retirementChecks });
     const workloadStart = performance.now();
     const deadline = workloadStart + config.durationMs;
     const maybeReload = (ordinal) => {
       if (!config.reloadEvery || ordinal % config.reloadEvery || reloadTask) return;
       const source = sources[reloads.length % sources.length];
-      reloadTask = (async () => {
-        const before = (await graph.getProvider(source.providerId)).staticRevision;
-        source.version = String(++source.reloads + 1);
-        await writeFile(path.join(source.root, 'provider.json'), JSON.stringify(manifest(source.providerId, source.version)));
-        const overlap = inFlight;
-        const started = performance.now();
-        const result = await graph.reload({ providerId: source.providerId });
-        assert(result.ok, 'reload must publish a validated file view');
-        const current = await graph.getProvider(source.providerId);
-        assert.notEqual(current.staticRevision, before);
-        const retained = await graph.getProvider(source.providerId, { requiredStaticRevision: before });
-        assert.equal(retained.meta.servedFrom, 'previous');
-        reloads.push({ providerId: source.providerId, durationMs: performance.now() - started, inFlightAtStart: overlap,
-          revisionChanged: true, previousReadable: true });
-        progress({ phase: 'reload', ...reloads.at(-1) });
-      })().catch((error) => { failure = error; }).finally(() => { reloadTask = undefined; });
+      reloadTask = reloadProvider(source, 'load').catch((error) => { failure = error; }).finally(() => { reloadTask = undefined; });
     };
     const workers = await Promise.allSettled(Array.from({ length: config.concurrency }, (_, worker) => (async () => {
       let cursor;
@@ -132,7 +215,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
           if (failure) throw failure;
           const ordinal = nextOperation++;
           const kind = kinds[ordinal % kinds.length];
-          const source = sources[ordinal % sources.length];
+          const source = sources[Math.floor(ordinal / kinds.length) % sources.length];
           const bound = graph.forProvider(source.providerId);
           const child = id(1 + ((ordinal + worker) % (source.nodes - 1)));
           const start = performance.now();
@@ -146,6 +229,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
                 assert(page.items.every((item) => sources.some((source) => source.providerId === item.id.providerId)));
                 assert.equal(page.meta.warnings.length, 0);
                 assert(Buffer.byteLength(JSON.stringify(page)) <= 24576);
+                for (const providerId of new Set(page.items.map((item) => item.id.providerId))) providerQueries[providerId].catalog++;
                 cursor = page.nextCursor;
               } catch (error) {
                 if (!cursor || error.code !== 'CG_REVISION_MISMATCH') throw error;
@@ -153,6 +237,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
                 // Verify recovery immediately; a rejected stale cursor alone is not a successful query.
                 const restarted = await graph.listCatalog({ limit: 100 });
                 assert(restarted.items.length > 0); assert.equal(restarted.meta.warnings.length, 0);
+                for (const providerId of new Set(restarted.items.map((item) => item.id.providerId))) providerQueries[providerId].catalog++;
                 cursor = restarted.nextCursor;
               }
             } else if (kind === 'filteredCatalog') {
@@ -179,6 +264,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
               assert.equal(page.results.length, 1); assert(page.results[0].ok);
               assert.equal(page.results[0].value.text, 'Capacity guide 正文\n');
             }
+            if (kind !== 'catalog') providerQueries[source.providerId][kind]++;
             recordLatency(latencies[kind], performance.now() - start);
           } finally { inFlight--; }
           // Let reload I/O, memory sampling and other workers run between CPU-heavy pages.
@@ -191,6 +277,8 @@ export async function runCapacity(options = {}, progress = () => {}) {
     assert(workers.every((worker) => worker.status === 'fulfilled'));
     workloadMs = performance.now() - workloadStart;
     assert(kinds.every((kind) => latencies[kind].count), 'every query family must execute');
+    assert(Object.values(providerQueries).every((counts) => kinds.filter((kind) => kind !== 'catalog').every((kind) => counts[kind] > 0)),
+      'every Provider must execute every bound query family');
     assert(peakInFlight <= config.concurrency);
     const closing = performance.now();
     const pending = Array.from({ length: config.concurrency }, () => graph.forProvider(sources[0].providerId)
@@ -209,9 +297,10 @@ export async function runCapacity(options = {}, progress = () => {}) {
   }
   await assert.rejects(stat(root), { code: 'ENOENT' });
   return { ...config, node: process.version, platform: process.platform, topology: 'per-provider star with all four forward/reverse relations',
-    authority: 'real file definitions and local document I/O', setupMs, openMs, workloadMs, closeMs,
+    authority: 'real file definitions and local document I/O', setupMs, openMs, correctnessMs, workloadMs, closeMs,
     operationsCompleted: Object.values(latencies).reduce((sum, state) => sum + state.count, 0), peakInFlight,
-    queries: Object.fromEntries(kinds.map((kind) => [kind, summary(latencies[kind])])), reloads, cursorRestarts,
+    queries: Object.fromEntries(kinds.map((kind) => [kind, summary(latencies[kind])])), providerQueries,
+    catalogCoverage, retirementChecks, reloads, cursorRestarts,
     memory,
     pinnedReadsCompleted, closedQueriesRejected: true, temporarySourcesRemoved: true, modelCalls: 0,
     limitations: 'Local bounded load; sampled memory; no production SLA, database-driver retirement or model-quality claim' };

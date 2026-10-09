@@ -75,10 +75,10 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 | 省略 `knowledgeIds` | 读取匹配的直接 Document；Collection 成员必须显式选择 |
 | 省略 `roles/locales` | 不限制对应维度；locale 规范化后精确匹配，无父语言回退 |
 | `knowledgeIds/roles/locales: []` | 合法但匹配为空；不要与 `queryKnowledge` 不允许空 `knowledgeIds` 的规则混淆 |
-| 正文预算 | 默认每篇最多 32,768 字节，每次最多 8 篇；篇数在实际读取前检查，超限为查询级 `CG_BUDGET_EXCEEDED` |
+| 正文预算 | 每次最多 8 篇；全文读取受单次完整响应预算保护，文档总大小不设准入门槛；大文档使用下方分页接口 |
 | 原始输入预算 | selected 默认最多 32 项；knowledgeIds/roles/locales 每维默认最多 128 项，重复值也计数，超限在点读前失败 |
 | 完整响应预算 | 默认 4 MiB JSON UTF-8 字节，包含正文转义、失败槽位和元数据；超限为查询级 `CG_BUDGET_EXCEEDED`，需要拆批或过滤 |
-| 单篇失败 | 缺失文件、无匹配 Reader、非法 UTF-8、Reader 合同错误或单篇超限产生失败槽位，其他成功项保留；查看 `meta.completeness` |
+| 单篇失败 | 缺失文件、无匹配 Reader、非法 UTF-8、Reader 合同错误或全文超过单次响应容量产生失败槽位；改用分页可继续读取大文档 |
 
 具体 Reader 选择、来源身份和错误码见[Reader 与 Adapter](./runtime-adapter#knowledgereader)。这里的默认值可以通过 `budgets.read` 调整，不能绕过所选修订和 Provider 范围。
 
@@ -93,5 +93,30 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 ## queryKnowledge
 
 `KnowledgeSearchTarget` 只含最终过滤后的公开文档映射，不含绝对知识根或 `readContext`。原始数组、最终目标数与目标 JSON 字节数均有预算，超限时 Retriever 不会被调用。后端的 `KnowledgeHit` 使用 UTF-8 字节偏移，`endOffset` 为开区间；Core 核验后生成带正式路由元数据的 `KnowledgeResultHit`。`KnowledgeIndexEvidence` 必须证明映射、配置和内容身份与当前请求一致，即使零命中也不能省略。
+
+## 正文分段读取
+
+<span className="cg-status">可用</span>
+
+`DocumentBodyQuery` 与 `SpecificationBodyQuery` 分别用于 `readDocumentPage()`、`readSpecificationPage()`。选择能力和文档后，模型决定读取范围与是否继续。小文档一页可包含全文；大文档使用 `nextCursor` 连续读完，无需改写来源或提高整篇门槛。
+
+```ts
+const provider = graph.forProvider('seed.http');
+let cursor: string | undefined;
+do {
+  const page = await provider.readDocumentPage({
+    capabilityId: 'route.validation', knowledgeId: 'D-02',
+    ...(cursor ? { cursor } : {}),
+  });
+  // 根据 page.text 决定是否继续；此处示意读取全部页。
+  cursor = page.nextCursor;
+} while (cursor);
+```
+
+`DocumentBodyPage` 明确返回 UTF-8 字节范围 `startOffset/endOffset`、总字节数 `totalBytes`、本页 `byteLength`、`hasMore` 与可选 `nextCursor`。`complete` 只在本次返回整篇时为 true；末页不等于全文。全文 `contentId` 和 `pageContentId` 分别计算，保留 BOM 与原始换行。默认页大小 32768 字节，由 `read.maxBytes` 控制，单次 JSON 响应仍受 `read.maxResponseBytes` 保护。
+
+可指定 `startOffset/maxBytes` 读取范围，或传 `cursor` 续读；不能同时指定 `cursor/startOffset`。偏移必须在 UTF-8 边界。分页优先在较近的段落或围栏行结束；超长单行、代码块通过明确的连续范围读取。游标绑定 Provider、文档身份、静态修订、来源路径和全文哈希。来源正文变化，即使静态修订没变，旧游标也返回 `CG_REVISION_MISMATCH`。
+
+本地读取逐块计算完整哈希并检查打开文件的身份与变更；HTTP 参考 Reader 支持无 Range 的来源，流式读取全文，只保留所选范围，整体期限或 `signal` 会终止实际连接。每页核验全文意味着额外 I/O，不能把范围响应字节数当实际来源读取量。旧 Reader 仅实现 `read` 时采用有界全文回退；超过回退容量或需要真实取消时应实现 `stream`。失败后已启动的读取与资源清理完成才结束查询。
 
 <Contracts />

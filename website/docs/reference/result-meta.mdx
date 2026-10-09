@@ -86,7 +86,7 @@ Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticR
 | Neighbors | 50 默认页、100 最大页、24,576 页字节、2,048 单项字节 |
 | Detail | 20 能力、16,384 单项字节、131,072 总字节 |
 | Selection | 32 个显式能力、128 个闭包能力、256 条依赖边 |
-| Document read | 每篇 32,768 字节、每次 8 文档 |
+| Document read | 默认页 32,768 字节、全文每次 8 文档；大文档可续读 |
 | Specification documents | 每页 20 项、131,072 页字节；正文仍受 Document read 预算约束 |
 | Capability retrieval | 20 候选、512 单候选字节 |
 | Knowledge query | 32 个原始 selected、每维 128 个过滤值、128 个最终 targets、8 命中、2,048 单个 snippet 字节 |
@@ -121,7 +121,7 @@ Selection 按选择、节点和依赖边数量限制工作量，当前没有独�
 | `selection.maxSelected` | 32 | 去重前显式选择数量 |
 | `selection.maxNodes` | 128 | 完整闭包节点数量 |
 | `selection.maxEdges` | 256 | 完整闭包真实依赖边数量 |
-| `read.maxBytes` | 32768 | 每篇正文原始字节 |
+| `read.maxBytes` | 32768 | 每页/流式块原始字节，不限制整篇大小 |
 | `read.maxDocumentsPerCall` | 8 | 整次正文读取文档数量 |
 | `read.maxSelected` | 32 | 文档读取原始 selected 数量，去重前检查 |
 | `read.maxFilterValuesPerDimension` | 128 | 直接读取每维 knowledgeIds/roles/locales 原始数量 |

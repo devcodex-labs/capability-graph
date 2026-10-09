@@ -1,21 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm, realpath, mkdir, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile, mkdir, symlink } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph, CapabilityGraphError, type KnowledgeDocumentRef, type KnowledgeReader, type OpenConfig } from "../src/index.js";
 import { contentId } from "../src/knowledge/local-file-reader.js";
 import { FakeDatabase, record } from "./contract/fake-database.js";
+import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 const doc = (knowledgeId: string, file = `${knowledgeId}.md`): KnowledgeDocumentRef => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "relative-file", path: file } });
 const http: KnowledgeDocumentRef = { kind: "document", knowledgeId: "remote", role: "guide", locator: { type: "http", url: "https://example.test/doc" } };
 const id = (capabilityId: string, providerId = "seed") => ({ providerId, capabilityId });
 const code = (expected: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === expected;
 async function fixture(run: (root: string) => Promise<void>) {
-  const parent = await realpath(tmpdir()); const root = await mkdtemp(path.join(parent, "capability-graph-read-"));
+  const root = await createTestDirectory("capability-graph-read-");
   try { await run(root); } finally {
-    assert.equal(path.dirname(root), parent); assert.ok(path.basename(root).startsWith("capability-graph-read-"));
-    assert.equal(await realpath(root), root); await rm(root, { recursive: true, force: true });
+    await removeTestDirectory(root);
   }
 }
 const config = (root: string, records: ReturnType<typeof record>[], extra: Partial<OpenConfig> = {}): OpenConfig => ({
@@ -67,13 +66,15 @@ test("known and unknown requested knowledge IDs both retain slots, in determinis
   } finally { await graph.close(); }
 }));
 
-test("read limits apply to expanded slots and complete document bytes, never a successful prefix", async () => fixture(async (root) => {
+test("read limits apply to expanded slots; page budgets do not reject full small documents", async () => fixture(async (root) => {
   await writeFile(path.join(root, "large.md"), "12345");
   const graph = await CapabilityGraph.open(config(root, [record("a", { knowledge: [doc("large"), doc("other")] })], { budgets: { read: { maxBytes: 4, maxDocumentsPerCall: 1 } } }));
   try {
     await assert.rejects(graph.readDocuments({ selected: [id("a")] }), code("CG_BUDGET_EXCEEDED"));
     const page = await graph.readDocuments({ selected: [id("a")], knowledgeIds: ["large"] });
-    assert.ok(!page.results[0]!.ok); assert.equal(page.results[0]!.error.code, "CG_BUDGET_EXCEEDED");
+    assert.ok(page.results[0]!.ok); assert.equal(page.results[0]!.value.text, "12345");
+    const chunk = await graph.readDocumentPage({ capability: id("a"), knowledgeId: "large" });
+    assert.equal(chunk.text, "1234"); assert.equal(chunk.complete, false); assert.ok(chunk.nextCursor);
   } finally { await graph.close(); }
 }));
 

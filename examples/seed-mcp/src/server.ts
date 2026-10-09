@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CapabilityGraph, CapabilityGraphError, parseQualifiedId } from "@devcodex/capability-graph";
@@ -51,6 +49,14 @@ export function createSeedServer(graph: CapabilityGraph, providerRoot: string): 
     ...scope, selected: z.array(id), knowledgeIds: z.array(z.string()).optional(), roles: z.array(z.string()).optional(),
     locales: z.array(z.string()).optional(),
   } }, (query) => call(() => graph.readDocuments(query)));
+  const bodyPage = { knowledgeId: z.string(), startOffset: z.number().int().nonnegative().optional(),
+    maxBytes: z.number().int().positive().optional(), cursor: z.string().optional(), requiredStaticRevision: z.string().optional() };
+  server.registerTool("example_read_document_page", { description: "Read a document page. For large sources, decide whether to continue with nextCursor. Full-document and page hashes are separate.", inputSchema: {
+    ...bodyPage, capability: id,
+  } }, (query, extra) => call(() => graph.readDocumentPage({ ...query, signal: extra.signal })));
+  server.registerTool("example_read_specification_page", { description: "Read one Specification document page and optionally continue with its version-bound cursor.", inputSchema: {
+    ...bodyPage, providerId: z.string(),
+  } }, (query, extra) => call(() => graph.readSpecificationPage({ ...query, signal: extra.signal })));
   server.registerTool("example_read_specification", { description: "Explicitly read selected Specification documents from one Provider.", inputSchema: {
     providerId: z.string(), knowledgeIds: z.array(z.string()).optional(), locales: z.array(z.string()).optional(),
     requiredStaticRevision: z.string().optional(),
@@ -66,8 +72,11 @@ export function createSeedServer(graph: CapabilityGraph, providerRoot: string): 
     ...scope, project: z.string(), environment: z.string(), instanceOf: id.optional(), instanceId: z.string().optional(),
     requiredRuntimeRevision: z.string().optional(), cursor: z.string().optional(), limit: z.number().int().positive().optional(),
   } }, (query) => call(() => graph.queryRuntime(query)));
-  server.registerResource("provider-specification", "seed://provider/specification", { mimeType: "text/markdown" }, async (uri) => ({
-    contents: [{ uri: uri.href, mimeType: "text/markdown", text: await readFile(path.join(providerRoot, "PROVIDER.md"), "utf8") }],
-  }));
+  server.registerResource("provider-specification", "seed://provider/specification", { mimeType: "text/markdown" }, async (uri) => {
+    const batch = await graph.forProvider("seed.http").readSpecification({ knowledgeIds: ["SPEC-01"] });
+    const slot = batch.results[0];
+    if (!slot || !slot.ok) throw new CapabilityGraphError(slot && !slot.ok ? slot.error.code : "CG_NOT_FOUND", { nextAction: "repair_source" });
+    return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: slot.value.text }] };
+  });
   return server;
 }

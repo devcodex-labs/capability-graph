@@ -158,8 +158,8 @@ for (const entry of statuses) {
   }
 }
 const vext = statuses.find((entry) => entry.id === 'vextjs-integration');
-if (!vext || vext.status !== 'Conceptual' || vext.source !== null || vext.verify !== null) {
-  fail('VextJS integration must remain Conceptual without runnable evidence');
+if (!vext || vext.status !== 'Contract-only' || vext.source !== '../examples/vextjs' || vext.verify !== 'npm test') {
+  fail('VextJS integration must retain the explicit contract and opt-in real-source boundary');
 }
 
 const publicRoutes = new Set(publicPages.map((file) => path.relative(docsRoot, file)

@@ -150,7 +150,9 @@ npm run evaluate
 
 `npm run demo:http` 运行真实 Node.js HTTP 文档读取、能力词项召回、知识检索、过期拒绝和重建恢复，再请求业务路由。示例不调用模型；数据库与真实框架接入仍需分别实现和验证。
 
-`npm run evaluate:capacity` 执行可复用的真实文件容量验证。默认 1 万节点、2 个 Provider、10 并发，混合目录/详情/八类邻居/选择/正文/规范查询，并交错定义更新与 reload，验证关闭时已 pin 的读取完成和新查询拒绝。扩大验证可运行 `npm run evaluate:capacity -- --nodes 100000 --providers 2 --concurrency 100 --operations 3000 --duration-ms 120000 --reload-every 1000`；持续时间是负载下限，等待中的 reload/读取会延长总耗时。临时来源执行后删除，JSON 报告保留在同级产物目录。延迟和采样内存只说明本机本次运行，不是生产容量承诺。
+`npm run evaluate:capacity` 执行可复用的真实文件容量验证。默认 1 万节点、2 个 Provider、10 并发：先完整遍历全局 Catalog，核对跨 Provider 的全部身份、无遗漏和重复；再强制每个 Provider 至少两轮 reload，验证旧 previous 退出可查询槽位，同时已 pin 的查询仍能读取原视图。随后混合目录/详情/八类邻居/选择/正文/规范查询，交错定义更新与 reload，最后验证关闭时读取完成和新查询拒绝。报告分别记录 `catalogCoverage`、`retirementChecks`、负载中的 `providerQueries` 与各阶段耗时；全局 Catalog 的负载计数按页面实际出现的 Provider 统计。
+
+扩大验证可运行 `npm run evaluate:capacity -- --nodes 100000 --providers 2 --concurrency 100 --operations 3000 --duration-ms 120000 --reload-every 1000 --reload-rounds 2`。操作数至少为 `7 × Provider 数`；`--reload-rounds` 可增大但不能少于两轮，`--reload-every 0` 只关闭负载期间的交错 reload。持续时间是负载下限，完整遍历、强制 reload 及等待中的读取会增加总耗时。临时来源执行后删除，JSON 报告保留在同级产物目录。延迟和采样内存只说明本机本次运行，不是生产容量承诺。
 
 容量工具每类延迟最多保留 4096 个样本，报告标明分位数来自全量还是抽样；计数和最大值持续累计，内存统计也使用固定大小，避免验证工具自身随运行时长持续增长。
 
@@ -172,3 +174,9 @@ npm run evaluate
 ## 许可证
 
 Apache-2.0
+
+大文档使用 `readDocumentPage` / `readSpecificationPage`，模型决定范围与是否续读。默认 32 KiB 是页大小，文档总大小不设准入门槛；全文与本页哈希分开，内容变化拒绝旧游标。旧全文接口保持完整返回语义，超过单次响应容量时改用分页。
+
+VextJS 的固定原生 schema 2 接入与实际验证入口见 [examples/vextjs](examples/vextjs/README.md)。原生目录角色与来源保留，运行快照保持 partial/unknown/unverified；默认回归与外部框架、数据库、浏览器证据分开。
+
+CI 的 `test:package:built`、`evaluate:built` 和 website `build:built` 先核对源码及全部输出指纹；普通命令仍从当前源构建。共享 dist 的构建必须串行，临时报告、服务数据和浏览器输出在仓库外。

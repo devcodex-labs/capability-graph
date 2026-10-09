@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { request as httpRequest, type ClientRequest } from "node:http";
+import { request as httpRequest, type ClientRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import type { KnowledgeReader, KnowledgeDocumentRef, KnowledgeReadContext } from "@devcodex/capability-graph";
 
@@ -13,6 +13,7 @@ export class HttpKnowledgeReader implements KnowledgeReader {
   private readonly maxConcurrent: number;
   private readonly requests = new Set<ClientRequest>();
   private readonly pending = new Set<Promise<ReadResult>>();
+  private readonly streams = new Set<Promise<void>>();
   private closed = false;
 
   constructor(options: { allowedOrigins: readonly string[]; timeoutMs?: number; maxConcurrent?: number }) {
@@ -29,6 +30,51 @@ export class HttpKnowledgeReader implements KnowledgeReader {
   }
   get activeRequests(): number { return this.requests.size; }
   canRead(ref: Parameters<KnowledgeReader["canRead"]>[0]): boolean { return ref.kind === "document" && ref.locator.type === "http"; }
+  /** Full-body streaming also supports servers without Range/ETag. Core computes the full hash.
+   * The deadline covers the entire transfer and abort destroys the actual socket. */
+  async *stream(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, options: { chunkBytes: number; signal?: AbortSignal }) {
+    if (this.closed || ref.locator.type !== "http") throw new Error("Reader unavailable");
+    const source = ref.locator.url; const url = new URL(source);
+    if (!this.origins.has(url.origin) || url.username || url.password || this.requests.size >= this.maxConcurrent) throw new Error("Source unavailable");
+    options.signal?.throwIfAborted();
+    let finish!: () => void;
+    const done = new Promise<void>((resolve) => { finish = resolve; }); this.streams.add(done);
+    let request: ClientRequest | undefined; let timer: ReturnType<typeof setTimeout> | undefined;
+    const abort = () => request?.destroy(new Error("HTTP knowledge transfer aborted"));
+    try {
+      const response = await new Promise<IncomingMessage>((resolve, reject) => {
+        request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
+          method: "GET", agent: false, headers: { "accept-encoding": "identity", accept: "text/plain, text/markdown" },
+        }, resolve);
+        this.requests.add(request);
+        request.on("error", reject);
+        options.signal?.addEventListener("abort", abort, { once: true });
+        timer = setTimeout(() => request?.destroy(new Error("HTTP knowledge deadline exceeded")), this.timeoutMs);
+        request.end();
+      });
+      const encoding = response.headers["content-encoding"];
+      if (response.statusCode !== 200 || (encoding && encoding !== "identity")) throw new Error("Source unavailable");
+      const contentType = response.headers["content-type"] ?? "text/plain; charset=utf-8";
+      let emitted = false;
+      for await (const chunk of response) {
+        options.signal?.throwIfAborted();
+        const bytes = Buffer.from(chunk);
+        for (let offset = 0; offset < bytes.length; offset += options.chunkBytes) {
+          emitted = true; yield { bytes: bytes.subarray(offset, offset + options.chunkBytes), source, contentType };
+        }
+      }
+      if (!response.complete) throw new Error("Incomplete source");
+      if (!emitted) yield { bytes: new Uint8Array(), source, contentType };
+    } finally {
+      clearTimeout(timer); options.signal?.removeEventListener("abort", abort);
+      if (request) {
+        request.destroy();
+        if (!request.closed) await new Promise<void>((resolve) => request!.once("close", resolve));
+        this.requests.delete(request);
+      }
+      finish(); this.streams.delete(done);
+    }
+  }
   read(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, budget: { maxBytes: number }): Promise<ReadResult> {
     const task = this.transfer(ref, budget.maxBytes);
     this.pending.add(task);
@@ -88,6 +134,6 @@ export class HttpKnowledgeReader implements KnowledgeReader {
   async close(): Promise<void> {
     this.closed = true;
     for (const request of this.requests) request.destroy(new Error("Reader closed"));
-    await Promise.allSettled([...this.pending]);
+    await Promise.allSettled([...this.pending, ...this.streams]);
   }
 }

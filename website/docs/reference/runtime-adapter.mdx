@@ -69,7 +69,8 @@ Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有�
 |---|---|---|
 | retrieveCapabilities | 非空 text，允许 scope 与当前静态修订 → 候选身份/score/sourceStaticRevision，再投影 CapabilityCandidate | limit 默认/最大 20，单候选 512 字节；未配置 CG_RETRIEVER_UNCONFIGURED，后端异常 CG_RETRIEVER_UNAVAILABLE；不合法候选剔除并 warning/partial |
 | queryKnowledge | 非空 text、非空 selected，knowledgeIds/roles/locales 可选 → QueryKnowledgePage | limit 默认/最大 8，snippet 2,048 UTF-8 字节；原始 selected 32、每维过滤 128、最终 targets 128/131,072 字节，检索前校验 |
-| KnowledgeReader.read | 必填 Document、只在 Reader 内可用的 context、maxBytes → bytes/contentType/contentId/source | 默认每篇 32,768 字节；bytes 为 Uint8Array，contentId 为 k: 加原始 bytes 的 SHA-256 小写十六进制前 16 位，source 精确等于 locator；错误逐文档返回，不拼接 Collection |
+| KnowledgeReader.read | 必填 Document、只在 Reader 内可用的 context、maxBytes → bytes/contentType/contentId/source | 返回完整有界字节；全文调用默认受 4 MiB 响应容量保护；contentId 为原始完整 bytes 的 SHA-256 前 16 位，source 精确等于 locator |
+| KnowledgeReader.stream | 可选 Document/context/chunkBytes/signal → AsyncIterable 字节块 | 单块不超过 chunkBytes，总文档大小不设门槛；Core 计算完整哈希；取消和迭代器退出必须关闭实际 I/O |
 | RuntimeAdapter.query | 必填 project/environment/currentStaticRevision/limit，可选 instanceOf/instanceId/cursor → RuntimeAdapterResult | 输入 limit 来自 runtime 有效预算；Core 默认等 5,000ms，不发送 AbortSignal；完整校验见[Runtime](./runtime) |
 | DatabaseReadView 扫描/邻居 | StorePageRequest 必填 limit/maxBytes，cursor 可选 → StorePage&lt;T&gt; | 按收到的数量/字节预算返回严格有序且有进展的页；坏页/漂移使验证或查询失败，不以空页绕过合同 |
 
@@ -91,7 +92,7 @@ queryKnowledge 只在最终选定文档内检索。有最终 targets 时，Retri
 | 单项命中违反合同 | warning 中的 `CG_ADAPTER_CONTRACT_INVALID` | 剔除坏项，保留合法命中；meta.completeness 为 partial。身份范围或预算违规可使用对应 warning 码 |
 | 有效证据、零命中 | `searched` | 成功，items 为空且有 indexStatus；不要将证据失败转换为此状态 |
 
-evidence 的 staticRevisionByProvider 必须精确覆盖最终 targets；mapping/config/content revision 对齐，freshness 必须 current 才能成功。KnowledgeRetrievalAccess 只能读本次列出的身份/knowledgeId 对，maxBytes 仍受 Core 限制；retrieve 结束后保存的 access 不可再发起读取。
+evidence 的 staticRevisionByProvider 必须精确覆盖最终 targets；mapping/config/content revision 对齐，freshness 必须 current 才能成功。KnowledgeRetrievalAccess 只能读本次列出的身份/knowledgeId 对；`read` 受单次容量保护，新增可选 `scan` 以有界块消费全文并返回 `KnowledgeScanResult`，不限制文档总大小。retrieve 结束后保存的 access 不可再发起读取。小正文保留有界查询快照；大正文的命中再按范围复核，来源漂移产生 warning/partial，不能拼接新旧版本。
 
 所有 id 为非空实现标识，不代表授权。可选 invalidate(change) 使用 SourceChange 的明确 reason 枚举；V1 Core **不自动调度 invalidate**。Runtime/Reader/Retriever 自己拥有连接、重试、取消与清理，只有数据库 view.close 的调用归 Core。实现步骤与骨架见[集成](../integrations/index)。
 

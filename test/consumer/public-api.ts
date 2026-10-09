@@ -65,6 +65,8 @@ function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, raw:
   void bound.listSpecificationDocuments({ limit: 20 });
   void bound.readSpecification({ knowledgeIds: ["SPEC-01"], locales: ["zh-CN"] });
   void bound.readDocuments({ selected: ["route.validation"], roles: ["guide"], locales: ["zh-CN"] });
+  void bound.readDocumentPage({ capabilityId: "route.validation", knowledgeId: "D-02", maxBytes: 4096 });
+  void bound.readSpecificationPage({ knowledgeId: "SPEC-01" });
   // @ts-expect-error Bound calls cannot override provider scope.
   void bound.listCatalog({ requestProviderScope: ["other"] });
   // @ts-expect-error Detail does not expose internal full adjacency lists.

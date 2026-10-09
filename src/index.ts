@@ -11,6 +11,7 @@ export type { AuthoritySpec, ProviderLoadSpec, ReloadResult } from "./core-host.
 export type { DatabaseAuthorityAdapter, DatabaseReadView, StorePage, StorePageRequest, UnvalidatedProviderRecord, UnvalidatedCapabilityRecord } from "./store/types.js";
 export type * from "./query/types.js";
 export type * from "./knowledge/types.js";
+export type { DocumentBodyQuery, SpecificationBodyQuery, DocumentBodyPage } from "./knowledge/pages.js";
 export type { ReadDocumentsQuery, DocumentRead, DocumentReadBatch, ReadSpecificationQuery,
   SpecificationDocumentRead, SpecificationReadBatch } from "./knowledge/read.js";
 export type * from "./retrieval/types.js";

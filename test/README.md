@@ -1,6 +1,6 @@
 # 场景验收入口
 
-本目录保存可持续执行的回归测试与固定材料。临时消费者、日志、截图及一次性诊断统一位于仓库同级 `capability-graph-artifacts`，测试只清理自己创建的目录。不要把本机报告或生成结果作为新的测试源码提交。
+本目录保存可持续执行的回归测试与固定材料。临时来源、消费者、日志、截图及一次性诊断统一位于仓库同级 `capability-graph-artifacts`，支持 `CG_ARTIFACTS_DIR` 指定其他仓库外目录。Core 文件测试使用 `contract/temporary-directory.ts`，清理时核对创建归属、真实路径和符号链接；测试只清理自己创建的目录。不要把本机报告或生成结果作为新的测试源码提交。
 
 根 `npm test` 先构建公开包、验证类型并编译测试；下表中的 `dist-test` 命令在该构建完成后使用。测试验证具体输入、结果与失败语义，不能用测试数量推导场景覆盖率。
 
@@ -15,11 +15,14 @@
 | 稳定数据库视图、查询 pin、reload/previous、退休与失败清理 | `store-lifecycle.test.ts`、`source-binding.test.ts` | `npm test` | 数据库 Adapter 合同，使用假实现 |
 | 实际路由实例、项目/环境隔离、失联恢复及端口释放 | `real-runtime.test.ts`、`contract/http-service-process.ts` | `node --test dist-test/test/real-runtime.test.js` | 独立 Node.js HTTP 进程 |
 | 实际 HTTP 正文、中文分块、零命中证据、旧索引拒绝、重建恢复、201 业务请求 | `http-retrieval.test.ts` | `npm run demo:http`；`node --test dist-test/test/http-retrieval.test.js` | 真实本机 HTTP 与有限词项索引，零模型调用 |
-| BOM/补充字符的原始字节偏移、LRU 淘汰、相同修订下来源映射变化、读失败恢复及重建原子性 | `http-retrieval.test.ts`、`text-retrieval.test.ts` | `npm test` | 真实本机 HTTP 与文件来源 |
-| 高扇入反向关系的完整排序、源数组不变；多 Provider 混合查询、改版 reload、previous 与关闭时 pin | `memory-graph-store.test.ts`、`validation/capacity.test.mjs` | `npm test`；`npm run evaluate:capacity -- --nodes 100000 --providers 2 --concurrency 100 --operations 3000 --duration-ms 120000 --reload-every 1000` | 索引回归及可复用真实文件负载；规模运行不在默认 CI 中，报告保存在仓库外 |
+| BOM/补充字符的原始字节偏移、LRU 淘汰、来源映射变化、失效与旧请求回填竞争、在途配置快照、读失败恢复及重建原子性 | `http-retrieval.test.ts`、`text-retrieval.test.ts` | `npm test` | 真实本机 HTTP 与文件来源 |
+| 高扇入反向关系排序、源数组不变；完整全局分页、每个 Provider 的多轮 reload/previous 退休与 pin、混合负载及失败清理 | `memory-graph-store.test.ts`、`validation/capacity.test.mjs` | `npm test`；`npm run evaluate:capacity -- --nodes 100000 --providers 2 --concurrency 100 --operations 3000 --duration-ms 120000 --reload-every 1000 --reload-rounds 2` | 索引回归及真实文件负载；正确性与负载分阶段，规模运行不在默认 CI 中，报告保存在仓库外 |
+| Core 临时目录覆盖配置、归属清理与替换 junction 拒绝 | `validation/temporary-directory.test.mjs` | `npm test` | 文件系统保护合同 |
 | MCP Collection 分页/点读、召回/知识成功及失败透传、stdio 子进程退出 | `examples/seed-mcp/test/server.test.ts`、`retrieval.test.ts` | 根测试后，在 `examples/seed-mcp` 执行 `npm ci --ignore-scripts`、`npm test` | 实际 MCP 协议，受控检索后端 |
-| 页面还原、教程负例、发布/防回退规则、外部产物清理保护 | `website/unit/` | `npm run test:docs` | 文档消费者与发布规则；不代表已经部署 |
+| 页面还原、教程负例、发布/防回退规则、手动恢复标签快照与外部产物清理保护 | `website/unit/` | `npm run test:docs` | 文档消费者与发布规则；不代表已经部署 |
 | 导航、搜索、键盘、移动视口及页面元数据 | `website/browser/` | `npm --prefix website run build` 后执行 `npm run test:site`；`npm run test:site:cross` | Chromium 完整回归，Firefox/WebKit 代表性冒烟 |
 | 实际公开 tarball、独立安装/类型、未泄露私有材料 | `scripts/test-package.mjs` | `npm run test:package` | 实装消费者，执行完清理 |
 
-真实数据库驱动、VextJS 接入、模型/Agent 任务、生产容量和长期负载需要对应项目及运行条件；当前测试不能证明这些交付。屏幕阅读器和真实用户走读也需要独立执行证据。CI 声明 Windows/Linux 与 Node 20.19.0、22.12.0、24.19.0，实际通过情况以具体运行记录为准。
+新增 `document-pages.test.ts` 覆盖大文档/长代码块/中文 emoji/BOM 拼接、来源漂移、无 Range HTTP 和实际取消。`validation/vextjs-adapter.test.mjs` 覆盖原生角色、稳定导出、未知运行证据及游标漂移；真实原生 MCP 与 TCP Session 验证入口见 `examples/vextjs/README.md`。`validation/build-state.test.mjs` 证明显式复用构建会拒绝旧源、输出改动和孤儿文件。
+
+真实数据库驱动、模型/Agent 任务、生产容量和长期负载需要对应项目及运行条件；默认回归不能证明这些交付。VextJS 的真实验证需外部固定来源与服务，独立记录执行证据。屏幕阅读器和真实用户走读也需要独立执行证据。CI 声明 Windows/Linux 与 Node 20.19.0、22.12.0、24.19.0，实际通过情况以具体运行记录为准。

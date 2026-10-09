@@ -32,18 +32,24 @@ const readme = await readFile(path.join(repositoryRoot, 'README.md'), 'utf8');
 assert(readme.includes(`changelogs/${manifest.version}.md`), 'README must link the release changelog');
 
 const releaseId = `capability-graph-${manifest.version}`;
-const releaseCommit = process.env.RELEASE_COMMIT ?? execFileSync('git', ['rev-parse', 'HEAD'], {
+const checkoutCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
   cwd: repositoryRoot,
   encoding: 'utf8'
 }).trim();
+const releaseCommit = process.env.RELEASE_COMMIT ?? checkoutCommit;
 assert(/^[0-9a-f]{40}$/i.test(releaseCommit), 'release commit must be a full Git SHA');
+const tagCommit = execFileSync('git', ['rev-parse', '--verify', `refs/tags/${releaseTag}^{commit}`], {
+  cwd: repositoryRoot, encoding: 'utf8'
+}).trim();
+assert(tagCommit === releaseCommit, 'release commit must match the immutable release tag');
+assert(checkoutCommit === releaseCommit, 'release checkout must match the immutable release commit');
 
 if (process.env.GITHUB_OUTPUT) {
   await appendFile(process.env.GITHUB_OUTPUT, [
     `release_id=${releaseId}`,
     `release_tag=${releaseTag}`,
     `release_commit=${releaseCommit}`,
-    `documentation_commit=${execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' }).trim()}`,
+    `documentation_commit=${checkoutCommit}`,
     `package_version=${manifest.version}`,
     ''
   ].join('\n'), 'utf8');

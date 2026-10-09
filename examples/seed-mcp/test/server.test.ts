@@ -28,7 +28,7 @@ async function connected(run: (client: Client, graph: CapabilityGraph) => Promis
 }
 test("MCP: initialize and enumerate query tools, not one tool per capability", async () => connected(async (client) => {
   const list = await client.listTools();
-  assert.equal(list.tools.length, 12);
+  assert.equal(list.tools.length, 14);
   assert.ok(list.tools.every((tool) => tool.name.startsWith("example_")));
   assert.equal(JSON.stringify(list).includes("D-02"), false);
 }));
@@ -45,6 +45,10 @@ test("MCP: static and document queries exactly match the same Core API", async (
       await graph.readSpecification({ providerId: "seed.http", knowledgeIds: ["SPEC-01"] })],
     ["example_read_documents", { selected: [canonical("route.validation"), canonical("schema.request")] },
       await graph.readDocuments({ selected: [canonical("route.validation"), canonical("schema.request")] })],
+    ["example_read_document_page", { capability: canonical("route.validation"), knowledgeId: "D-02", maxBytes: 20 },
+      await graph.readDocumentPage({ capability: canonical("route.validation"), knowledgeId: "D-02", maxBytes: 20 })],
+    ["example_read_specification_page", { providerId: "seed.http", knowledgeId: "SPEC-01", maxBytes: 20 },
+      await graph.readSpecificationPage({ providerId: "seed.http", knowledgeId: "SPEC-01", maxBytes: 20 })],
   ];
   for (const [name, args, expected] of checks) {
     const actual = await client.callTool({ name, arguments: args });
@@ -108,7 +112,7 @@ test("MCP: actual stdio child serves requests and exits on close", async (contex
   let pid: number | null = null;
   try {
     await client.connect(transport); pid = transport.pid; assert.ok(pid);
-    assert.equal((await client.listTools()).tools.length, 12);
+    assert.equal((await client.listTools()).tools.length, 14);
     const result = payload(await client.callTool({ name: "example_list_catalog", arguments: {} }));
     assert.equal((result.items as unknown[]).length, 5);
   } finally { await client.close(); await transport.close(); }

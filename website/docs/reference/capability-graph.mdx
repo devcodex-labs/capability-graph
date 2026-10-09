@@ -26,6 +26,8 @@ import Contracts from '@generated/snippets/contracts-capability-graph.mdx';
 | `resolveSelection(query)` | 从显式能力沿 `requires` 求完整闭包 | 不沿其他关系扩张；超预算整次失败 |
 | `readDocuments(query)` | 按 ID、用途、语言读取文档 | Collection 成员须显式给出成员 ID |
 | `readSpecification(query)` | 显式读取 Provider 规范文档 | 不由其他查询自动触发 |
+| `readDocumentPage(query)` | 按能力与文档读取 UTF-8 范围 | 内容版本绑定的游标；模型决定续读 |
+| `readSpecificationPage(query)` | 分段读取指定规范文档 | 不把本页当全文 |
 | `retrieveCapabilities(query)` | 可选候选召回 | 不替代目录，需配置 Retriever |
 | `queryKnowledge(query)` | 检索已选知识 | 返回证据片段，不生成答案 |
 | `queryRuntime(query)` | 查询运行实例 | 需要 Provider、项目和环境 |

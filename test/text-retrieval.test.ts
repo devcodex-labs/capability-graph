@@ -3,7 +3,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { CapabilityGraph, type SourceChange } from '@devcodex/capability-graph';
+import { CapabilityGraph, type KnowledgeRetriever, type SourceChange } from '@devcodex/capability-graph';
 import { TextCapabilityRetriever, TextKnowledgeRetriever } from '../examples/seed-runtime/text-retrieval.js';
 
 const helper = pathToFileURL(path.resolve(import.meta.dirname, '../../scripts/lib/website-paths.mjs'));
@@ -32,6 +32,48 @@ const config = (root: string) => ({ hostAllowedProviders: ['alpha'], integration
   providers: [{ providerId: 'alpha', authority: { kind: 'file' as const, rootDir: root } }] });
 const query = (capabilityId: string, text = 'validation') => ({ selected: [{ capabilityId }], knowledgeIds: [`GUIDE-${capabilityId}`], text });
 const change = (providerId: string, staticRevision: string, reason: SourceChange['reason']): SourceChange => ({ providerId, staticRevision, reason });
+
+test('in-flight queries keep one configuration and unrelated invalidation preserves publication', async () => {
+  for (const reconfigure of [false, true]) {
+    const source = await sources();
+    const retriever = new TextKnowledgeRetriever();
+    let captured!: () => void, captureFailed!: (error: unknown) => void, release!: () => void;
+    const ready = new Promise<void>((resolve, reject) => { captured = resolve; captureFailed = reject; });
+    const resume = new Promise<void>((resolve) => { release = resolve; });
+    let reads = 0, graph: CapabilityGraph | undefined, pending: Promise<unknown> | undefined;
+    const wrapper: KnowledgeRetriever = { id: retriever.id, retrieve: (input, access) => retriever.retrieve(input, {
+      read: async (...args) => {
+        try {
+          const body = await access.read(...args);
+          if (++reads === 1) { captured(); await resume; }
+          return body;
+        } catch (error) { captureFailed(error); throw error; }
+      },
+    }) };
+    try {
+      graph = await CapabilityGraph.open({ ...config(source.first), knowledgeRetriever: wrapper });
+      const provider = graph.forProvider('alpha');
+      const revision = (await provider.getProvider()).staticRevision;
+      const input = { selected: [{ capabilityId: 'a' }, { capabilityId: 'b' }], text: 'validation' };
+      const older = provider.queryKnowledge(input);
+      pending = older; older.catch(captureFailed);
+      await ready;
+      await retriever.invalidate(change('unrelated', revision, 'knowledge_body'));
+      if (reconfigure) retriever.configure({ chunkBytes: 4, maxDocumentBytes: 1, stopWords: ['validation'] });
+      release();
+      assert((await older).items.length > 0, 'all body limits, chunks and query terms use the invocation snapshot');
+      assert.equal(retriever.cachedSelections, reconfigure ? 0 : 1);
+      if (reconfigure) {
+        await assert.rejects(provider.queryKnowledge(input), { code: 'CG_BUDGET_EXCEEDED' });
+        retriever.configure({ maxDocumentBytes: 32768 });
+        assert.equal((await provider.queryKnowledge(input)).items.length, 0, 'new query uses the new stop words');
+      }
+    } finally {
+      release(); await Promise.allSettled(pending ? [pending] : []);
+      await graph?.close(); await source.close();
+    }
+  }
+});
 
 test('real file indexes enforce LRU capacity and scoped invalidation without hiding read failures', async () => {
   const source = await sources();

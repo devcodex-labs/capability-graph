@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, realpath, rm, writeFile, unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { cp, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph } from "@devcodex/capability-graph";
 import { runSeedTask, seedProviderRoot } from "../examples/seed-api/main.js";
 import { seedRuntimeFixture } from "./contract/fixture-runtime-adapter.js";
+import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 test("Seed: real definitions and public API select only the two required documents", async () => {
   const result = await runSeedTask();
@@ -29,7 +29,7 @@ test("Seed non-F-18: contract Runtime step uses a test-only fixture, not a claim
 });
 
 test("Seed: second provider isolation and failed update recovery on actual author files", async () => {
-  const parent = await realpath(tmpdir()); const root = await mkdtemp(path.join(parent, "capability-graph-seed-"));
+  const root = await createTestDirectory("capability-graph-seed-");
   const first = path.join(root, "first"); const second = path.join(root, "second");
   try {
     await cp(seedProviderRoot, first, { recursive: true }); await cp(seedProviderRoot, second, { recursive: true });
@@ -52,13 +52,12 @@ test("Seed: second provider isolation and failed update recovery on actual autho
       assert.equal((await graph.forProvider("seed.http").listCatalog()).meta.refreshFailed, undefined);
     } finally { await graph.close(); }
   } finally {
-    assert.equal(path.dirname(root), parent); assert.ok(path.basename(root).startsWith("capability-graph-seed-")); assert.equal(await realpath(root), root);
-    await rm(root, { recursive: true, force: true });
+    await removeTestDirectory(root);
   }
 });
 
 test("Seed: identity replacement removes the old capability without deleting shared knowledge", async () => {
-  const parent = await realpath(tmpdir()); const root = await mkdtemp(path.join(parent, "capability-graph-seed-identity-"));
+  const root = await createTestDirectory("capability-graph-seed-identity-");
   try {
     await cp(seedProviderRoot, root, { recursive: true });
     const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http"], integrationEnabledProviders: ["seed.http"],
@@ -77,7 +76,6 @@ test("Seed: identity replacement removes the old capability without deleting sha
       assert.ok((await readFile(path.join(root, "knowledge/route-validation.md"), "utf8")).length > 100);
     } finally { await graph.close(); }
   } finally {
-    assert.equal(path.dirname(root), parent); assert.ok(path.basename(root).startsWith("capability-graph-seed-identity-")); assert.equal(await realpath(root), root);
-    await rm(root, { recursive: true, force: true });
+    await removeTestDirectory(root);
   }
 });

@@ -8,12 +8,60 @@ import { CapabilityGraph, type KnowledgeReadContext, type KnowledgeDocumentRef, 
 import { FakeDatabase, record } from './contract/fake-database.js';
 import { HttpKnowledgeReader } from "../examples/seed-runtime/knowledge-reader.js";
 import { createHttpRetrievalExample, runHttpRetrievalDemo } from "../examples/seed-runtime/retrieval-demo.js";
+import { TextKnowledgeRetriever } from "../examples/seed-runtime/text-retrieval.js";
 import { assertPortReleased } from "./contract/http-service-process.js";
 
 const context: KnowledgeReadContext = { providerId: 'seed.http', staticRevision: 's:test',
   sourceContext: { providerId: 'seed.http', authorityKind: 'file', sourceRevision: 's:test' } };
 const ref = (url: string): KnowledgeDocumentRef => ({ kind: 'document', knowledgeId: 'HTTP', role: 'guide', locator: { type: 'http', url } });
 const contentId = (bytes: Uint8Array) => `k:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}`;
+
+for (const finishOlderFirst of [true, false]) test(`HTTP invalidation blocks old cache publication; older query finishes first=${finishOlderFirst}`, async () => {
+  const example = await createHttpRetrievalExample();
+  const retriever = new TextKnowledgeRetriever();
+  let captured!: () => void, captureFailed!: (error: unknown) => void, release!: () => void;
+  const ready = new Promise<void>((resolve, reject) => { captured = resolve; captureFailed = reject; });
+  const resume = new Promise<void>((resolve) => { release = resolve; });
+  let reads = 0, graph: CapabilityGraph | undefined, pending: Promise<unknown> | undefined;
+  try {
+    graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed.http'], integrationEnabledProviders: ['seed.http'],
+      providers: [{ providerId: 'seed.http', authority: { kind: 'file', rootDir: example.root } }],
+      knowledgeRetriever: retriever, readers: [{ id: 'held-real-http', canRead: (ref) => example.reader.canRead(ref),
+        read: async (...args) => {
+          try {
+            const body = await example.reader.read(...args);
+            if (++reads === 1) { captured(); await resume; }
+            return body;
+          } catch (error) { captureFailed(error); throw error; }
+        } }],
+    });
+    const provider = graph.forProvider('seed.http');
+    const query = { selected: [{ capabilityId: 'route.validation' }], knowledgeIds: ['HTTP-GUIDE'], text: '请求校验' };
+    const oldContentId = contentId(Buffer.from(example.body()));
+    const older = provider.queryKnowledge(query);
+    pending = older;
+    older.catch(captureFailed);
+    await ready;
+    example.updateBody('请求校验新正文：先检查必填字段。\n');
+    await retriever.invalidate({ providerId: 'seed.http', staticRevision: example.staticRevision, reason: 'knowledge_body' });
+    assert.equal(retriever.cachedSelections, 0);
+    if (finishOlderFirst) {
+      release();
+      const page = await older;
+      assert(page.items.length > 0 && page.items.every((hit) => hit.contentId === oldContentId));
+      assert.equal(retriever.cachedSelections, 0, 'invalidated request must not repopulate an empty cache');
+    }
+    const newer = await provider.queryKnowledge(query);
+    assert(newer.items.length > 0 && newer.items.every((hit) => hit.contentId === contentId(Buffer.from(example.body()))));
+    if (!finishOlderFirst) { release(); await older; }
+    assert.equal(retriever.cachedSelections, 1);
+    assert((await provider.queryKnowledge(query)).items.length > 0, 'old completion must not replace the new cache');
+  } finally {
+    release(); await Promise.allSettled(pending ? [pending] : []);
+    await graph?.close(); await example.close();
+    await assertPortReleased(example.sourcePort); await assertPortReleased(example.servicePort);
+  }
+});
 
 async function httpSource(handler: (url: string, response: ServerResponse) => void) {
   const server = createServer((request, response) => handler(request.url!, response));

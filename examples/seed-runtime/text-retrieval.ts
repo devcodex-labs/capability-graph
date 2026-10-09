@@ -63,36 +63,40 @@ interface Configuration { chunkBytes: number; maxDocumentBytes: number; stopWord
 export class TextKnowledgeRetriever implements KnowledgeRetriever {
   readonly id = "seed-text-knowledge";
   private readonly cache = new Map<string, Index>();
+  private readonly pending = new Set<{ providers: ReadonlySet<string>; invalidated: boolean }>();
   private configuration: Configuration = { chunkBytes: 512, maxDocumentBytes: 32768, stopWords: [] };
   constructor(private readonly maxCachedSelections = 4) {
     if (!Number.isSafeInteger(maxCachedSelections) || maxCachedSelections < 1) throw new Error("Invalid cache capacity");
   }
-  configure(options: Partial<Configuration>): void {
-    const next = { ...this.configuration, ...options };
+  /** pageBytes controls scan chunk size, not total document admission. maxDocumentBytes is a legacy alias. */
+  configure(options: Partial<Configuration> & { pageBytes?: number }): void {
+    if (options.pageBytes !== undefined && options.maxDocumentBytes !== undefined && options.pageBytes !== options.maxDocumentBytes) throw new Error("Conflicting page sizes");
+    const { pageBytes, ...legacy } = options;
+    const next = { ...this.configuration, ...legacy, ...(pageBytes === undefined ? {} : { maxDocumentBytes: pageBytes }) };
     if (![next.chunkBytes, next.maxDocumentBytes].every((value) => Number.isSafeInteger(value) && value > 0) ||
         next.chunkBytes < 4 || next.chunkBytes > 2048 || !Array.isArray(next.stopWords) || next.stopWords.some((value) => typeof value !== "string")) {
       throw new Error("Invalid text index configuration");
     }
     this.configuration = { ...next, stopWords: [...new Set(next.stopWords.map((value) => value.normalize("NFKC").toLowerCase()))].sort() };
   }
-  private configRevision(): string { return `text:${createHash("sha256").update(JSON.stringify(this.configuration)).digest("hex").slice(0, 16)}`; }
-  private indexTerms(text: string): ReadonlySet<string> {
-    const ignored = new Set(this.configuration.stopWords);
+  private configRevision(configuration: Configuration): string { return `text:${createHash("sha256").update(JSON.stringify(configuration)).digest("hex").slice(0, 16)}`; }
+  private indexTerms(text: string, configuration: Configuration): ReadonlySet<string> {
+    const ignored = new Set(configuration.stopWords);
     return new Set(terms(text).filter((term) => !ignored.has(term)));
   }
-  private chunks(bytes: Uint8Array): Chunk[] {
+  private chunks(bytes: Uint8Array, configuration: Configuration): Chunk[] {
     // Keep a leading BOM as a code point: offsets refer to the original bytes.
     const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     const chunks: Chunk[] = [];
     let startOffset = 0, length = 0, snippet = "";
     const flush = () => {
       if (!snippet) return;
-      chunks.push({ startOffset, endOffset: startOffset + length, snippet, terms: this.indexTerms(snippet) });
+      chunks.push({ startOffset, endOffset: startOffset + length, snippet, terms: this.indexTerms(snippet, configuration) });
       startOffset += length; length = 0; snippet = "";
     };
     for (const char of text) {
       const size = Buffer.byteLength(char, "utf8");
-      if (length + size > this.configuration.chunkBytes) flush();
+      if (length + size > configuration.chunkBytes) flush();
       snippet += char; length += size;
       if (char === "\n") flush();
     }
@@ -101,37 +105,75 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
   async retrieve(input: Parameters<KnowledgeRetriever["retrieve"]>[0], access: Parameters<KnowledgeRetriever["retrieve"]>[1]): ReturnType<KnowledgeRetriever["retrieve"]> {
     if (input.targets.length > 128) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
     const selection = input.targets.map(identity).sort().join("|");
-    // Sequential access avoids overflowing an injected Reader's connection limit
-    // and leaves no detached reads after a failed retrieve invocation.
-    const bodies: { target: (typeof input.targets)[number]; body: Awaited<ReturnType<typeof access.read>> }[] = [];
-    for (const target of input.targets) bodies.push({ target,
-      body: await access.read({ id: target.id, knowledgeId: target.knowledgeId }, { maxBytes: this.configuration.maxDocumentBytes }),
-    });
-    const configurationRevision = this.configRevision();
-    let index = this.cache.get(selection);
-    if (!index) {
-      index = { staticRevisionByProvider: { ...input.staticRevisionByProvider }, mappingRevision: input.mappingRevision,
-        configurationRevision, documents: bodies.map(({ target, body }) => ({ id: target.id, knowledgeId: target.knowledgeId,
-          contentId: body.contentId, source: body.source, chunks: this.chunks(body.bytes) })) };
-      if (this.cache.size >= this.maxCachedSelections) this.cache.delete(this.cache.keys().next().value!);
-      this.cache.set(selection, index);
-    } else { this.cache.delete(selection); this.cache.set(selection, index); }
-    const wanted = [...this.indexTerms(input.text)];
-    const hits: KnowledgeHit[] = index.documents.flatMap((document) => document.chunks.map((chunk) => ({
-      id: document.id, knowledgeId: document.knowledgeId, contentId: document.contentId, source: document.source,
-      startOffset: chunk.startOffset, endOffset: chunk.endOffset, snippet: chunk.snippet, score: score(wanted, chunk.terms),
-    }))).filter((hit) => hit.score > 0).sort((a, b) => b.score - a.score || identity(a).localeCompare(identity(b)) || a.startOffset - b.startOffset)
-      .slice(0, input.limit);
-    const indexed = new Map(index.documents.map((document) => [identity(document), document]));
-    return { hits, evidence: {
-      staticRevisionByProvider: index.staticRevisionByProvider, mappingRevision: index.mappingRevision,
-      observedAt: new Date().toISOString(), freshness: "current", sourceConfigRevision: configurationRevision,
-      indexedConfigRevision: index.configurationRevision,
-      documents: bodies.map(({ target, body }) => ({ id: target.id, knowledgeId: target.knowledgeId,
-        sourceContentId: body.contentId, indexedContentId: indexed.get(identity(target))!.contentId })),
-    } };
+    const configuration = this.configuration;
+    const configurationRevision = this.configRevision(configuration);
+    const cached = this.cache.get(selection);
+    const invocation = { providers: new Set(Object.keys(input.staticRevisionByProvider)), invalidated: false };
+    this.pending.add(invocation);
+    try {
+      // Sequential access avoids overflowing an injected Reader's connection limit
+      // and leaves no detached reads after a failed retrieve invocation.
+      const bodies: { target: (typeof input.targets)[number]; body: { contentId: string; source: string }; chunks: Chunk[] }[] = [];
+      for (const target of input.targets) {
+        if (access.scan && configuration.maxDocumentBytes >= 4) {
+          const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+          const chunks: Chunk[] = []; let pendingText = ""; let offset = 0;
+          const flush = (final: boolean) => {
+            // Keep only one unfinished chunk. Do not retain full document bytes.
+            while (pendingText && (final || Buffer.byteLength(pendingText) >= configuration.chunkBytes)) {
+              let snippet = ""; let length = 0;
+              for (const char of pendingText) {
+                const size = Buffer.byteLength(char);
+                if (length + size > configuration.chunkBytes) break;
+                snippet += char; length += size;
+                if (char === "\n") break;
+              }
+              chunks.push({ startOffset: offset, endOffset: offset + length, snippet, terms: this.indexTerms(snippet, configuration) });
+              offset += length; pendingText = pendingText.slice(snippet.length);
+            }
+          };
+          const body = await access.scan({ id: target.id, knowledgeId: target.knowledgeId }, (bytes) => {
+            // A cached index needs a fresh content identity, not a second copy of its chunks.
+            if (!cached) { pendingText += decoder.decode(bytes, { stream: true }); flush(false); }
+          }, { chunkBytes: configuration.maxDocumentBytes });
+          if (!cached) { pendingText += decoder.decode(); flush(true); }
+          bodies.push({ target, body, chunks });
+        } else {
+          const body = await access.read({ id: target.id, knowledgeId: target.knowledgeId }, { maxBytes: configuration.maxDocumentBytes });
+          bodies.push({ target, body, chunks: cached ? [] : this.chunks(body.bytes, configuration) });
+        }
+      }
+      let index = cached;
+      if (!index) {
+        index = { staticRevisionByProvider: { ...input.staticRevisionByProvider }, mappingRevision: input.mappingRevision,
+          configurationRevision, documents: bodies.map(({ target, body, chunks }) => ({ id: target.id, knowledgeId: target.knowledgeId,
+            contentId: body.contentId, source: body.source, chunks })) };
+      }
+      // An old request may finish its snapshot, but cannot republish after host
+      // invalidation or configure(). Only active invocations retain these tokens.
+      if (!invocation.invalidated && configuration === this.configuration) {
+        this.cache.delete(selection);
+        if (this.cache.size >= this.maxCachedSelections) this.cache.delete(this.cache.keys().next().value!);
+        this.cache.set(selection, index);
+      }
+      const wanted = [...this.indexTerms(input.text, configuration)];
+      const hits: KnowledgeHit[] = index.documents.flatMap((document) => document.chunks.map((chunk) => ({
+        id: document.id, knowledgeId: document.knowledgeId, contentId: document.contentId, source: document.source,
+        startOffset: chunk.startOffset, endOffset: chunk.endOffset, snippet: chunk.snippet, score: score(wanted, chunk.terms),
+      }))).filter((hit) => hit.score > 0).sort((a, b) => b.score - a.score || identity(a).localeCompare(identity(b)) || a.startOffset - b.startOffset)
+        .slice(0, input.limit);
+      const indexed = new Map(index.documents.map((document) => [identity(document), document]));
+      return { hits, evidence: {
+        staticRevisionByProvider: index.staticRevisionByProvider, mappingRevision: index.mappingRevision,
+        observedAt: new Date().toISOString(), freshness: "current", sourceConfigRevision: configurationRevision,
+        indexedConfigRevision: index.configurationRevision,
+        documents: bodies.map(({ target, body }) => ({ id: target.id, knowledgeId: target.knowledgeId,
+          sourceContentId: body.contentId, indexedContentId: indexed.get(identity(target))!.contentId })),
+      } };
+    } finally { this.pending.delete(invocation); }
   }
   async invalidate(change: SourceChange): Promise<void> {
+    for (const invocation of this.pending) if (invocation.providers.has(change.providerId)) invocation.invalidated = true;
     for (const [selection, index] of this.cache) if (change.providerId in index.staticRevisionByProvider) this.cache.delete(selection);
   }
   get cachedSelections(): number { return this.cache.size; }

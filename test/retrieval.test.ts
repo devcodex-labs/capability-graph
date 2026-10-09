@@ -141,7 +141,7 @@ test("Collection and member selections deduplicate composite targets and never t
     assert.deepEqual(input.targets.map((target) => target.knowledgeId), ["intro", "routing"]);
     assert.deepEqual(input.targets[0]?.viaCollectionIds, ["manual"]);
     assert.equal(JSON.stringify(input).includes("knowledge-root"), false); assert.equal(JSON.stringify(input).includes("readContext"), false);
-    assert.deepEqual(Object.keys(access), ["read"]); return result;
+    assert.deepEqual(Object.keys(access), ["read", "scan"]); return result;
   }) }));
   try {
     const page = await graph.queryKnowledge({ text: "find", selected: [id(), id()], knowledgeIds: ["manual", "intro"] });
@@ -271,7 +271,7 @@ test("unawaited access reads keep the pinned source alive until completion, with
       const db = new FakeDatabase([record("a", { name: String(databases.length), knowledge: [document("intro")] })]); databases.push(db); return db;
     } } } }],
     readers: [{ id: "slow", canRead: () => true, read: async (_ref, _context, budget) => {
-      assert.equal(budget.maxBytes, 32768); started(); await gate;
+      started(); assert.equal(budget.maxBytes, 100000); await gate;
       return { bytes, contentId: contentId(bytes), contentType: "text/plain", source: "https://example.test/intro" };
     } }],
     knowledgeRetriever: { id: "background", retrieve: async (input, access) => {

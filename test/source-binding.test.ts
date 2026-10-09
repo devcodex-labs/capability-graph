@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph, type OpenConfig } from "../src/index.js";
 import { FakeDatabase, record } from "./contract/fake-database.js";
+import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 const selected = [{ providerId: "seed", capabilityId: "a" }];
 const knowledge = [{ kind: "document", knowledgeId: "doc", role: "guide", locator: { type: "relative-file", path: "doc.md" } }];
@@ -14,8 +14,8 @@ const databaseConfig = (openView: () => Promise<FakeDatabase>): OpenConfig => ({
 });
 
 async function fixture(run: (a: string, b: string) => Promise<void>) {
-  const cwd = process.cwd(); const parent = await realpath(tmpdir());
-  const root = await mkdtemp(path.join(parent, "capability-graph-root-"));
+  const cwd = process.cwd();
+  const root = await createTestDirectory("capability-graph-root-");
   try {
     for (const name of ["a", "b"]) {
       const provider = path.join(root, name, "provider"); await mkdir(provider, { recursive: true });
@@ -26,9 +26,7 @@ async function fixture(run: (a: string, b: string) => Promise<void>) {
     await run(path.join(root, "a"), path.join(root, "b"));
   } finally {
     process.chdir(cwd);
-    assert.equal(path.dirname(root), parent); assert.equal(await realpath(root), root);
-    assert.ok(path.basename(root).startsWith("capability-graph-root-"));
-    await rm(root, { recursive: true, force: true });
+    await removeTestDirectory(root);
   }
 }
 async function body(graph: CapabilityGraph, requiredStaticRevision?: string) {
