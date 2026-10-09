@@ -96,7 +96,9 @@ export async function materializeTutorial(destination, tutorial) {
 /** Compare only after materialization; a fixture must never supply a missing page file. */
 export async function compareFixture(tutorial, fixtureRoot) {
   for (const [name, body] of tutorial.files) {
-    assert.equal(await readFile(path.join(fixtureRoot, name), 'utf8'), body, `fixture drift: ${name}`);
+    const fixture = await readFile(path.join(fixtureRoot, name), 'utf8');
+    assert.equal(fixture.replaceAll('\r\n', '\n'), body.replaceAll('\r\n', '\n'),
+      `fixture drift: ${name}`);
   }
 }
 
