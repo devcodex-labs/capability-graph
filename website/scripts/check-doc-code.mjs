@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { CapabilityGraph } from '../../dist/index.js';
 import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
+import { verifyTutorialSuite } from './lib/tutorial.mjs';
 
 const docsRoot = path.join(websiteRoot, 'docs');
 const readPage = (name) => readFile(path.join(docsRoot, `${name}.mdx`), 'utf8');
@@ -17,36 +18,11 @@ const fences = (source, language) => [...source.matchAll(new RegExp(
 // exactly as authored, without rewriting imports to private source paths.
 const scratch = await mkdtemp(path.join(repositoryRoot, '.docs-code-'));
 try {
-  const tutorial = await readPage('getting-started/first-provider');
+  const tutorialChecks = await verifyTutorialSuite(scratch);
   const fixtureRoot = path.join(websiteRoot, 'fixtures', 'first-provider');
-  const providerRoot = path.join(scratch, 'providers', 'acme-http');
+  // Keep the advanced Reader/API fixture independent of page materialization.
+  const providerRoot = path.join(scratch, 'legacy-provider');
   await cp(fixtureRoot, providerRoot, { recursive: true });
-
-  for (const [, file, body] of fences(tutorial, 'md')) {
-    assert(['PROVIDER.md', 'knowledge/routing.md'].includes(file), `unexpected tutorial file: ${file}`);
-    assert.equal(body.trim(), (await readFile(path.join(fixtureRoot, file), 'utf8')).trim(), `${file} prose drift`);
-    await writeFile(path.join(providerRoot, file), `${body}\n`, 'utf8');
-  }
-  for (const [, file, body] of fences(tutorial, 'json')) {
-    if (!file) continue;
-    assert(['provider.json', 'route.capability.json', 'route-http.capability.json'].includes(file));
-    await writeFile(path.join(providerRoot, file), `${body}\n`, 'utf8');
-  }
-  const script = fences(tutorial, 'js').find(([, file]) => file === 'discover.mjs');
-  assert(script, 'tutorial must expose a complete discover.mjs');
-  await writeFile(path.join(scratch, 'discover.mjs'), script[2], 'utf8');
-  const output = JSON.parse(execFileSync(process.execPath, [path.join(scratch, 'discover.mjs')], {
-    cwd: scratch, encoding: 'utf8', timeout: 30_000
-  }));
-  assert.deepEqual(output.catalog, ['route', 'route.http']);
-  assert.equal(output.detail, 'route.http');
-  assert.deepEqual(output.parents, ['route']);
-  assert.equal(output.document, 'routing-guide');
-  assert.equal(output.completeness, 'complete');
-  assert.equal(output.text, await readFile(path.join(providerRoot, 'knowledge/routing.md'), 'utf8'));
-  const expected = JSON.parse(fences(tutorial, 'json').find(([, file]) => !file)[2]);
-  const { text, ...projection } = output;
-  assert.deepEqual(projection, expected, 'documented expected output drifted');
 
   const installation = fences(await readPage('getting-started/installation'), 'js')[0];
   await writeFile(path.join(scratch, 'check.mjs'), installation[2], 'utf8');
@@ -127,7 +103,7 @@ try {
   } finally {
     await remote.close();
   }
-  console.log(`document code check passed: tutorial executed, expected output matched, ${sources.length} typed examples, API/Reader contracts`);
+  console.log(`document code check passed: ${tutorialChecks.checkpoints.join('/')}, ${tutorialChecks.g4Cases.join('/')}, ${sources.length} typed examples, legacy API/Reader contracts`);
 } finally {
   // Only remove the exact temporary directory allocated above.
   assert.equal(path.dirname(scratch), repositoryRoot);

@@ -9,21 +9,13 @@ description: 创建 provider.json 和第一组能力定义，并用真实文件�
 
 ## 最快跑通
 
-已经完成[安装](./installation)时，先使用仓库中的[完整受检示例目录](https://github.com/devcodex-labs/capability-graph/tree/main/website/fixtures/first-provider)。它包含本页全部定义、知识文件和 `discover.mjs`，不需要把下方片段重新拼装。
+完成[安装](./installation)后，在当前项目创建本页三个文件，运行 `node discover.mjs`。不需要克隆仓库、TypeScript 编译器、知识文档、Specification、HTTP 服务或 MCP。
 
-把该目录保存到项目后运行：
-
-```sh
-node first-provider/discover.mjs
-```
-
-成功输出包含 `catalog: ["route", "route.http"]`、`selected: ["route.http"]`、`document: "routing-guide"` 和 `specification: "SPEC-01"`。下文逐项解释定义、显式选择与读取，再说明如何放进常见的 `providers/acme-http` 项目布局。
-
-一个文件权威 Provider 至少需要 `provider.json` 和一个 `*.capability.json`。Core 会递归收集能力文件，但会按精确目录名跳过 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache` 和 `.tmp`。
+本页的成功目标只有一个：从真实文件定义发现 `acme.http` 的 `route` 能力。发现能力不等于执行路由业务。
 
 ## 前置条件与目标
 
-完成[安装](./installation)，在接入项目中创建下面的文件。本页从零定义两个静态能力，最后读取一份知识文档；无需启动 HTTP 服务、MCP 或数据库。
+使用安装页创建的 `capability-graph-demo/` 作为工作目录：
 
 ```text
 capability-graph-demo/
@@ -31,13 +23,10 @@ capability-graph-demo/
 ├── discover.mjs
 └── providers/acme-http/
     ├── provider.json
-    ├── PROVIDER.md
-    ├── route.capability.json
-    ├── route-http.capability.json
-    └── knowledge/routing.md
+    └── route.capability.json
 ```
 
-前四个定义/规范文件都放在 `providers/acme-http/`；知识放在其 `knowledge/` 子目录。
+`package.json` 来自 npm 初始化和安装；其余文件按下面内容创建。所有命令在项目根执行，脚本以自身位置定位 Provider，不受终端后续切换目录影响。
 
 ## 1. 定义 Provider
 
@@ -45,48 +34,19 @@ capability-graph-demo/
 {
   "providerId": "acme.http",
   "name": "Acme HTTP",
-  "version": "0.1.0",
-  "specification": {
-    "specificationId": "acme.http.conventions",
-    "version": "1",
-    "appliesTo": {
-      "software": "acme-http",
-      "versionRange": ">=0.1.0 <1.0.0"
-    },
-    "documents": [{ "kind": "document", "knowledgeId": "SPEC-01", "role": "specification", "locale": "en",
-      "locator": { "type": "relative-file", "path": "PROVIDER.md" } }]
-  }
+  "version": "0.1.0"
 }
 ```
 
-| 字段 | 必填 | 作用及本例选择 |
+保存到 `providers/acme-http/provider.json`。
+
+| 字段 | 必填 | 如何填写 |
 |---|---|---|
-| `providerId` | 是 | 稳定机器身份；`acme.http` 必须与加载配置一致 |
-| `name` | 是 | 展示名称，改名不会自动生成新身份 |
-| `version` | 是 | Provider 定义的版本标签，不属于能力二元身份，也不代替 Static Revision |
-| `specification` | 否 | Provider 全局使用规则的元数据与文档映射；不需要规范时可整体省略 |
-| `specificationId` | 声明规范时是 | 规范自身的稳定身份，本例与 Provider ID 分开 |
-| `specification.version` | 声明规范时是 | 规范版本，可独立于 Provider 版本演进 |
-| `appliesTo` | 否 | 适用性元数据，内部 `software`、`versionRange`、`conditions` 均可选 |
-| `appliesTo.software` | 否 | 本例规范面向 `acme-http` 软件 |
-| `appliesTo.versionRange` | 否 | 适用版本描述；Core 不探测项目版本或执行范围匹配 |
-| `documents` | 声明规范时是 | 非空 Document 列表；每篇 `role` 固定为 `specification`，可按 `knowledgeId` 与 `locale` 选择 |
+| `providerId` | 是 | Provider 的稳定机器身份；必须与加载配置中的 `acme.http` 一致 |
+| `name` | 是 | 展示名称；改名不改变机器身份 |
+| `version` | 是 | Provider 定义版本，不是 npm 包版本，也不能代替查询的 Static Revision |
 
-`documents` 是 Provider Specification 的声明映射。Core 可在 `readSpecification()` 被显式调用时读取正文，但不会在目录、详情或 Selection 中自动读取，也不会把正文当作指令执行。
-
-创建引用的 `PROVIDER.md`：
-
-```md title="PROVIDER.md"
-# Acme HTTP Provider
-
-- 修改已有路由前，通过已配置的 Runtime 查询确认项目中的实例。
-- 路由注册与请求校验是不同能力，先按任务选择。
-- 只读取已选 Capability 关联的 Knowledge。
-```
-
-Core 校验文档引用与 Provider 范围。接入层负责判断适用版本、决定是否读取正文并如何向 Agent 投递。
-
-Specification 写跨能力的使用规则；Capability 描述可以独立发现和选择的能力；Knowledge 写执行某个已选能力时才需要的详细知识。把所有规则塞进 `description` 会让每次目录查询重复传输长正文。
+Specification 是可选的全局使用规则，本次无需填写空对象或空文档列表。需要时按[进阶教程的独立 G4 步骤](../guides/progressive-discovery#g4-provider-specification)接入。
 
 ## 2. 定义主能力
 
@@ -100,94 +60,38 @@ Specification 写跨能力的使用规则；Capability 描述可以独立发现�
 }
 ```
 
+保存到 `providers/acme-http/route.capability.json`。
+
 | 字段 | 必填 | 如何填写 |
 |---|---|---|
-| `capabilityId` | 是 | Provider 内稳定身份；`route` 表达路由能力族 |
-| `name` | 是 | 人类可读名称 |
-| `description` | 是 | 回答“这是什么能力、解决什么问题” |
-| `whenToUse` | 是 | 回答“什么任务下应该考虑它”，帮助 Agent 选择 |
-| `distinction` | 否 | 与容易混淆的能力或 Runtime 实例区分；存在歧义时应填写 |
+| `capabilityId` | 是 | Provider 内的稳定身份，本例为 `route` |
+| `name` | 是 | 可读名称 |
+| `description` | 是 | 这是什么能力，解决什么问题 |
+| `whenToUse` | 是 | 哪些任务应该考虑它，不写成自动执行指令 |
+| `distinction` | 否 | 说明它与容易混淆的能力或 Runtime 实例有什么不同 |
 
-再添加一个细分能力：
+一个文件 Authority 至少包含 `provider.json` 和一个 `*.capability.json`。Core 收集定义并完整校验，不从能力 ID 中的点号猜关系。本例没有关系和 Knowledge，均可直接省略。
 
-```json title="route-http.capability.json"
-{
-  "capabilityId": "route.http",
-  "name": "HTTP routing",
-  "description": "Expose a request handler through an HTTP route.",
-  "whenToUse": "The application accepts HTTP requests.",
-  "distinction": "Describes an HTTP routing capability, not a live route instance.",
-  "parents": ["route"],
-  "knowledge": [
-    {
-      "kind": "document",
-      "knowledgeId": "routing-guide",
-      "role": "guide",
-      "locale": "en",
-      "locator": { "type": "relative-file", "path": "knowledge/routing.md" }
-    }
-  ]
-}
-```
-
-关系端点必须位于同一 Provider。`parents`、`specializes`、`requires` 分别无环；Core 不从命名层级推导关系。
-
-这里用 `parents: ["route"]` 表达 HTTP 路由属于路由能力族。`route.http` 中的点号只是命名约定，省略 `parents` 就没有父子关系。只有“保留另一能力核心语义的更具体变体”才使用 `specializes`；`related` 只提示显式关联；只有确实需要另一能力作为必要上下文时才写 `requires`。本例没有依赖边，因此 Selection 不会把父能力自动加入闭包。
-
-| Knowledge 字段 | 必填 | 含义 |
-|---|---|---|
-| `knowledge` | 否 | 本能力关联的知识引用；没有知识时可省略 |
-| `kind` | 引用内是 | `document` 表示可精确读取的一篇文档；Collection 成员也可按成员 ID 显式读取 |
-| `knowledgeId` | 引用内是 | 本例为 `routing-guide`；读取用 Provider、已选能力身份和知识 ID 定位，不能当作全局地址 |
-| `role` | Document 内是 | 用途标签，本例为 `guide`；过滤与发现均使用它 |
-| `locale` | 否 | BCP 47 语言标签，本例为 `en`；按规范值精确匹配，不做自动语言回退 |
-| `locator` | Document 内是 | 知识来源描述，不是正文 |
-| `locator.type` | 是 | `relative-file` 使用内置本地 Reader |
-| `locator.path` | 是 | 相对该文件 Authority 的 `rootDir`，不是相对 `process.cwd()` |
-
-同时创建 `knowledge/routing.md`。本地知识正文不进入 Static Revision；读取结果通过独立 `contentId` 标识。
-
-```md title="knowledge/routing.md"
-# HTTP Routing Guide
-
-Register the route in the host framework, then expose its static capability through the Provider-owned discovery API or MCP integration. Runtime route instances remain an Adapter concern.
-```
-
-修改绑定或 locator 会改变静态定义；只修改正文则用新的 `contentId` 区分内容，避免把整篇文档混进静态图哈希。
+增加子能力、关系和本地知识，见[渐进发现与按需读取](../guides/progressive-discovery)。Core 按精确目录名跳过 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache`、`.tmp`；正式定义不要放进这些目录。
 
 ## 3. 打开 Provider
 
-以下配置片段展示各项含义；第 4 步给出包含初始化和关闭的完整 `discover.mjs`。
-
-```ts
-import { CapabilityGraph } from '@devcodex/capability-graph';
-
-const graph = await CapabilityGraph.open({
-  hostAllowedProviders: ['acme.http'],
-  integrationEnabledProviders: ['acme.http'],
-  providers: [{
-    providerId: 'acme.http',
-    authority: { kind: 'file', rootDir: '/absolute/path/to/acme-provider' }
-  }]
-});
-```
-
-有效启用范围中的每个 Provider 必须恰有一个 Authority。缺少来源会得到 `CG_CONFIG_INCOMPLETE`，不会被解释为空目录。
+下面完整脚本中的配置含义如下：
 
 | 配置项 | 本例中的作用 |
 |---|---|
-| `hostAllowedProviders` | 宿主允许访问 `acme.http` |
-| `integrationEnabledProviders` | 本次集成启用 `acme.http`，不能越过宿主允许集合 |
-| `providers` | 为有效启用 Provider 配置唯一 Authority；允许集合不等于来源地址 |
-| `providers[].providerId` | 标识这条来源配置属于谁，须与 `provider.json` 相符 |
-| `authority.kind` | `file` 表示文件权威；数据库模式需要另配 Adapter |
-| `authority.rootDir` | Provider 根目录，包含上面的定义和知识文件 |
+| `hostAllowedProviders` | 宿主允许访问的 Provider 上限 |
+| `integrationEnabledProviders` | 当前集成启用的 Provider，与宿主允许集合取交集 |
+| `providers` | 为每个有效启用 Provider 配置唯一 Authority，不是允许名单 |
+| `providers[].providerId` | 对应 `provider.json` 的身份 |
+| `authority.kind` | `file` 表示读取文件定义，不导入业务源码 |
+| `authority.rootDir` | 包含两个定义文件的真实根目录，本例相对 `discover.mjs` 定位 |
 
-有效范围为 `hostAllowedProviders ∩ integrationEnabledProviders ∩ requestProviderScope`，未提供请求范围时使用前两者的交集。这两个数组分别服务宿主策略与当前集成开关，不能用它们代替 `providers` 的加载配置。
+有效范围为 `hostAllowedProviders ∩ integrationEnabledProviders ∩ requestProviderScope`，未提供请求范围时使用前两者交集。有效启用的 Provider 缺少来源时返回 `CG_CONFIG_INCOMPLETE`，不是合法空目录。
 
 ## 4. 执行渐进查询
 
-在项目根创建 `discover.mjs`。目录返回两个能力的摘要；本例的调用方随后明确选择 `route.http`，Core 不会自行判断用户意图。Provider 想首轮只展示主能力时，需在接入层定义入口策略，见下一页。
+在项目根创建完整的 `discover.mjs`：
 
 ```js title="discover.mjs"
 import { fileURLToPath } from 'node:url';
@@ -208,31 +112,10 @@ const graph = await CapabilityGraph.open({
 try {
   const provider = graph.forProvider('acme.http');
   const catalog = await provider.listCatalog({ limit: 20 });
-  const requiredStaticRevision = catalog.meta.staticRevision;
-  const detail = await provider.getCapabilities(['route.http'], { requiredStaticRevision });
-  const neighbors = await provider.getNeighbors('route.http', { requiredStaticRevision });
-  const selection = await provider.resolveSelection({ selected: ['route.http'], requiredStaticRevision });
-  const documents = await provider.readDocuments({
-    selected: selection.resolved.map(({ capabilityId }) => capabilityId),
-    knowledgeIds: ['routing-guide'],
-    roles: ['guide'],
-    locales: ['en'],
-    requiredStaticRevision
-  });
-  const specification = await provider.readSpecification({ knowledgeIds: ['SPEC-01'], requiredStaticRevision });
-
-  if (!detail.results[0]?.ok || !documents.results[0]?.ok || !specification.results[0]?.ok) {
-    throw new Error(JSON.stringify({ detail, documents, specification }));
-  }
   console.log(JSON.stringify({
     catalog: catalog.items.map(({ id }) => id.capabilityId),
-    detail: detail.results[0].value.id.capabilityId,
-    parents: neighbors.groups.parents.items.map(({ id }) => id.capabilityId),
-    selected: selection.resolved.map(({ capabilityId }) => capabilityId),
-    document: documents.results[0].value.knowledgeId,
-    specification: specification.results[0].value.knowledgeId,
-    text: documents.results[0].value.text,
-    completeness: catalog.meta.completeness
+    completeness: catalog.meta.completeness,
+    hasNextCursor: Boolean(catalog.nextCursor)
   }, null, 2));
 } finally {
   await graph.close();
@@ -243,45 +126,37 @@ try {
 node discover.mjs
 ```
 
-读取顺序是：
+1. `open()` 加载有效范围中的文件定义并校验，失败时不会生成可用图。
+2. `forProvider('acme.http')` 把后续查询绑定到一个 Provider，可使用其内部能力 ID。
+3. `listCatalog()` 返回平坦摘要，不读 Knowledge，不查询 Runtime，也不是“仅主能力”专用接口。
+4. 输出把结果投影成能力 ID、完整性和是否还有下一页，便于核对。
+5. `finally` 在成功或查询失败后关闭当前程序创建的 graph，释放权威视图句柄。
 
-1. `listCatalog()` 返回用途、使用时机和关键区别，用于第一轮选择。
-2. `getCapabilities()` 返回已选能力详情，关系摘要和知识引用有各自预算，不返回知识正文。
-3. `getNeighbors()` 只展开请求的关系组，不递归遍历整张图。
-4. `resolveSelection()` 从显式能力沿 `requires` 计算完整必要上下文闭包；不会沿 `parents` 或 `related` 扩张。
-5. `readDocuments()` 按知识 ID、用途和语言筛选后读取；`readSpecification()` 是独立的显式规范读取。
-
-始终检查 `meta.completeness`、`warnings` 和 `nextCursor`。部分结果不是全集；已知 ID 也可以直接查询详情，无需强制先列目录。
-
-`close()` 释放 Core 持有的权威视图句柄，不取消已经交给 Adapter 的底层任务。
+这里只定义了 `route`，因此 Catalog 恰好只有它；增加子能力后平坦目录也会列出子能力。首轮只展示主能力的入口策略归 Provider API/MCP，见[主能力接入](./provider-owned-api)。
 
 ## 预期结果与排错
 
-终端输出的精简投影如下，`text` 字段还会包含上面知识文件的完整正文：
-
 ```json
 {
-  "catalog": ["route", "route.http"],
-  "detail": "route.http",
-  "parents": ["route"],
-  "selected": ["route.http"],
-  "document": "routing-guide",
-  "specification": "SPEC-01",
-  "completeness": "complete"
+  "catalog": ["route"],
+  "completeness": "complete",
+  "hasNextCursor": false
 }
 ```
 
-这证明定义可加载、显式父关系可查询、Selection 不误把父节点当依赖、文档及规范可按需读取。`requiredStaticRevision` 来自本次 Catalog，后续查询沿用它，不能填写 Provider 的 `version`。
+三项同时符合，说明首次加载和目录发现成功；不是业务执行、知识读取或 Runtime 接入成功。`meta.completeness` 为 `partial` 或存在 `nextCursor` 时只是部分结果，不能当成全集；完整结果仍应留意 `meta.warnings`。
 
-| 失败 | 优先检查 |
+| 失败现象 | 优先检查 |
 |---|---|
+| 找不到 npm 包 | 是否在运行脚本所属项目安装 `@devcodex/capability-graph` |
 | `CG_CONFIG_INCOMPLETE` | 有效启用的 Provider 是否有唯一来源配置 |
-| `CG_VALIDATION_FAILED` | JSON 必填字段、Provider 身份、关系端点是否完整 |
-| 文档逐项读取失败 | `knowledge/routing.md` 是否位于 Authority 根内且与 locator 一致 |
-| `CG_REVISION_MISMATCH` | 是否沿用了已退休修订；重新发现后再作选择 |
+| `CG_LOAD_FAILED` | 文件目录、读权限和 JSON 是否能加载 |
+| `CG_VALIDATION_FAILED` | 必填字段、Provider ID 与关系端点是否有效 |
+| Catalog 没有 `route` | 两个 JSON 是否保存到配置的 Provider 根内，文件名是否以 `.capability.json` 结尾 |
+| 输出 `partial` 或有下一页 | 保留过滤条件与修订续查，不把这一页当全集 |
 
-批量详情和知识返回 `results`，每项检查 `ok`；目录返回 `items`。其他情况见[故障排查](../troubleshooting/index)。
+后续详情与文档返回批量 `results`，要逐项检查 `ok`，不能仅凭 Promise 成功就认定每项都成功。更多症状见[故障排查](../troubleshooting/index)。
 
 ## 下一步
 
-把这组查询原语接入 [Provider 自有 API](./provider-owned-api)，或直接查看 [Provider 自有 MCP](../integrations/provider-owned-mcp) 的渐进发现流程。
+需要关系、知识、依赖闭包或规范时，按[渐进发现与按需读取](../guides/progressive-discovery)继续。要向 Agent 提供入口，再选择 [Provider 自有 API](./provider-owned-api) 或[自有 MCP](../integrations/provider-owned-mcp)，两者都不是首次发现的必需步骤。

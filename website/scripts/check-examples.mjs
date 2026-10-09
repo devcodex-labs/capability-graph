@@ -3,6 +3,12 @@ import { access, cp, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '../../dist/index.js';
 import { repositoryRoot, websiteRoot } from './lib/paths.mjs';
+import { compareFixture, loadTutorial } from './lib/tutorial.mjs';
+
+// Unit/negative tests are part of the existing check:examples entry, not an optional new script.
+execFileSync(process.execPath, ['--test', path.join(websiteRoot, 'scripts/lib/tutorial.test.mjs')], {
+  cwd: repositoryRoot, stdio: 'inherit', timeout: 30_000
+});
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -15,11 +21,17 @@ for (const entry of statuses) {
   assert(!ids.has(entry.id), `duplicate example status: ${entry.id}`);
   ids.add(entry.id);
   assert(allowedStatuses.has(entry.status), `invalid example status for ${entry.id}`);
+  assert(Array.isArray(entry.prerequisites) && Array.isArray(entry.userResponsibilities) &&
+    entry.userResponsibilities.length > 0 && typeof entry.proof === 'string' && entry.proof.length > 0,
+    `${entry.id} must state prerequisites, proof limits and user responsibilities`);
   if (entry.status === 'Conceptual') {
     assert(entry.source === null && entry.verify === null, `${entry.id} must not claim a runnable source`);
+    assert(entry.runDir === null && entry.entry === null, `${entry.id} must not claim an execution entry`);
     continue;
   }
   assert(typeof entry.source === 'string' && typeof entry.verify === 'string', `${entry.id} must declare source and verification`);
+  assert(typeof entry.runDir === 'string' && typeof entry.entry === 'string', `${entry.id} must declare cwd and entry`);
+  assert((await stat(path.join(repositoryRoot, entry.runDir))).isDirectory(), `${entry.id} cwd does not exist`);
   const source = entry.source.startsWith('fixtures/')
     ? path.join(websiteRoot, entry.source)
     : path.resolve(websiteRoot, entry.source);
@@ -40,15 +52,8 @@ const snapshot = JSON.parse(await readFile(path.join(websiteRoot, 'generated', '
 assert(JSON.stringify(snapshot) === JSON.stringify(fixture), 'generated First Provider snapshot drifted from fixtures');
 await Promise.all(fixtureDocuments.map((file) => access(path.join(fixtureRoot, file))));
 
-const tutorial = await readFile(path.join(websiteRoot, 'docs', 'getting-started', 'first-provider.mdx'), 'utf8');
-const documented = new Map();
-for (const match of tutorial.matchAll(/```json title="([^"]+)"\r?\n([\s\S]*?)\r?\n```/g)) {
-  documented.set(match[1], JSON.parse(match[2]));
-}
-for (const file of fixtureFiles) {
-  assert(documented.has(file), `First Provider tutorial is missing ${file}`);
-  assert(JSON.stringify(documented.get(file)) === JSON.stringify(fixture[file]), `${file} documentation drifted from fixture`);
-}
+await compareFixture(await loadTutorial('G0'), path.join(websiteRoot, 'fixtures/minimal-provider'));
+await compareFixture(await loadTutorial('MCP'), path.join(websiteRoot, 'fixtures/mcp-main-entry'));
 
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['acme.http'],
@@ -81,6 +86,10 @@ try {
   assert(documents.results.length === 1 && documents.results[0].ok, 'routing-guide must be readable');
   assert(documents.results[0].value.knowledgeId === 'routing-guide', 'readDocuments returned the wrong knowledge item');
   assert(documents.results[0].value.text.includes('Register the route'), 'routing-guide content is incomplete');
+  const specification = await provider.readSpecification({ knowledgeIds: ['SPEC-01'], requiredStaticRevision: revision });
+  assert(specification.results[0]?.ok, 'advanced fixture Specification regression must remain runnable');
+  assert(specification.results[0].value.text === await readFile(path.join(fixtureRoot, 'PROVIDER.md'), 'utf8'),
+    'advanced fixture Specification must return its actual body');
 } finally {
   await graph.close();
 }
@@ -97,6 +106,7 @@ try {
   assert(fixtureOutput.detail === 'route.http', 'standalone fixture detail drifted');
   assert(fixtureOutput.parents.join(',') === 'route', 'standalone fixture relation drifted');
   assert(fixtureOutput.document === 'routing-guide', 'standalone fixture knowledge drifted');
+  assert(fixtureOutput.specification === 'SPEC-01', 'standalone fixture Specification drifted');
   assert(fixtureOutput.completeness === 'complete', 'standalone fixture must remain complete');
 } finally {
   assert(path.dirname(fixtureRunRoot) === repositoryRoot, 'fixture run root escaped the repository');
@@ -106,4 +116,4 @@ try {
 
 await access(path.join(repositoryRoot, 'dist', 'index.d.ts'));
 await import('./check-doc-code.mjs');
-console.log(`example check passed: ${statuses.length} status entries and runnable First Provider flow`);
+console.log(`example check passed: ${statuses.length} status entries, page-only tutorials and independent advanced Fixture`);

@@ -1,0 +1,5 @@
+{
+  "providerId": "acme.http",
+  "name": "Acme HTTP",
+  "version": "0.1.0"
+}

@@ -1,4 +1,5 @@
 [
+  { "type": "file", "name": "progressive-discovery", "label": "渐进发现与按需读取" },
   { "type": "file", "name": "model-a-provider", "label": "建模 Provider" },
   { "type": "file", "name": "design-relations", "label": "设计关系" },
   { "type": "file", "name": "add-local-knowledge", "label": "添加本地知识" },

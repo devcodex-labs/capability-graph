@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -111,4 +114,83 @@ test("MCP: actual stdio child serves requests and exits on close", async (contex
   } finally { await client.close(); await transport.close(); }
   assert.ok(pid); assert.throws(() => process.kill(pid!, 0));
   context.diagnostic(`stdio child PID=${pid}; transport closed; process absent; no TCP listener`);
+});
+
+test("MCP docs: page-restored main entry runs the progressive stdio chain and preserves failures", async (context) => {
+  const privateRoot = path.resolve(fileURLToPath(new URL("../../", import.meta.url)));
+  const websiteRoot = path.resolve(fileURLToPath(new URL("../../../../website/", import.meta.url)));
+  const helperUrl = pathToFileURL(path.join(websiteRoot, "scripts", "lib", "tutorial.mjs")).href;
+  const { loadTutorial, materializeTutorial, compareFixture } = await import(helperUrl);
+  // Keep one directory level under the private package for SDK and Seed path resolution.
+  const scratch = await mkdtemp(path.join(privateRoot, ".docs-main-"));
+  let pid: number | null = null;
+  try {
+    const tutorial = await loadTutorial("MCP");
+    await compareFixture(tutorial, path.join(websiteRoot, "fixtures", "mcp-main-entry"));
+    const materialized = await materializeTutorial(scratch, tutorial);
+    const output = JSON.parse(execFileSync(process.execPath, [materialized.script], {
+      cwd: privateRoot, encoding: "utf8", timeout: 30_000,
+    }));
+    assert.deepEqual(output, tutorial.expected);
+
+    const client = new Client({ name: "docs-stdio", version: "0.1.0" });
+    const transport = new StdioClientTransport({ command: process.execPath,
+      args: [path.join(scratch, "server.mjs")], stderr: "pipe" });
+    try {
+      await client.connect(transport); pid = transport.pid; assert.ok(pid);
+      assert.equal((await client.listTools()).tools.length, 5);
+      const main = payload(await client.callTool({ name: "example_list_main_capabilities", arguments: {} }));
+      assert.deepEqual((main.capabilities as { id: { capabilityId: string } }[]).map((item) => item.id.capabilityId), ["route"]);
+      const serialized = JSON.stringify(main);
+      for (const forbidden of ["neighborSummaries", "knowledge", "observation", "D-02", "route.validation"]) {
+        assert.equal(serialized.includes(forbidden), false, `main entry leaks ${forbidden}`);
+      }
+      const R = main.staticRevision as string;
+      assert.equal(typeof R, "string");
+      const wrong = await client.callTool({ name: "example_get_capabilities",
+        arguments: { ids: [canonical("route")], requiredStaticRevision: "s:0000000000000000" } });
+      assert.equal(wrong.isError, true); assert.equal(payload(wrong).code, "CG_REVISION_MISMATCH");
+      assert.equal(payload(wrong).nextAction, "refresh");
+      const unselected = payload(await client.callTool({ name: "example_read_documents", arguments: {
+        selected: [canonical("route")], knowledgeIds: ["D-02"], requiredStaticRevision: R,
+      } }));
+      assert.equal((unselected.results as { ok: boolean }[])[0]?.ok, false);
+      assert.equal(JSON.stringify(unselected).includes("# Route Validation"), false);
+      const malformed = await client.callTool({ name: "example_resolve_selection",
+        arguments: { selected: ["route.validation"] } });
+      assert.equal(malformed.isError, true);
+      assert.match(JSON.stringify(malformed.content), /Invalid arguments|invalid_type|Expected object/i);
+      const singleRevision = await client.callTool({ name: "example_resolve_selection",
+        arguments: { selected: [canonical("route.validation")], requiredStaticRevisionByProvider: R } });
+      assert.equal(singleRevision.isError, true);
+      assert.match(JSON.stringify(singleRevision.content), /Invalid arguments|invalid_type|Expected object/i);
+      const incompleteRevisionMap = await client.callTool({ name: "example_resolve_selection",
+        arguments: { selected: [canonical("route.validation")], requiredStaticRevisionByProvider: {} } });
+      assert.equal(incompleteRevisionMap.isError, true);
+      assert.equal(payload(incompleteRevisionMap).code, "CG_INPUT_INVALID");
+    } finally { try { await client.close(); } finally { await transport.close(); } }
+    assert.ok(pid); assert.throws(() => process.kill(pid!, 0));
+
+    // Missing configured main entries retain their failed slots instead of becoming an empty success.
+    const { createMainEntryServer } = await import(pathToFileURL(path.join(scratch, "server.mjs")).href);
+    const missing = await createMainEntryServer({ mainEntries: ["missing"] });
+    const missingClient = new Client({ name: "docs-missing", version: "0.1.0" });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    try {
+      await missing.server.connect(a); await missingClient.connect(b);
+      const response = payload(await missingClient.callTool({ name: "example_list_main_capabilities", arguments: {} }));
+      const slots = response.capabilities as { ok: boolean; error: { code: string } }[];
+      assert.equal(slots.length, 1); assert.equal(slots[0]?.ok, false);
+      assert.equal(slots[0]?.error.code, "CG_NOT_FOUND");
+    } finally {
+      try { await missingClient.close(); } finally {
+        try { await missing.server.close(); } finally { await missing.graph.close(); }
+      }
+    }
+    context.diagnostic(`page-only MCP chain passed; child PID=${pid} absent; no TCP listener`);
+  } finally {
+    assert.equal(path.dirname(scratch), privateRoot);
+    assert(path.basename(scratch).startsWith(".docs-main-"));
+    await rm(scratch, { recursive: true, force: true });
+  }
 });

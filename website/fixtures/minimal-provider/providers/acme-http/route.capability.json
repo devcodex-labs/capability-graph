@@ -1,0 +1,7 @@
+{
+  "capabilityId": "route",
+  "name": "Routing",
+  "description": "Define how requests reach application handlers.",
+  "whenToUse": "Choose a routing capability before changing an entrypoint.",
+  "distinction": "A static capability family, not registered runtime routes."
+}

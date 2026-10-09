@@ -5,8 +5,8 @@ const websiteRoot = path.resolve(import.meta.dirname, '..');
 const docsRoot = path.join(websiteRoot, 'docs');
 const sections = [
   'getting-started',
-  'concepts',
   'guides',
+  'concepts',
   'integrations',
   'examples',
   'reference',
@@ -141,6 +141,15 @@ for (const file of publicPages) {
 const statuses = JSON.parse(await readFile(path.join(websiteRoot, 'data', 'example-status.json'), 'utf8'));
 for (const entry of statuses) {
   if (!terminology.allowedStatuses.includes(entry.status)) fail(`invalid example status ${entry.status}`);
+  if (!Array.isArray(entry.prerequisites) || !Array.isArray(entry.userResponsibilities) ||
+      !entry.userResponsibilities.length || typeof entry.proof !== 'string' || !entry.proof) {
+    fail(`${entry.id} must document preparation, proof boundaries and user responsibilities`);
+  }
+  if (entry.status === 'Conceptual') {
+    if (entry.runDir !== null || entry.entry !== null) fail(`${entry.id} cannot claim a runnable cwd/entry`);
+  } else if (typeof entry.runDir !== 'string' || typeof entry.entry !== 'string') {
+    fail(`${entry.id} needs an explicit execution cwd and entry`);
+  }
 }
 const vext = statuses.find((entry) => entry.id === 'vextjs-integration');
 if (!vext || vext.status !== 'Conceptual' || vext.source !== null || vext.verify !== null) {

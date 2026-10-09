@@ -7,7 +7,7 @@ description: 在 Provider 自己的 API 中暴露渐进式能力发现，而不�
 
 <span className="cg-status">设计示例；Seed 参考可运行</span>
 
-Provider 自己决定 HTTP 路径、认证、请求范围和返回形状。先完成上一页并得到已打开的 `graph`。下面是供自有 handler 调用的 TypeScript 函数片段，不包含 HTTP 服务启动；完整普通 API 执行路径见下方 Seed 链接。
+这是 API 设计示例，不是 HTTP Server。Provider 自己决定路径、认证、请求范围和返回形状。前置为 G0 的 route 定义；在自己的当前进程中按最小页配置重新 open，把该进程持有的 graph 传给下方函数。最小页退出时已 close，不能把它的变量当作下一个进程的输入。完整普通 Node.js 执行路径见下方 Seed 链接。
 
 本例由 Provider 显式维护主入口 `route`。Core 的 `listCatalog()` 返回平坦目录，不会自动筛选根节点；固定入口可直接调用批量详情，再投影首轮需要的摘要。
 
@@ -39,12 +39,14 @@ export async function listMainCapabilities(graph: CapabilityGraph) {
 | 请求 | Handler 调用 | 预期结果与下一步 |
 |---|---|---|
 | `GET /capabilities/main` | 上面的 `listMainCapabilities(graph)` | 返回 `route` 摘要及修订，Agent 根据意图选路由能力 |
-| `POST /capabilities/children`，输入能力 `route` 与上一步修订 | `getNeighbors('route', { kinds: ['children'], requiredStaticRevision })` | `groups.children.items` 包含 `route.http`，有游标时继续该组 |
-| `POST /capabilities/detail`，输入 `route.http` 与同一修订 | `getCapabilities(['route.http'], { requiredStaticRevision })` | `results[0]` 为能力详情，先检查 `ok` |
-| `POST /capabilities/selection`，显式选择 `route.http` | `resolveSelection({ selected: ['route.http'], requiredStaticRevision })` | 返回必要的 `requires` 闭包和每个加入项的原因 |
-| `POST /capabilities/documents`，传入 Selection 结果 | `readDocuments({ selected: resolved.map((id) => id.capabilityId), requiredStaticRevision })` | 返回已选能力知识的逐项内容/错误 |
+| `POST /capabilities/children`，输入 route 与修订 | `getNeighbors('route', { kinds: ['children'], requiredStaticRevision })` | G0 合法为空；添加 G1 后包含 route.http，有游标时继续该组 |
+| `POST /capabilities/detail`，输入 route.http 与同一修订 | `getCapabilities(['route.http'], { requiredStaticRevision })` | 需要 G1；先检查 ok，详情的关系/知识仍受预算裁剪，不是全量定义 |
+| `POST /capabilities/selection`，显式选择 route.validation | `resolveSelection({ selected: ['route.validation'], requiredStaticRevision })` | 需要 G3；补齐 schema.request，返回 added 与 reasons，不执行任务 |
+| `POST /capabilities/documents`，传入完整 Selection 结果 | `readDocuments({ selected: resolved.map((id) => id.capabilityId), requiredStaticRevision })` | 必须实际有 Knowledge；G2 的 route.http 才关联 routing-guide，G3 示例本身没有知识 |
 
 请求体中的 `requiredStaticRevision` 取首个响应的真实值，不填写版本号。Handler 应验证输入，先按用户/租户解析允许的 Provider，再取得绑定对象；`forProvider()` 本身不做用户认证。服务关闭时等待在途请求完成，再关闭共享 `graph`，不要在每次 handler 结束时关闭它。
+
+各阶段完整文件见[进阶教程](../guides/progressive-discovery)。这些路径和工具名只属于接入示意，npm 包不会注册它们；只调用主入口函数不能证明 HTTP 路由、认证或并发停机已经实现。
 
 显式修订已退休时，向调用方返回 `CG_REVISION_MISMATCH` 并重新发现；不能静默换成当前修订。分页结果保留对应关系组的游标、完整性和 warnings。
 

@@ -5,10 +5,10 @@ description: 从安装到第一次能力查询，完成 Capability Graph 的最�
 
 # 快速开始
 
-本分区面向第一次接入 Capability Graph 的 Provider 作者和框架维护者。完成后，你将拥有一个可校验的 Provider 定义、一个明确范围的 Core 实例，以及一个由 Provider 自己暴露的 API 入口。
+本分区面向第一次接入的 Provider 作者和框架维护者。前两步在一个空 Node.js 项目中完成能力发现；API/MCP 是随后按需选择的集成方式。
 
 1. [安装](./installation)包并确认 Node.js 版本。
-2. [创建第一个 Provider](./first-provider)，定义 Provider、能力、本地知识并完成渐进查询。
-3. [Provider 自有 API](./provider-owned-api)，把查询原语接入自己的服务，并选择关系、知识、Runtime 或 MCP 的后续路径。
+2. [创建第一个 Provider](./first-provider)，只定义一个 Provider、一个能力并验证目录结果。
+3. 按任务选择[渐进发现与按需读取](../guides/progressive-discovery)、[Provider 自有 API](./provider-owned-api)或[Provider 自有 MCP](../integrations/provider-owned-mcp)；不必先完成所有增强能力。
 
 **当前边界**：Core 不执行能力，也不替 Provider 设计认证、MCP 工具名称或 Agent 意图路由。

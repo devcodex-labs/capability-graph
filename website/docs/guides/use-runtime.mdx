@@ -11,6 +11,8 @@ Runtime 接入从一个明确 Adapter 开始。Adapter 接收 Provider、项目�
 
 只有需要确认“当前项目实际注册了什么”时才接 Runtime；仅发现框架支持的能力，无需启动业务服务。
 
+最小 acme.http 教程没有 Runtime Adapter 或业务注册表。本页使用独立 seed.http 场景，不能仅把 providerId 改成 acme.http 就得到实例。最快核对真实路径：在完整源码仓库根运行 npm ci、npm test，随后 node --test dist-test/test/real-runtime.test.js；测试自己启动/关闭 HTTP 进程并验证端口释放，不需要手动启动一个未知服务。
+
 下面是接入片段：先构建仓库示例并由应用启动 Seed HTTP 服务，取得它实际监听的地址。`runtimeAdapter` 使用仓库 `examples/seed-runtime/adapter.ts` 的 `HttpRuntimeAdapter`，不是主包内置导出；实例化方式和端点约束见[Runtime Adapter](../integrations/runtime-adapter)。`providers` 指向仓库的 `examples/seed-provider`，`project`/`environment` 必须与服务启动配置一致。完整自动执行路径见[真实 Runtime 示例](../examples/seed-provider#真实-runtime)。
 
 ```ts

@@ -23,7 +23,7 @@ Provider Specification 描述如何正确使用该 Provider；正文归 Provider
 
 ## 贯穿示例：Acme HTTP
 
-入门中的 `acme.http` 定义 `route` 和 `route.http`。能力增长后可扩展为：
+最小入门的 acme.http 只有 route；[进阶 G1](../guides/progressive-discovery#g1-child-capability)才添加 route.http。可继续按任务扩展为：
 
 | 能力 | 负责什么 | 何时选择 |
 |---|---|---|
@@ -32,7 +32,20 @@ Provider Specification 描述如何正确使用该 Provider；正文归 Provider
 | `route.validation` | 路由请求校验 | 在 handler 前验证输入 |
 | `schema.request` | 请求结构声明 | 描述必填字段和输入类型 |
 
-后两项是概念扩展示例，不会由两节点入门 Fixture 自动生成。`PROVIDER.md` 放跨能力规则，验证指南绑定 `route.validation`；具体 `POST /users` 留给 Runtime，避免把每个业务路由变成静态能力。
+后两项可按独立 G3 定义，但该检查点没有绑定 Knowledge；不要据此假设能读验证指南。G4 的 PROVIDER.md 放跨能力规则，具体 POST /users 留给 Runtime，避免把业务路由实例建成静态能力。Specification 可独立于子能力和知识读取接入。
+
+## 版本与内容身份
+
+| 值 | 说明 |
+|---|---|
+| npm 包版本 1.0.1 | 使用哪一版 Core API |
+| provider.version | 作者对定义的版本标签，本例0.1.0，不属于能力身份 |
+| specification.version | 规范自身的版本，独立于 Provider 版本 |
+| Static Revision | 实际静态定义快照身份，查询必须使用响应中的真实值 |
+| Runtime Revision | Adapter 观察的实例快照，不替代静态修订 |
+| contentId | 实际知识字节身份；只改正文不会改变 Static Revision |
+
+不要将这些值互相填入 requiredStaticRevision 或 requiredRuntimeRevision。
 
 ## 能力建模
 

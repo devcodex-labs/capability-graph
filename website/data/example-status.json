@@ -4,6 +4,11 @@
     "status": "Runnable",
     "source": "../examples/seed-provider",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "自动路径的公开行为，不证明生产集成",
+    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
     "claims": ["file authority", "local document"]
   },
   {
@@ -11,6 +16,11 @@
     "status": "Runnable",
     "source": "../examples/seed-api",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "自动路径的公开行为，不证明生产集成",
+    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
     "claims": ["provider-owned API reference"]
   },
   {
@@ -18,6 +28,11 @@
     "status": "Runnable",
     "source": "../examples/seed-mcp",
     "verify": "npm test",
+    "runDir": "examples/seed-mcp",
+    "prerequisites": ["root: npm ci","root: npm test","examples/seed-mcp: npm ci --ignore-scripts"],
+    "entry": "npm test；页面 docs-main-entry/client.mjs",
+    "proof": "自动路径的公开行为，不证明生产集成",
+    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
     "claims": ["provider-owned MCP reference"]
   },
   {
@@ -25,13 +40,23 @@
     "status": "Runnable",
     "source": "../examples/seed-runtime",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "自动路径的公开行为，不证明生产集成",
+    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
     "claims": ["real HTTP runtime observation"]
   },
   {
     "id": "first-provider-tutorial",
     "status": "Runnable",
-    "source": "fixtures/first-provider",
+    "source": "fixtures/minimal-provider",
     "verify": "npm run check:examples",
+    "runDir": "website",
+    "prerequisites": ["root: npm run build","website: npm ci"],
+    "entry": "页面还原的 discover.mjs",
+    "proof": "自动路径的公开行为，不证明生产集成",
+    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
     "claims": ["first provider tutorial"]
   },
   {
@@ -39,6 +64,11 @@
     "status": "Runnable",
     "source": "../test/provider-isolation.test.ts",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "自动路径的公开行为，不证明生产集成",
+    "userResponsibilities": ["按页面创建文件和安装依赖","接入方负责认证、部署和进程管理"],
     "claims": ["provider isolation", "union catalog"]
   },
   {
@@ -46,6 +76,11 @@
     "status": "Conceptual",
     "source": null,
     "verify": null,
+    "runDir": null,
+    "prerequisites": [],
+    "entry": null,
+    "proof": "职责与推荐组合，无执行证据",
+    "userResponsibilities": ["实现并验证对应Adapter"],
     "claims": ["recommended integration shape only"]
   },
   {
@@ -53,6 +88,11 @@
     "status": "Contract-only",
     "source": "../src/store/types.ts",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "公开类型与正负合同，不证明真实后端",
+    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
     "claims": ["adapter contract", "contract tests"]
   },
   {
@@ -60,6 +100,11 @@
     "status": "Contract-only",
     "source": "../src/retrieval/types.ts",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "公开类型与正负合同，不证明真实后端",
+    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
     "claims": ["adapter contract", "contract tests"]
   },
   {
@@ -67,6 +112,11 @@
     "status": "Contract-only",
     "source": "../src/retrieval/types.ts",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "公开类型与正负合同，不证明真实后端",
+    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
     "claims": ["adapter contract", "contract tests"]
   },
   {
@@ -74,6 +124,11 @@
     "status": "Contract-only",
     "source": "../src/knowledge/types.ts",
     "verify": "npm test",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci"],
+    "entry": "npm test",
+    "proof": "公开类型与正负合同，不证明真实后端",
+    "userResponsibilities": ["实现实际后端","配置访问与生命周期"],
     "claims": ["reader contract", "negative tests"]
   }
 ]

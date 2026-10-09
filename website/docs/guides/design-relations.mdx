@@ -9,6 +9,8 @@ description: 选择正确关系类型，验证端点、方向和独立环约束�
 
 ## 决策顺序
 
+前置：最小页只有 route，不能直接运行下方 route.validation 片段。先完成[进阶 G1](./progressive-discovery#g1-child-capability)及独立 G3 的两个新能力定义，或使用完整 Seed；四个端点都必须在当前同一 Authority 根中。以下是关系设计片段，不是完整能力文件或执行入口。
+
 1. “B 是 A 的直接分类或组成上位概念”时，B 可作为 A 的 `parents`。
 2. “A 保留 B 的核心语义但更具体”时，A 可 `specializes` B。
 3. “两者只需要提示关联，且方向有意义”时，使用 `related`。
@@ -35,7 +37,7 @@ description: 选择正确关系类型，验证端点、方向和独立环约束�
 
 通过 `getNeighbors()` 分组检查方向，并加入悬空端点、自环，以及 `parents`、`specializes`、`requires` 各自成环的负向 Fixture。只有确实必要的上下文才声明 `requires`，否则会扩大读取前的能力选择。
 
-查询片段，`provider` 已绑定定义所属 Provider：
+查询片段：在当前程序复制最小教程的 open/forProvider/try/finally，再将 try 内查询替换为下方代码。provider 绑定 acme.http，读取的是刚才合并关系后重新打开的定义，不能引用之前已关闭进程的变量：
 
 ```ts
 const page = await provider.getNeighbors('route.validation');

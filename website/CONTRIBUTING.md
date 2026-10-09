@@ -4,7 +4,7 @@
 
 ## 内容要求
 
-- Getting Started 说明目标、前置条件、创建文件、字段含义、执行命令、预期结果、常见错误和下一步；主路径至少有一份可从空项目执行的完整代码。
+- Getting Started 从空 npm 项目只创建最小 Provider 和一个能力，完成 Catalog；关系、Knowledge、requires/Selection、Specification 在唯一进阶页按G1-G4添加。每检查点完整脚本独立open/close，G3/G4能仅从G0开始，不隐藏高级Fixture输入。
 - Guide 解释适用场景、关键取舍与验证方式。配置片段明确合并位置，保留必填字段；代码依赖外部变量时写明来源，不标成独立可运行。
 - Integration 区分 Core 和实现方职责，解释输入/输出、预算、失败语义、资源所有权及最小实现边界。骨架通过公开类型编译，不将依赖注入的合同示例宣称为真实后端。
 - Example 包含场景、源码布局、运行目录/命令、关键调用和预期输出，说明证明范围。源码链接补充正文，不替代正文。
@@ -18,7 +18,7 @@
 
 ## 验证
 
-在 `website/` 执行 `npm run build`：生成公开合同、核对内容/字段、执行教程，再构建站点。`check:examples` 会核对文档 JSON/Markdown 与 Fixture，直接提取并运行 `discover.mjs`、比对页面预期输出，编译列入校验清单的 Guide/API/Adapter 片段，并执行主入口投影和 Reader 内容身份合同。
+在 website 执行 npm run build。scripts/lib/tutorial.mjs 是本地、Registry及MCP测试共用的页面还原器，只接受固定检查点/文件白名单。页面是输入真相源，Fixture只对照，不能复制Fixture补文件。check:examples运行helper负例、G0-G4及独立G4四例、页面输出，保留高级Fixture Specification/Reader/API和类型片段回归。安装验证需使用仓库外消费者和独立冻结的期望版本，不以实际读取的版本自证。
 
 维护 First Provider Fixture 时，在仓库根先构建主包，再执行：
 
@@ -33,4 +33,6 @@ npm run check:examples
 
 新增被称为可运行的代码时，将其加入 `scripts/check-doc-code.mjs` 或真实示例测试；不要只增一个状态标签。生成与验证临时文件必须清理。Seed 的真实性另由根 `npm test` 和 `examples/seed-mcp` 的 `npm test` 验证。
 
-运行 `npm run check:build`、`npm run build:ai` 和 `npm run test:site` 核对正式页面/跳转、AI 输出、导航、搜索、响应式和可访问性。浏览器预览由 Playwright 管理，结束后确认监听端口释放。自动检查不替代人工阅读，尤其不以字数、段落数量或固定标题证明教学质量。
+最终验收顺序是 build → build:ai → check:build → test:site → check:build/check:package，记录最终doc_build全部文件SHA；浏览器预览不得隐式重建。之后若页面/配置/生成输入或输出变化，必须重建并重验同一制品。Playwright管理自己的preview，结束确认端口释放，不复用或杀用户服务。自动检查不替代独立用户走读，未取得真实走读证据时仍UNVERIFIED。
+
+MCP完整Server/Client由公开页面还原到私有包下一层临时目录，保留固定SDK解析与Seed相对路径，标准stdio测试核对主入口无首轮泄漏、修订/参数/文档错误和进程退出。原十二工具/五能力平坦Catalog回归不可替换。新增验证消费者必须同步页面、状态数据、helper、安装链、生成输出和测试，不只改截图断言。

@@ -7,11 +7,11 @@ description: 为已选能力关联并安全读取 Provider 根目录内的本地
 
 <span className="cg-status">接入片段；本地读取有可运行示例</span>
 
-当一个能力需要长说明、操作步骤或限制时，把正文单独放入 Knowledge，避免目录每次携带全文。短用途和选择条件仍写在 Capability 的摘要字段。本页假设你已有包含 `route.validation` 的 Provider；从空目录操作请先完成[第一个 Provider](../getting-started/first-provider)。
+当能力需要长说明时，把正文放入 Knowledge，短用途仍写在 Capability 摘要。本页延续[进阶 G1](./progressive-discovery#g1-child-capability)的 route.http；最小 G0 尚无子能力，不能直接读取它。完整文件和可运行脚本见[独立 G2 步骤](./progressive-discovery#g2-local-knowledge)，本页解释字段和失败边界。
 
 ## 1. 放置文档
 
-将 Markdown 或文本放在 Provider 权威根内，例如 `knowledge/route-validation.md`。
+将 Markdown 或文本放在 Provider 权威根内，例如 `knowledge/routing.md`，内容使用 G2 给出的完整文档。
 
 ## 2. 关联能力
 
@@ -19,15 +19,15 @@ description: 为已选能力关联并安全读取 Provider 根目录内的本地
 
 ```json
 {
-  "capabilityId": "route.validation",
+  "capabilityId": "route.http",
   "knowledge": [{
     "kind": "document",
-    "knowledgeId": "route-validation-guide",
+    "knowledgeId": "routing-guide",
     "role": "guide",
-    "locale": "zh-CN",
+    "locale": "en",
     "locator": {
       "type": "relative-file",
-      "path": "knowledge/route-validation.md"
+      "path": "knowledge/routing.md"
     }
   }]
 }
@@ -35,13 +35,14 @@ description: 为已选能力关联并安全读取 Provider 根目录内的本地
 
 ## 3. 只读取已选能力
 
-查询片段：`provider` 是已打开图的 Provider 绑定对象。修订从此次目录结果取得：
+查询片段：在当前 discover.mjs 内复制 G2 的 open/forProvider/try/finally，用下面代码替换 try 内查询。provider 是当前程序绑定 acme.http 的对象，修订从当前目录取得，不跨进程复用变量：
 
 ```ts
 const catalog = await provider.listCatalog();
 const requiredStaticRevision = catalog.meta.staticRevision;
 const result = await provider.readDocuments({
-  selected: ['route.validation'],
+  selected: ['route.http'],
+  knowledgeIds: ['routing-guide'], roles: ['guide'], locales: ['en'],
   requiredStaticRevision
 });
 for (const item of result.results) {
@@ -56,7 +57,7 @@ Core 会校验相对路径仍位于 Provider 根的真实路径中，并按条�
 
 ## 预期结果
 
-成功项的 `value.knowledgeId` 为 `route-validation-guide`，`value.text` 为文件正文，`contentId` 标识实际读取的字节。空的 `selected` 无效；拼错知识 ID、文件不存在或越出根边界应检查逐项错误，不能解释成“能力没有知识”。仅改正文无需重建能力身份；改关联需要重新加载静态定义。
+成功项的 `value.knowledgeId` 为 `routing-guide`，`value.text` 与 knowledge/routing.md 一致，`contentId` 标识实际字节。空 selected 无效；拼错知识 ID、文件缺失或越界应检查逐项错误，不能解释成“没有知识”。只改正文无需重建能力身份；改关联需重新加载静态定义。接口 Promise 成功不代表每项 ok。
 
 下一步需要全文检索时再考虑[检索 Adapter](../integrations/capability-retriever)，不要把 Collection 当作可直接拼接的文档。
 

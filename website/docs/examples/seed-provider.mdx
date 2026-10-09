@@ -81,7 +81,7 @@ npm test
 
 先完成根目录的 `npm test`，再运行上面的 MCP 命令。预期私有包测试通过，并能发现十二个查询工具和 Specification Resource；默认 Runtime/检索未配置的调用应返回明确错误。
 
-手动连接时，让 MCP 客户端以 stdio 启动 `node`，参数为 `examples/seed-mcp/dist/src/main.js` 的绝对路径。它没有 HTTP URL；由 MCP 客户端管理子进程停止。首次工具调用及输入/输出见 [Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。
+手动连接原 Seed 时，让客户端以 stdio 启动 node，参数为 examples/seed-mcp/dist/src/main.js 的绝对路径。它没有 HTTP URL，由客户端管理子进程停止。原 Seed 保持十二工具及五能力平坦 Catalog；只从 route 主入口开始的完整 server/client 示例另见[Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。两者不混称同一个默认工具集。
 
 ## 真实 Runtime
 
@@ -106,4 +106,4 @@ node --test dist-test/test/real-runtime.test.js
 
 ## 文档入门 Fixture
 
-文档中的 [创建第一个 Provider](../getting-started/first-provider) 使用更小的 `website/fixtures/first-provider`：`acme.http` Provider、`route`、`route.http` 和本地 Routing Guide。运行 `cd website && npm run check:examples` 会从公开入口验证目录、详情、关系和文档读取，并核对文档 JSON 与 Fixture 不漂移。
+最小页只有 acme.http 的 route，对照目录是 website/fixtures/minimal-provider；文件和脚本来自公开页面，不需下载 Fixture 才能运行。G1-G4 在[进阶教程](../guides/progressive-discovery)按任务添加。旧 website/fixtures/first-provider 保留关系、知识和 Specification 的高级回归，不能拿它给最小教程暗中补文件。源码贡献者在 website 执行 npm run check:examples，执行页面还原与旧合同两条独立路径。

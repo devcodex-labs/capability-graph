@@ -25,15 +25,18 @@ description: 使用二元能力身份和显式关系，避免跨来源歧义、�
 
 ## 关系模型
 
-能力关系用于表达静态能力之间的明确语义。Capability Graph 有三种作者声明的正向关系和三种查询时生成的反向投影：
+能力关系表达静态能力的明确语义。共有四种作者声明的正向关系与四种查询生成的反向投影：
 
 | 正向 | 反向 | 含义 | 环规则 |
 |---|---|---|---|
 | `parents` | `children` | 分类或组成层级 | `parents` 图必须是 DAG |
 | `specializes` | `specializedBy` | 更具体的语义变体 | `specializes` 图无环 |
 | `related` | `relatedBy` | 有方向的显式关联 | 允许循环和双向声明 |
+| `requires` | `requiredBy` | 使用/理解能力所需的必要上下文 | requires 图独立无环 |
 
 `related` 不自动补反向边；`relatedBy` 只是查询投影。命名层级、共同前缀和 Runtime `instanceOf` 都不会生成静态边。
+
+Selection 只沿 requires 补齐上下文，不沿分类、特化或弱关联扩张；requiredBy 只用于反向发现。requires 不安排执行顺序，也不表示 Core 执行依赖业务。完整可运行例子见[独立 G3](../guides/progressive-discovery#g3-required-context)。
 
 关系端点必须属于同一 Provider。跨 Provider 组合发生在 Agent 任务层，而不是写入 V1 正式图。实践见 [设计关系](../guides/design-relations)。
 

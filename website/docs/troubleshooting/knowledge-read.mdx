@@ -5,6 +5,8 @@ description: 诊断知识关联、Reader、路径、Retriever、索引证据和 
 
 # 知识与 Adapter
 
+先确认能力实际绑定了 Knowledge；最小 G0 没有知识，G2 才给 route.http 绑定 routing-guide，独立 G3 不自动拥有验证指南。可直接按[G2完整文件](../guides/progressive-discovery#g2-local-knowledge)核对 relative-file 路径和正文，再看逐项结果。Specification 是单独的 Provider 读取，不属于 selected 能力 Knowledge。
+
 - `CG_KNOWLEDGE_NOT_ASSOCIATED`：已选能力没有匹配的 knowledgeId；核对选择和过滤。
 - `CG_KNOWLEDGE_TYPE_UNSUPPORTED`：将 Collection ID 当成单篇文档读取。可先用 `listKnowledgeMembers()` 发现成员，再按成员 ID 精确读取；需要全文检索时配置 Retriever 并使用 `queryKnowledge()`。
 - `CG_READER_UNCONFIGURED`：远程引用存在，但没有 Reader；配置 Reader，不要写成“没有知识”。

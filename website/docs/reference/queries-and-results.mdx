@@ -17,6 +17,8 @@ description: Catalog、Detail、Neighbor、Selection 与文档发现的输入、
 
 支持 `requiredStaticRevision`、`neighborLimitPerKind`、`knowledgeLimit` 和每能力知识续页游标。详情只返回有界关系摘要和 KnowledgeRef，不递归读取邻居或正文。
 
+逐项 results 检查 ok；成功详情的 neighborSummaries/knowledge 仍可能 truncated，知识摘要可带 nextCursor。getCapabilities 不是导出未裁剪原始定义的接口；需要关系下一页时调用 getNeighbors，需要 Collection 成员时调用 listKnowledgeMembers。
+
 ## NeighborQuery
 
 可指定关系种类、每组游标、页大小和静态修订。结果为八组固定键：`parents/children`、`specializes/specializedBy`、`related/relatedBy`、`requires/requiredBy`。每组独立报告完整性和续页位置。只有 `requires` 参与 Selection 闭包；`requiredBy` 是由它派生的反向发现关系。
@@ -28,6 +30,8 @@ description: Catalog、Detail、Neighbor、Selection 与文档发现的输入、
 ## Selection
 
 `ResolveSelectionQuery` 提供非空 `selected`、可选的范围收窄和逐 Provider 指定修订。原始选择最多 32 项，即使重复也计入；闭包最多 128 个能力和 256 条真实依赖边。`SelectionResult` 返回首次出现顺序的 `requested`、排序后的 `resolved/added`、全部 `requiresEdges`，以及每个节点的 `SelectionReason.requested/requiredBy`。任何节点、边、Scope 或修订错误都会使整次调用失败，不交付半个闭包。多 Provider 返回 `servedFromByProvider`、`staticRevisionByProvider` 与组合修订；`servedFrom` 可能是 `mixed`。
+
+Selection 不规划执行顺序，仅读取前补齐必要上下文。绑定对象使用 selected: ['route.validation'] 和单个 requiredStaticRevision；未绑定 graph 使用完整二元身份，以及 requiredStaticRevisionByProvider 映射。不能把两种参数形状互换。实际代码见[进阶 G3](../guides/progressive-discovery#g3-required-context)。
 
 ## 文档发现
 

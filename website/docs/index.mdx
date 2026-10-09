@@ -7,14 +7,14 @@ description: 面向 Provider 的能力建模、发现与知识导航基础设施
 
 Capability Graph 帮助框架、SDK 或平台把能力整理成 Agent 可以逐步查询的目录。维护这组定义和接入规则的一方称为 Provider；它使用 Core 加载和查询定义，通过自己的 API 或 MCP 提供发现入口。
 
-**下一步：** [运行第一个示例](./getting-started/first-provider) · [判断是否适合](#何时使用)
+**开始接入：** [安装](./getting-started/installation) → [创建一个能力并发现它](./getting-started/first-provider)。首次成功只需两个 JSON 和一个 Node.js 脚本，不需要克隆仓库或启动服务。
 
 ## 它解决什么问题
 
 例如用户要求“给现有 `POST /users` 增加请求校验”。只有工具名称或一整本文档时，Agent 仍需判断哪些能力有关、项目是否已有这条路由，以及该读哪段说明。使用 Capability Graph 后，接入层可以让 Agent：
 
 1. 从路由目录发现 `route.validation`，按任务意图选择它。
-2. 查看它与 `schema.request` 的关系，决定是否还需要请求 Schema。
+2. 显式选择它，沿作者声明的 `requires` 补齐 `schema.request` 等必要上下文；这不是业务执行顺序。
 3. 通过已配置的 Runtime Adapter 确认项目中的 `POST /users` 实例。
 4. 读取已选能力关联的知识，再由宿主完成代码修改和验证。
 
@@ -45,7 +45,8 @@ Core 提供发现和查询结果，不执行能力，也不代替 Agent 判断�
 ## 从这里开始
 
 - [快速开始](./getting-started/index)：从安装到第一个 Provider 和第一次查询。
-- [核心概念](./concepts/index)：理解身份、关系、范围、修订、知识和 Runtime。
+- [使用指南](./guides/index)：按当前任务添加子能力、知识、API/MCP 或 Runtime。
+- [核心概念](./concepts/index)：需要时查身份、关系、范围、修订、知识和 Runtime。
 - [GitHub](https://github.com/devcodex-labs/capability-graph)：查看源码、测试和真实 Seed。
 
 ## 文档目录
@@ -60,9 +61,10 @@ Core 提供发现和查询结果，不执行能力，也不代替 Agent 判断�
 
 ## 最小能力发现
 
-前置条件：已安装包，并按快速开始创建 `acme.http` Provider。下面是接入片段，需将 `rootDir` 替换为该 Provider 的真实目录；它不会生成定义文件。
+这是[最小 Provider 教程](./getting-started/first-provider)的查询代码：前提是已安装包，并在项目根的 `providers/acme-http/` 保存了该页两个 JSON。它不会替你生成定义文件；直接在全新目录运行会加载失败。
 
 ```ts
+import { fileURLToPath } from 'node:url';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
 const graph = await CapabilityGraph.open({
@@ -70,13 +72,13 @@ const graph = await CapabilityGraph.open({
   integrationEnabledProviders: ['acme.http'],
   providers: [{
     providerId: 'acme.http',
-    authority: { kind: 'file', rootDir: '/absolute/path/to/provider' }
+    authority: { kind: 'file', rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url)) }
   }]
 });
 
 try {
   const catalog = await graph.forProvider('acme.http').listCatalog();
-  console.log(catalog.items);
+  console.log({ items: catalog.items, meta: catalog.meta, nextCursor: catalog.nextCursor });
 } finally {
   await graph.close();
 }
@@ -95,7 +97,7 @@ try {
 | `listCatalog()` | 返回平坦能力摘要，不是根节点专用接口，也不展开详情、知识和 Runtime |
 | `close()` | 释放 Core 持有的权威视图句柄 |
 
-使用快速开始的两个能力时，`catalog.items` 中会同时有 `route` 和 `route.http`。其中一项的精简投影如下，省略修订等字段：
+最小教程只定义 `route`，所以 `catalog.items` 恰有一项。精简投影如下，省略修订等字段：
 
 ```json
 {
@@ -109,4 +111,4 @@ try {
 
 `meta.completeness` 为 `complete` 且没有 `nextCursor` 才表示本次目录已返回完整。要先只暴露主能力，由 Provider 接入层维护入口选择；不能把不带过滤的 `listCatalog()` 当作“只返回主能力”。加载失败时先检查 Provider ID、目录和定义必填字段。
 
-下一步进入[快速开始](./getting-started/index)，创建真实定义并把主能力、意图收窄和子能力逐层暴露给 Agent。
+能力文件没有规定 HTTP/MCP 工具。关系与知识见[使用指南](./guides/index)；主入口、意图收窄和逐层暴露由[接入层](./integrations/index)负责，不由 Core 自动判断。

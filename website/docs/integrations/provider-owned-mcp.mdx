@@ -11,7 +11,7 @@ Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程�
 
 1. **列出主能力**：Provider 显式选择主入口并返回摘要和修订；也可以用 `listCatalog()` 暴露有界平坦目录，但它不会自动只返回根节点。
 2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`；可选 Retriever 只能召回已有身份。
-3. **进入能力详情**：调用 `getCapabilities()` 获取完整定义。
+3. **进入能力详情**：调用 getCapabilities() 获取有界详情，不把关系/知识摘要当未裁剪全量定义。
 4. **展开子能力或关联**：按需调用 `getNeighbors()`，不在首轮暴露整图。
 5. **解析 Selection**：把明确选中的能力交给 `resolveSelection()`，仅沿 `requires` 补齐必要上下文并展示原因。
 6. **读取知识或 Runtime**：可先分页发现文档元数据，再按需读取正文；Runtime 需要项目和环境，可选用 `instanceOf` 收窄，不要求先选择知识。
@@ -20,25 +20,203 @@ Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程�
 
 ## Seed 调用示例
 
-以下是实际 Seed 工具参数示例，需先启动该示例并通过 MCP 客户端调用；这些 JSON 不是 Core 配置文件。SDK 依赖、启动入口和自动验证见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。
+本节是**独立的主入口示例**，使用真实 seed.http 定义，只注册五个查询工具。原 examples/seed-mcp Server 保持十二工具，example_list_catalog 仍返回五个能力的平坦目录。Core 不自动选择主入口，也不把每个能力注册成一个 MCP 工具。
 
-先调用 `example_list_catalog`：
+### 运行前提与文件
 
-```json
-{ "requestProviderScope": ["seed.http"], "limit": 20 }
+使用完整源码仓库，不是空 npm 消费项目。固定 SDK 1.30.0、Zod 3.25.76 由独立私有包声明。在仓库根开始：
+
+```sh
+npm ci
+npm test
+cd examples/seed-mcp
+npm ci --ignore-scripts
+npm test
 ```
 
-得到五个 Seed 能力的平坦摘要，以及 `meta.staticRevision`。这是参考工具的真实行为；要只给 Agent 主入口，可采用[Provider 自有 API](../getting-started/provider-owned-api)的显式入口投影，再包装成自己的 MCP 工具。
+回到仓库根，新建 examples/seed-mcp/docs-main-entry/ 并创建下方两个完整文件。目录层级不能随意改变：Server 按自身位置读取 ../../seed-provider/，SDK 从外层私有包解析。安装主包不会附带这些源码。stdio 没有 HTTP URL，由 Client 启动和关闭子进程。
 
-Agent 选择 `route` 后，调用 `example_get_neighbors` 的参数片段如下，`requiredStaticRevision` 需要添加为上次返回的真实值：
+### Server：显式主入口
 
-```json
-{ "qualifiedId": "seed.http::route", "kinds": ["children"], "limitPerKind": 20 }
+```js title="server.mjs"
+import { fileURLToPath } from 'node:url';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { CapabilityGraph, CapabilityGraphError, parseQualifiedId } from '@devcodex/capability-graph';
+
+const id = z.object({ providerId: z.string(), capabilityId: z.string() });
+const revision = { requiredStaticRevision: z.string().optional() };
+const kinds = ['parents', 'children', 'specializes', 'specializedBy',
+  'related', 'relatedBy', 'requires', 'requiredBy'];
+const response = (value) => ({ content: [{ type: 'text', text: JSON.stringify(value) }] });
+
+/** This reference owns one graph; the host owns authentication and project binding. */
+export async function createMainEntryServer({ mainEntries = ['route'] } = {}) {
+  const rootDir = fileURLToPath(new URL('../../seed-provider/', import.meta.url));
+  const graph = await CapabilityGraph.open({
+    hostAllowedProviders: ['seed.http'], integrationEnabledProviders: ['seed.http'],
+    providers: [{ providerId: 'seed.http', authority: { kind: 'file', rootDir } }]
+  });
+  const server = new McpServer({ name: 'seed-main-entry', version: '0.1.0' });
+  const call = async (operation) => {
+    try { return response(await operation()); }
+    catch (error) {
+      return { ...response(error instanceof CapabilityGraphError
+        ? { code: error.code, nextAction: error.nextAction }
+        : { code: 'CG_PARTIAL_ITEM', nextAction: 'repair_source' }), isError: true };
+    }
+  };
+  server.registerTool('example_list_main_capabilities', {
+    description: 'List explicit main entries, not every capability.', inputSchema: revision
+  }, (query) => call(async () => {
+    const details = await graph.forProvider('seed.http').getCapabilities(mainEntries, query);
+    return {
+      capabilities: details.results.map((item) => item.ok
+        ? { ok: true, id: item.value.id, name: item.value.name,
+          description: item.value.description, whenToUse: item.value.whenToUse,
+          distinction: item.value.distinction }
+        : item),
+      staticRevision: details.meta.staticRevision, meta: details.meta
+    };
+  }));
+  server.registerTool('example_get_neighbors', {
+    description: 'Expand only requested relation groups.',
+    inputSchema: { ...revision, qualifiedId: z.string(),
+      kinds: z.array(z.enum(kinds)).optional(),
+      limitPerKind: z.number().int().positive().optional(),
+      cursors: z.object(Object.fromEntries(kinds.map((kind) => [kind, z.string().optional()]))).optional() }
+  }, ({ qualifiedId, ...query }) => call(() => graph.getNeighbors(parseQualifiedId(qualifiedId), query)));
+  server.registerTool('example_get_capabilities', {
+    description: 'Get bounded details for explicit identities.',
+    inputSchema: { ...revision, ids: z.array(id) }
+  }, ({ ids, ...query }) => call(() => graph.getCapabilities(ids, query)));
+  server.registerTool('example_resolve_selection', {
+    description: 'Complete required context, not an execution plan.',
+    inputSchema: { selected: z.array(id), requestProviderScope: z.array(z.string()).optional(),
+      requiredStaticRevisionByProvider: z.record(z.string()).optional() }
+  }, (query) => call(() => graph.resolveSelection(query)));
+  server.registerTool('example_read_documents', {
+    description: 'Read knowledge declared by the full selected context.',
+    inputSchema: { ...revision, selected: z.array(id), requestProviderScope: z.array(z.string()).optional(),
+      knowledgeIds: z.array(z.string()).optional(), roles: z.array(z.string()).optional(),
+      locales: z.array(z.string()).optional() }
+  }, (query) => call(() => graph.readDocuments(query)));
+  return { server, graph };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { server, graph } = await createMainEntryServer();
+  let closing;
+  const close = () => closing ??= (async () => {
+    try { await server.close(); } finally { await graph.close(); }
+  })();
+  process.once('SIGINT', () => { void close(); });
+  process.once('SIGTERM', () => { void close(); });
+  process.stdin.once('end', () => { void close(); });
+  try { await server.connect(new StdioServerTransport()); }
+  catch (error) {
+    console.error(error);
+    await close();
+    process.exitCode = 1;
+  }
+}
 ```
 
-预期 `groups.children.items` 包含 `route.http` 和 `route.validation`。选择验证能力后，用 `example_get_capabilities` 传 `ids: [{ providerId: 'seed.http', capabilityId: 'route.validation' }]`；再用 `example_resolve_selection` 传显式 `selected` 和同一修订，检查 `resolved`、`added` 与 `reasons`。需要 Collection 成员时先用 `example_list_knowledge_members` 列元数据，确认目标后用 `example_read_documents` 传非空 `selected` 与可选 `knowledgeIds/roles/locales`。返回数据在 MCP 的 `content` 文本块中以 JSON 表达，先解析再检查 `results[].ok`、warnings 和游标。
+mainEntries 是 Provider 显式策略，默认只有 route。首轮保留用途摘要、真实 Static Revision、meta 和逐项错误，不带邻居、知识或 Runtime；主入口缺失时保留失败槽位，不过滤成成功空列表。
 
-Seed 同时提供 `seed://provider/specification` Resource，由 MCP 集成层读取 `PROVIDER.md`。Core 提供 `example_list_specification_documents` 与 `example_read_specification` 对应的分页元数据和显式正文读取，不负责 Resource 投递或执行其中指令。参考还暴露可选检索工具；未配置后端时调用它们会失败，这不影响目录与本地读取。
+详情是**有界详情**，关系组/知识摘要仍可能截断。邻居保留八组固定键与各组游标，未请求的关系不递归展开。Selection 接收完整二元身份与逐 Provider 修订映射，读取接收完整 resolved。主入口策略与工具名不是 Core 的统一约定。
+
+### Client：实际渐进链
+
+```js title="client.mjs"
+import { fileURLToPath } from 'node:url';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+const client = new Client({ name: 'main-entry-client', version: '0.1.0' });
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [fileURLToPath(new URL('./server.mjs', import.meta.url))],
+  stderr: 'inherit'
+});
+async function query(name, args) {
+  const reply = await client.callTool({ name, arguments: args });
+  const block = reply.content.find((item) => item.type === 'text');
+  if (!block) throw new Error('MCP result has no JSON text');
+  const value = JSON.parse(block.text);
+  if (reply.isError) throw new Error(JSON.stringify(value));
+  if (value.results?.some((item) => !item.ok) ||
+      value.capabilities?.some((item) => !item.ok)) throw new Error(JSON.stringify(value));
+  if (value.meta?.completeness !== 'complete' || value.meta.warnings.length ||
+      value.nextCursor || Object.values(value.groups ?? {}).some((group) =>
+        group.completeness !== 'complete' || group.nextCursor)) {
+    throw new Error('Inspect meta and continue paging before treating the result as complete.');
+  }
+  return value;
+}
+try {
+  await client.connect(transport);
+  const main = await query('example_list_main_capabilities', {});
+  const R = main.staticRevision;
+  const children = await query('example_get_neighbors', {
+    qualifiedId: 'seed.http::route', kinds: ['children'], requiredStaticRevision: R
+  });
+  const selected = [{ providerId: 'seed.http', capabilityId: 'route.validation' }];
+  const detail = await query('example_get_capabilities', { ids: selected, requiredStaticRevision: R });
+  const selection = await query('example_resolve_selection', {
+    selected, requiredStaticRevisionByProvider: { 'seed.http': R }
+  });
+  const documents = await query('example_read_documents', {
+    selected: selection.resolved, requestProviderScope: ['seed.http'],
+    requiredStaticRevision: R, knowledgeIds: ['D-02', 'D-03'],
+    roles: ['guide', 'reference'], locales: ['en']
+  });
+  console.log(JSON.stringify({
+    main: main.capabilities.map(({ id }) => id.capabilityId),
+    children: children.groups.children.items.map(({ id }) => id.capabilityId),
+    detail: detail.results[0].value.id.capabilityId,
+    resolved: selection.resolved.map(({ capabilityId }) => capabilityId),
+    added: selection.added.map(({ capabilityId }) => capabilityId),
+    documents: documents.results.map(({ value }) => value.knowledgeId)
+  }, null, 2));
+} finally {
+  try { await client.close(); } finally { await transport.close(); }
+}
+```
+
+在仓库根运行：
+
+```sh
+node examples/seed-mcp/docs-main-entry/client.mjs
+```
+
+预期投影：
+
+```json
+{
+  "main": ["route"],
+  "children": ["route.http", "route.validation"],
+  "detail": "route.validation",
+  "resolved": ["route.validation", "schema.request"],
+  "added": ["schema.request"],
+  "documents": ["D-02", "D-03"]
+}
+```
+
+先解析 MCP text 的 JSON，再检查协议 isError、逐项 ok、完整性、warnings 和游标。R 来自本次 main.staticRevision，不填占位字符串或 Provider/npm 版本。此走读在部分结果/分页时明确中止；生产客户端应保留元数据并续查，不悄悄把一页当全集。
+
+| 阶段 | 参数关键形状 | 证明范围 |
+|---|---|---|
+| 主入口 | {} | 只展示 route，不首轮暴露整图 |
+| 子能力 | qualifiedId、kinds、requiredStaticRevision | children 返回 route.http/route.validation |
+| 详情 | ids 完整二元身份 | 验证能力的有界信息 |
+| Selection | selected、requiredStaticRevisionByProvider | requires 补齐 schema.request，返回加入原因 |
+| 文档 | 完整 resolved、knowledgeIds、roles、locales、R | 按需读 D-02/D-03，逐项保留结果 |
+
+Server stdout 只用于 JSON-RPC，日志写 stderr。Client finally 关闭 transport；Server 停机关闭自己的 graph。示例不实现生产认证、租户策略、部署或 Agent 自动意图判断。Runtime/检索不是本链前置。
+
+原 Seed 的 Specification Resource 与十二工具仍见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。五工具 Server 没有宣称提供该 Resource。
 
 ## 错误映射
 

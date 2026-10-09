@@ -18,6 +18,8 @@ description: Provider、Capability 定义字段、验证矩阵和二元身份合
 
 文件 Authority 的 `provider.json` 必须与配置中的 `providerId` 一致。每个有效启用 Provider 必须恰有一个 Authority。
 
+首次定义使用[最小 Provider](../getting-started/first-provider)，不需要 specification。需要跨能力规则时使用[独立 G4](../guides/progressive-discovery#g4-provider-specification)的完整文件；不要用空 specification 对象作占位。Provider/specification 版本、包版本与修订各自含义见[版本与内容身份](../concepts/provider-and-specification#版本与内容身份)。
+
 ## 可执行验证用例
 
 | Case ID | 字段/场景 | 预期 |

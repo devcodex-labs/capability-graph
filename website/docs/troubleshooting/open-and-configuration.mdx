@@ -7,6 +7,14 @@ description: 诊断 open、Authority、定义校验、Provider scope、身份与
 
 ## 症状
 
+| 运行前现象 | 先做什么 |
+|---|---|
+| ERR_MODULE_NOT_FOUND | 在脚本所属项目 npm install @devcodex/capability-graph，核对 npm ls 实际版本 |
+| import 语法失败 | 使用 .mjs，或确认 package.json 的 type:module；主包没有 require 入口 |
+| Engine 警告或启动失败 | node --version 核对安装页要求；镜像/Registry版本延迟不当成Core故障 |
+
+首次数据文件和完整启动脚本见[最小教程](../getting-started/first-provider)。它只有 route，查询 route.http/route.validation 前必须先创建对应进阶定义；安装 npm 包不会生成这些能力。
+
 `CapabilityGraph.open()` 返回 `CG_CONFIG_INCOMPLETE`、`CG_DUAL_AUTHORITY`、`CG_LOAD_FAILED` 或 `CG_VALIDATION_FAILED`。
 
 ## 检查顺序

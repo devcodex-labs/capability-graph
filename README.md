@@ -17,11 +17,13 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 
 ## 当前状态
 
-仓库中的包版本为待发布 `1.0.1`；公开 Registry 与网站在单独发布验收完成前仍以已发布版本为准。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
+当前已发布 `1.0.1`。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
 
 ```sh
 npm install @devcodex/capability-graph
 ```
+
+首次接入从[安装](https://devcodex-labs.github.io/capability-graph/getting-started/installation)和[最小 Provider](https://devcodex-labs.github.io/capability-graph/getting-started/first-provider)开始，不需要克隆本仓库或配置知识、Runtime。关系、知识、必要上下文与规范按[进阶教程](https://devcodex-labs.github.io/capability-graph/guides/progressive-discovery)分步接入。下文的完整 Seed 展示增强合同，不是首次接入必须填写的配置。
 
 已实现文件权威加载、校验、单 Provider 正式图、跨 Provider 联合目录、范围控制、修订快照、按需知识读取，以及可插拔的数据库、检索和 Runtime 合同。真实 Seed 同时提供普通 API 与 MCP 接入。
 

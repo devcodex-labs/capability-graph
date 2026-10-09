@@ -5,9 +5,9 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 
 # 安装
 
-<span className="cg-status">1.0.1 文档候选，尚未发布</span>
+<span className="cg-status">已发布 1.0.1</span>
 
-以下示例对应仓库中的 1.0.1 候选合同。正式发布前，Registry 的无版本安装仍可能取得 1.0.0；先用 `npm view @devcodex/capability-graph version` 核对版本。1.0.1 发布并通过公开安装验收后，下面的无版本安装才对应本页后续接口。
+本页及后续示例以已发布的 1.0.1 为接口基线。无版本安装使用 Registry 的 `latest`；安装后用 `npm ls @devcodex/capability-graph` 核对实际版本，镜像延迟时同时检查 Registry 配置。
 
 把包装在负责加载 Provider、向 Agent 提供 API/MCP 的 Node.js 接入项目中。Provider 定义目录只是数据目录，不必单独安装一份包；一个接入项目可以加载多个 Provider。
 
@@ -57,11 +57,11 @@ node check.mjs
 |---|---|
 | `ERR_MODULE_NOT_FOUND` | 在运行脚本所属项目安装依赖，确认包名和当前工作目录 |
 | `Cannot use import statement outside a module` | 使用 `.mjs`，或在所属 `package.json` 配置 `type: module` |
-| Node 版本不满足要求 | 先用 `node --version` 检查上述范围 |
+| Node 版本不满足要求 | 先用 `node --version` 检查上述范围；npm 的 engines 警告不等于运行兼容 |
 | npm 返回版本或包不存在 | 用 `npm config get registry` 检查 registry 配置，再用 `npm view @devcodex/capability-graph version` 核对镜像是否已同步 |
 
 安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本；1.0.0 不具备后文的 Selection 与多文档 Specification 接口。
 
 ## 下一步
 
-在[创建第一个 Provider](./first-provider)中建立 `providers/acme-http/`，完成第一次目录、关系和本地知识查询。
+在[创建第一个 Provider](./first-provider)中建立两个 JSON 定义和 `discover.mjs`，完成第一次目录查询。安装不会自动注册框架业务能力，也不会启动 API/MCP 服务。

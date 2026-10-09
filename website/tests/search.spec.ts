@@ -6,7 +6,8 @@ const queries = [
   ['Runtime', /运行时模型|使用运行时|运行时状态|运行时接口/],
   ['Knowledge', /知识模型|知识读取|KnowledgeReader 接入|KnowledgeRetriever 接入/],
   ['CG_REVISION_MISMATCH', /错误与恢复动作|修订、预算与分页/],
-  ['MCP', /Provider 自有 MCP|Seed MCP 示例/]
+  ['MCP', /Provider 自有 MCP|Seed MCP 示例/],
+  ['必要上下文', /渐进发现与按需读取|查询接口|身份与关系/]
 ] as const;
 
 for (const [query, expectedResult] of queries) {

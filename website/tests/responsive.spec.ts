@@ -4,6 +4,8 @@ const pages = [
   ['home', './'],
   ['first-provider', 'getting-started/first-provider'],
   ['installation', 'getting-started/installation'],
+  ['progressive', 'guides/progressive-discovery'],
+  ['mcp', 'integrations/provider-owned-mcp'],
   ['adapter', 'integrations/runtime-adapter'],
   ['runtime', 'guides/use-runtime'],
   ['reference', 'reference/capability-graph']
@@ -52,8 +54,8 @@ test('home process is vertical and ordered', async ({ page }) => {
 test('mobile home exposes the first action without scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./');
-  await expect(page.getByRole('link', { name: '运行第一个示例' })).toBeInViewport();
-  await expect(page.getByRole('link', { name: '判断是否适合' })).toBeInViewport();
+  await expect(page.getByRole('link', { name: '安装', exact: true }).filter({ visible: true }).last()).toBeInViewport();
+  await expect(page.getByRole('link', { name: '创建一个能力并发现它', exact: true })).toBeInViewport();
 });
 
 test('wide desktop keeps the compact navigation controls visible', async ({ page }) => {
@@ -69,3 +71,19 @@ test('wide desktop keeps the compact navigation controls visible', async ({ page
     clip: { x: 0, y: 0, width: 1720, height: 96 }
   });
 });
+
+for (const [viewportName, viewport] of viewports) {
+  test(`tutorial remains legible in dark mode on ${viewportName}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('guides/progressive-discovery');
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    const widths = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth
+    }));
+    expect(widths.scroll).toBeLessThanOrEqual(widths.client + 1);
+    await page.screenshot({ path: `output/playwright/screenshots/${viewportName}-progressive-dark.png` });
+  });
+}

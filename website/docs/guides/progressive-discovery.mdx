@@ -1,0 +1,415 @@
+---
+title: 渐进发现与按需读取
+description: 从最小能力分步加入子能力、文档、必要上下文和独立 Provider 规范读取。
+---
+
+# 渐进发现与按需读取
+
+<span className="cg-status">可运行</span>
+
+从[最小 Provider](../getting-started/first-provider)的 G0 开始，每次只加当前任务需要的内容。G1/G2 连续演进；G3、G4 都能独立从 G0 开始。每一步的 `discover.mjs` 是**完整替换文件**，重新打开自己的 graph 并在最后关闭，不复用上一个进程里的变量或已关闭对象。
+
+## 选择路径
+
+| 目标 | 需要的输入 | 运行位置 |
+|---|---|---|
+| G1 发现子能力 | G0 + 本节新文件 | 项目根 |
+| G2 读取本地知识 | G0 + G1，替换子能力文件并增加知识文件 | 项目根 |
+| G3 补齐必要上下文 | 仅 G0 + 两个新能力文件 | 项目根 |
+| G4 读取 Provider 规范 | 仅 G0 + 本节三个新/替换文件 | 独立 Provider 目录中的脚本 |
+
+先完成[安装](../getting-started/installation)。为了逐项核对，可以在同一已安装项目下使用不同 Provider 数据目录；不能把不同检查点的文件混在一起后仍声称只有一个能力。知识、Selection、Specification 都不是 Catalog 的必填配置。
+
+<a id="g1-child-capability"></a>
+
+## G1. 添加并发现子能力
+
+保留 G0 的 `provider.json`、`route.capability.json`，在 `providers/acme-http/` 新建：
+
+```json title="route-http.capability.json"
+{
+  "capabilityId": "route.http",
+  "name": "HTTP routing",
+  "description": "Expose a request handler through an HTTP route.",
+  "whenToUse": "The application accepts HTTP requests.",
+  "distinction": "A capability definition, not a live route instance.",
+  "parents": [
+    "route"
+  ]
+}
+```
+
+`parents: ["route"]` 是显式分类边，点号只是名称。Core 查询反向 `children` 时才得到 `route.http`，不会自动选择或执行它。替换项目根脚本：
+
+```js title="discover.mjs"
+import { fileURLToPath } from 'node:url';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: {
+      kind: 'file',
+      rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
+    }
+  }]
+});
+
+try {
+  const provider = graph.forProvider('acme.http');
+  const catalog = await provider.listCatalog({ limit: 20 });
+  const requiredStaticRevision = catalog.meta.staticRevision;
+  const neighbors = await provider.getNeighbors('route', {
+    kinds: ['children'], requiredStaticRevision
+  });
+  console.log(JSON.stringify({
+    children: neighbors.groups.children.items.map(({ id }) => id.capabilityId),
+    completeness: neighbors.meta.completeness,
+    hasNextCursor: Boolean(neighbors.groups.children.nextCursor)
+  }, null, 2));
+} finally {
+  await graph.close();
+}
+```
+
+在项目根运行 `node discover.mjs`，应得到：
+
+```json
+{
+  "children": [
+    "route.http"
+  ],
+  "completeness": "complete",
+  "hasNextCursor": false
+}
+```
+
+这里的关系组只有一个子能力。一般情况下要检查组的 `completeness/nextCursor` 和页级 `meta.warnings`；有游标时保留关系种类、过滤条件和同一修订续查。端点不存在、自环或 parents 成环会在加载阶段失败，而不是返回少一个子能力。
+
+<a id="g2-local-knowledge"></a>
+
+## G2. 为已选子能力读取本地知识
+
+在 G1 基础上，用下列完整内容替换子能力文件：
+
+```json title="route-http.capability.json"
+{
+  "capabilityId": "route.http",
+  "name": "HTTP routing",
+  "description": "Expose a request handler through an HTTP route.",
+  "whenToUse": "The application accepts HTTP requests.",
+  "distinction": "A capability definition, not a live route instance.",
+  "parents": [
+    "route"
+  ],
+  "knowledge": [
+    {
+      "kind": "document",
+      "knowledgeId": "routing-guide",
+      "role": "guide",
+      "locale": "en",
+      "locator": {
+        "type": "relative-file",
+        "path": "knowledge/routing.md"
+      }
+    }
+  ]
+}
+```
+
+在 Provider 根创建 `knowledge/routing.md`：
+
+```md title="knowledge/routing.md"
+# HTTP Routing Guide
+
+Register the route in the host framework; Core only discovers its definition.
+```
+
+| 字段 | 作用 |
+|---|---|
+| `kind: document` | 精确读取的一篇文档，不是整个 Collection |
+| `knowledgeId` | 在已选能力的知识范围内定位本篇文档 |
+| `role` / `locale` | 用途及语言过滤，本例 guide/en；语言精确匹配，不自动回退 |
+| `locator.type` | relative-file 使用内置本地 Reader |
+| `locator.path` | 相对 Authority 根，不相对脚本或终端目录 |
+
+替换项目根脚本：
+
+```js title="discover.mjs"
+import { fileURLToPath } from 'node:url';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: {
+      kind: 'file',
+      rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
+    }
+  }]
+});
+
+try {
+  const provider = graph.forProvider('acme.http');
+  const catalog = await provider.listCatalog();
+  const requiredStaticRevision = catalog.meta.staticRevision;
+  const result = await provider.readDocuments({
+    selected: ['route.http'], knowledgeIds: ['routing-guide'],
+    roles: ['guide'], locales: ['en'], requiredStaticRevision
+  });
+  const item = result.results[0];
+  if (!item?.ok) throw new Error(JSON.stringify(result));
+  console.log(JSON.stringify({
+    document: item.value.knowledgeId, text: item.value.text,
+    hasContentId: Boolean(item.value.contentId),
+    completeness: result.meta.completeness
+  }, null, 2));
+} finally {
+  await graph.close();
+}
+```
+
+运行 `node discover.mjs`，应得到：
+
+```json
+{
+  "document": "routing-guide",
+  "text": "# HTTP Routing Guide\n\nRegister the route in the host framework; Core only discovers its definition.\n",
+  "hasContentId": true,
+  "completeness": "complete"
+}
+```
+
+选择 `route.http` 后才读取它关联的 `routing-guide`。详情不自动带正文。`contentId` 标识实际读取字节；只改正文不会改变 Static Revision，改绑定/locator 则会改变静态定义。脚本先检查逐项 `ok`，文件缺失或越界不能伪装为空文档。没有全文检索后端也能完成本步骤。
+
+<a id="g3-required-context"></a>
+
+## G3. 独立解析必要上下文
+
+本节只需要 G0，不需要 G1/G2。保持仅有 `route` 的初始目录，增加：
+
+```json title="route-validation.capability.json"
+{
+  "capabilityId": "route.validation",
+  "name": "Request validation",
+  "description": "Validate input before a handler runs.",
+  "whenToUse": "A route needs a declared request contract.",
+  "requires": [
+    "schema.request"
+  ]
+}
+```
+
+```json title="schema-request.capability.json"
+{
+  "capabilityId": "schema.request",
+  "name": "Request schema",
+  "description": "Describe accepted request data.",
+  "whenToUse": "Input validation needs a request shape."
+}
+```
+
+`requires` 表示理解/使用验证能力所必要的上下文，**不是执行依赖调度或操作顺序**。这里只要求 Schema，不声明分类、特化或 Knowledge；所有端点必须由同一 Provider 提供，requires 独立无环。
+
+替换项目根脚本：
+
+```js title="discover.mjs"
+import { fileURLToPath } from 'node:url';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: {
+      kind: 'file',
+      rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
+    }
+  }]
+});
+
+try {
+  const provider = graph.forProvider('acme.http');
+  const catalog = await provider.listCatalog();
+  const selection = await provider.resolveSelection({
+    selected: ['route.validation'], requiredStaticRevision: catalog.meta.staticRevision
+  });
+  console.log(JSON.stringify({
+    requested: selection.requested.map(({ capabilityId }) => capabilityId),
+    resolved: selection.resolved.map(({ capabilityId }) => capabilityId),
+    added: selection.added.map(({ capabilityId }) => capabilityId),
+    reasons: selection.reasons.map(({ id, reason }) => ({
+      id: id.capabilityId, requested: reason.requested,
+      requiredBy: reason.requiredBy.map(({ capabilityId }) => capabilityId)
+    })),
+    completeness: selection.meta.completeness
+  }, null, 2));
+} finally {
+  await graph.close();
+}
+```
+
+运行 `node discover.mjs`，应得到：
+
+```json
+{
+  "requested": [
+    "route.validation"
+  ],
+  "resolved": [
+    "route.validation",
+    "schema.request"
+  ],
+  "added": [
+    "schema.request"
+  ],
+  "reasons": [
+    {
+      "id": "route.validation",
+      "requested": true,
+      "requiredBy": []
+    },
+    {
+      "id": "schema.request",
+      "requested": false,
+      "requiredBy": [
+        "route.validation"
+      ]
+    }
+  ],
+  "completeness": "complete"
+}
+```
+
+`requested` 是调用方显式选择；`resolved` 是完整必要上下文；`added` 是补入项，`requiredBy` 说明由哪个直接依赖加入。Core 不沿 parents/related 自动扩张。任何 Scope、修订、节点或闭包预算错误使整次 Selection 失败，不返回可冒充完整的半个闭包。需要读知识时，把**完整 resolved**传给读取接口；本节并未给这些能力配置知识。
+
+<a id="g4-provider-specification"></a>
+
+## G4. 独立发现并读取 Provider Specification
+
+本节只需要 G0，不需要 G1-G3。可在已安装 npm 包的项目下另建 `providers/acme-spec/`；该 Provider 根内只有下列四个文件：
+
+```text
+providers/acme-spec/
+├── provider.json
+├── route.capability.json
+├── PROVIDER.md
+└── discover.mjs
+```
+
+`route.capability.json` 使用 G0 的完整内容，不能复制含子能力/依赖/知识的高级 Fixture。项目 `package.json/node_modules` 留在外层。用下列内容创建/替换该目录的 `provider.json`：
+
+```json title="provider.json"
+{
+  "providerId": "acme.http",
+  "name": "Acme HTTP",
+  "version": "0.1.0",
+  "specification": {
+    "specificationId": "acme.http.conventions",
+    "version": "1",
+    "appliesTo": {
+      "software": "acme-http",
+      "versionRange": ">=0.1.0 <1.0.0"
+    },
+    "documents": [
+      {
+        "kind": "document",
+        "knowledgeId": "SPEC-01",
+        "role": "specification",
+        "locale": "en",
+        "locator": {
+          "type": "relative-file",
+          "path": "PROVIDER.md"
+        }
+      }
+    ]
+  }
+}
+```
+
+创建 `PROVIDER.md`：
+
+```md title="PROVIDER.md"
+# Acme HTTP Provider
+
+Discover capabilities before selecting context. Core does not execute routes.
+```
+
+Specification 是 Provider 跨能力规则：`specificationId/version` 标识规范，不改变能力二元身份。`appliesTo` 只描述适用性，Core 不探测项目版本或执行匹配。documents 必须非空、role 为 specification；这些元数据用于发现，正文仍需显式读取。
+
+**脚本在 Provider 根内**，所以 rootDir 用 `./`，而不是此前项目根脚本的 `./providers/acme-http/`：
+
+```js title="discover.mjs"
+import { fileURLToPath } from 'node:url';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['acme.http'],
+  integrationEnabledProviders: ['acme.http'],
+  providers: [{
+    providerId: 'acme.http',
+    authority: {
+      kind: 'file',
+      rootDir: fileURLToPath(new URL('./', import.meta.url))
+    }
+  }]
+});
+
+try {
+  const provider = graph.forProvider('acme.http');
+  const catalog = await provider.listCatalog();
+  const requiredStaticRevision = catalog.meta.staticRevision;
+  const metadata = await provider.listSpecificationDocuments({ requiredStaticRevision });
+  const result = await provider.readSpecification({
+    knowledgeIds: ['SPEC-01'], locales: ['en'], requiredStaticRevision
+  });
+  const item = result.results[0];
+  if (!item?.ok) throw new Error(JSON.stringify(result));
+  console.log(JSON.stringify({
+    catalog: catalog.items.map(({ id }) => id.capabilityId),
+    documents: metadata.items.map(({ knowledgeId }) => knowledgeId),
+    specification: item.value.knowledgeId, text: item.value.text,
+    completeness: result.meta.completeness,
+    hasNextCursor: Boolean(metadata.nextCursor)
+  }, null, 2));
+} finally {
+  await graph.close();
+}
+```
+
+在安装项目根运行：
+
+```sh
+node providers/acme-spec/discover.mjs
+```
+
+预期：
+
+```json
+{
+  "catalog": [
+    "route"
+  ],
+  "documents": [
+    "SPEC-01"
+  ],
+  "specification": "SPEC-01",
+  "text": "# Acme HTTP Provider\n\nDiscover capabilities before selecting context. Core does not execute routes.\n",
+  "completeness": "complete",
+  "hasNextCursor": false
+}
+```
+
+这证明只有 `route` 也可以独立发现 SPEC-01 并读取实际正文。`listSpecificationDocuments()` 只读元数据；`readSpecification()` 不要求先选择能力。它不执行规则，也不保证 Agent 采纳。检查元数据页游标及读取逐项结果，遗漏 PROVIDER.md 应出现明确读取失败，不是成功空文本。
+
+## 接下来
+
+- 面向 Agent 首轮只暴露主入口：[Provider 自有 API](../getting-started/provider-owned-api)或[自有 MCP](../integrations/provider-owned-mcp)。
+- 设计更多关系：[设计关系](./design-relations)；Knowledge Collection/远程来源见[知识接入](./add-local-knowledge)。
+- 项目实际实例与静态定义不同，按需接入[Runtime](./use-runtime)。
+- 修订、配置、部分结果出现问题时按[故障排查](../troubleshooting/index)处理，不把失败改成“没有能力”。

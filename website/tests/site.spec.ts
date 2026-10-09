@@ -23,6 +23,8 @@ test('top navigation is compact and all sidebar sections are expanded by default
   }
   const sidebarLabels = await sidebar.getByRole('link').allTextContents();
   expect(sidebarLabels.every((label) => /[\u3400-\u9fff]/u.test(label))).toBe(true);
+  expect(sidebarLabels.indexOf('使用指南')).toBeLessThan(sidebarLabels.indexOf('核心概念'));
+  await expect(sidebar.getByRole('link', { name: '渐进发现与按需读取', exact: true })).toBeVisible();
 
   await page.goto('getting-started/first-provider');
   await expect(page.locator('h1')).toContainText('创建第一个 Provider');
@@ -55,10 +57,22 @@ test('home section links use canonical index routes and quick start continues to
 test('first Provider starts with a complete runnable path', async ({ page }) => {
   await page.goto('getting-started/first-provider.html');
   await expect(page.locator('h2').first()).toContainText('最快跑通');
-  await expect(page.getByRole('link', { name: '完整受检示例目录' }))
-    .toHaveAttribute('href', 'https://github.com/devcodex-labs/capability-graph/tree/main/website/fixtures/first-provider');
-  await expect(page.getByText('node first-provider/discover.mjs', { exact: true })).toBeVisible();
+  await expect(page.locator('pre').getByText('node discover.mjs', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '完整受检示例目录' })).toHaveCount(0);
+  await expect(page.getByRole('main')).toContainText('不需要克隆仓库');
   await expect(page.getByText('npm run check:examples', { exact: true })).toHaveCount(0);
+});
+
+test('tutorial checkpoints and MCP entry remain directly reachable', async ({ page }) => {
+  await page.goto('guides/progressive-discovery#g4-provider-specification');
+  await expect(page.locator('h1')).toContainText('渐进发现与按需读取');
+  for (const anchor of ['g1-child-capability', 'g2-local-knowledge', 'g3-required-context', 'g4-provider-specification']) {
+    await expect(page.locator(`[id="${anchor}"]`)).toHaveCount(1);
+  }
+  await expect(page.getByRole('main')).toContainText('本节只需要 G0，不需要 G1-G3');
+  await page.goto('integrations/provider-owned-mcp#seed-调用示例');
+  await expect(page.getByRole('main')).toContainText('node examples/seed-mcp/docs-main-entry/client.mjs');
+  await expect(page.getByRole('main')).toContainText('十二工具');
 });
 
 for (const [route, canonical] of [

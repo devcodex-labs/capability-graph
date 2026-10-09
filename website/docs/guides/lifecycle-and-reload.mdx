@@ -16,14 +16,15 @@ description: 正确管理 open、reload、current/previous 视图和 close 的�
 5. `close()` 停止接受新查询并回收 Core 拥有的视图句柄。
 
 ```ts
+import { fileURLToPath } from 'node:url';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
-// Configuration fragment: replace the path with the provider from the tutorial.
+// This program owns the graph; request handlers should not close a shared graph.
 const config = {
   hostAllowedProviders: ['acme.http'],
   integrationEnabledProviders: ['acme.http'],
   providers: [{ providerId: 'acme.http',
-    authority: { kind: 'file' as const, rootDir: '/absolute/path/to/acme-provider' } }]
+    authority: { kind: 'file' as const, rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url)) } }]
 };
 const graph = await CapabilityGraph.open(config);
 try {
@@ -34,7 +35,7 @@ try {
 }
 ```
 
-这是接入片段，先准备入门页的 Provider 并替换目录。适合作者更新定义后主动刷新；只改知识正文不需要为了静态图重新加载。预期 `reloaded.ok` 为 `true`；定义内容未变时修订也可不变。刷新返回 `ok: false` 时读取 `providers` 内的错误，不要只等 Promise resolve 就报告更新成功。
+前置为最小页两个定义；代码保存到安装项目根，使用当前程序自己创建的 graph。适合作者更新定义后主动刷新；只改知识正文不需要刷新静态图。未改定义时 reloaded.ok 应为 true，修订可不变，这只证明刷新机制，不证明定义已升级。返回 ok:false 时检查 providers 内错误，不把 Promise resolve 当更新成功。
 
 `rootDir` 在 open 时固定为绝对根，之后改变 `cwd` 不会重定位来源。Core 不监听文件，也不定时刷新。
 
