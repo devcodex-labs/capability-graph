@@ -104,6 +104,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build && npm run build:tests
+      - id: paths
+        name: Normalize external consumer artifact paths
+        shell: bash
+        run: |
+          node --input-type=module - <<'JS'
+          import path from 'node:path';
+          import { appendFileSync, mkdirSync } from 'node:fs';
+          const artifacts = path.resolve(process.env.CG_ARTIFACTS_DIR);
+          const framework = path.resolve(process.env.VEXT_ROOT);
+          mkdirSync(artifacts, {recursive:true});
+          appendFileSync(process.env.GITHUB_ENV, `CG_ARTIFACTS_DIR=${artifacts}\nVEXT_ROOT=${framework}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `artifacts=${artifacts}\n`);
+          JS
       - name: Build the fixed upstream source outside the project
         shell: bash
         run: |
@@ -127,6 +140,6 @@ jobs:
         with:
           name: vextjs-installed-business-consumer
           path: |
-            ${{ env.CG_ARTIFACTS_DIR }}/vextjs-e2e-*/reports
-            ${{ env.CG_ARTIFACTS_DIR }}/vextjs-e2e-*/logs
+            ${{ steps.paths.outputs.artifacts }}/vextjs-e2e-*/reports
+            ${{ steps.paths.outputs.artifacts }}/vextjs-e2e-*/logs
           retention-days: 7
