@@ -9,7 +9,7 @@ export async function runSeedTask(options: {
 } = {}) {
   const graph = await CapabilityGraph.open({
     hostAllowedProviders: ["seed.http"], integrationEnabledProviders: ["seed.http"],
-    providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir: options.rootDir ?? seedProviderRoot } }],
+    providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory" as const, rootDir: options.rootDir ?? seedProviderRoot } }],
     runtimeAdapters: options.runtime ? [options.runtime.adapter] : [],
   });
   try {

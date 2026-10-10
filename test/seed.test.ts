@@ -36,11 +36,11 @@ test("Seed: second provider isolation and failed update recovery on actual autho
     const provider = JSON.parse(await readFile(path.join(second, "provider.json"), "utf8")) as { providerId: string };
     provider.providerId = "seed.other"; await writeFile(path.join(second, "provider.json"), JSON.stringify(provider));
     const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http", "seed.other"], integrationEnabledProviders: ["seed.http", "seed.other"],
-      providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir: first } }, { providerId: "seed.other", authority: { kind: "file", rootDir: second } }] });
+      providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory" as const, rootDir: first } }, { providerId: "seed.other", authority: { kind: "file", definitionLayout: "directory" as const, rootDir: second } }] });
     try {
       assert.equal((await graph.listCatalog()).items.length, 10);
       assert.equal((await graph.forProvider("seed.other").listCatalog()).items.length, 5);
-      const file = path.join(first, "route-validation.capability.json"); const original = await readFile(file, "utf8");
+      const file = path.join(first, "capabilities/route-validation.json"); const original = await readFile(file, "utf8");
       const old = (await graph.getProvider("seed.http")).staticRevision;
       await writeFile(file, "{bad json"); assert.equal((await graph.reload({ providerId: "seed.http" })).ok, false);
       assert.equal((await graph.forProvider("seed.http").listCatalog()).meta.refreshFailed, true);
@@ -61,12 +61,12 @@ test("Seed: identity replacement removes the old capability without deleting sha
   try {
     await cp(seedProviderRoot, root, { recursive: true });
     const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http"], integrationEnabledProviders: ["seed.http"],
-      providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir: root } }] });
+      providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory" as const, rootDir: root } }] });
     try {
-      const file = path.join(root, "route-validation.capability.json");
+      const file = path.join(root, "capabilities/route-validation.json");
       const replacement = JSON.parse(await readFile(file, "utf8")) as { capabilityId: string }; replacement.capabilityId = "route.check-input";
-      await writeFile(path.join(root, "replacement.capability.json"), JSON.stringify(replacement)); await unlink(file);
-      const schemaFile = path.join(root, "schema-request.capability.json");
+      await writeFile(path.join(root, "capabilities/replacement.json"), JSON.stringify(replacement)); await unlink(file);
+      const schemaFile = path.join(root, "capabilities/schema-request.json");
       const schema = JSON.parse(await readFile(schemaFile, "utf8")) as { related: string[] }; schema.related = ["route.check-input"];
       await writeFile(schemaFile, JSON.stringify(schema));
       assert.equal((await graph.reload()).ok, true);

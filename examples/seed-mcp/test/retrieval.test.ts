@@ -39,7 +39,7 @@ test("MCP: Collection pages, explicit member read and cursor mismatches preserve
     const response = await client.callTool({ name: "example_list_knowledge_members", arguments: args });
     assert.equal(response.isError, true); assert.equal(payload<ErrorShape>(response).code, "CG_REVISION_MISMATCH");
   }
-  const file = path.join(root, "route-validation.capability.json");
+  const file = path.join(root, "capabilities/route-validation.json");
   const definition = JSON.parse(await readFile(file, "utf8")); definition.description += " revised";
   await writeFile(file, JSON.stringify(definition)); await graph.reload();
   const oldCursor = await client.callTool({ name: "example_list_knowledge_members", arguments: { ...members, cursor: first.nextCursor } });

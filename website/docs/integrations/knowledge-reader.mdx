@@ -27,6 +27,9 @@ interface KnowledgeReader {
     contentId: string;
     source: string;
   }>;
+  stream?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext,
+    options: { chunkBytes: number; signal?: AbortSignal }):
+    AsyncIterable<{ bytes: Uint8Array; contentType: string; source: string }>;
 }
 ```
 
@@ -40,16 +43,24 @@ interface KnowledgeReader {
 
 ```ts title="reader-skeleton.ts"
 import { createHash } from 'node:crypto';
-import type { KnowledgeReader } from '@devcodex/capability-graph';
+import type { KnowledgeReader, KnowledgeDocumentRef, KnowledgeReadContext } from '@devcodex/capability-graph';
 
 export function createHttpReader(
-  readBounded: (url: string, maxBytes: number) => Promise<Uint8Array>
+  readBounded: (url: string, maxBytes: number) => Promise<Uint8Array>,
+  streamBounded?: (url: string, options: { chunkBytes: number; signal?: AbortSignal }) => AsyncIterable<Uint8Array>
 ): KnowledgeReader {
   return {
     id: 'acme-http-reader',
     canRead(ref) {
       return ref.kind === 'document' && ref.locator.type === 'http';
     },
+    ...(streamBounded ? { async *stream(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, options: { chunkBytes: number; signal?: AbortSignal }) {
+      if (ref.locator.type !== 'http') throw new Error('Unsupported locator');
+      for await (const bytes of streamBounded(ref.locator.url, options)) {
+        if (bytes.length > options.chunkBytes) throw new Error('Chunk budget exceeded');
+        yield { bytes, contentType: 'text/plain; charset=utf-8', source: ref.locator.url };
+      }
+    } } : {}),
     async read(ref, _context, { maxBytes }) {
       if (ref.locator.type !== 'http') throw new Error('Unsupported locator');
       const bytes = await readBounded(ref.locator.url, maxBytes);
@@ -70,3 +81,12 @@ export function createHttpReader(
 `bytes` 是正文原始字节，V1 的 `contentId` 为 `k:` 加 SHA-256 十六进制值的前 16 位；Core 会重新计算核验。`source` 必须等于声明的 URL，不能随意换成缓存路径或重定向地址。`maxBytes` 单位为字节，不能用字符串长度替代。
 
 成功时 `readDocuments()` 的成功槽位返回 `text`、`byteLength`、`contentId` 和原 `source`。伪造哈希/source 会得到 `CG_ADAPTER_CONTRACT_INVALID`，Reader 抛错投影为 `CG_READER_UNAVAILABLE`；批量读取中检查每项 `ok`。Reader 拥有网络资源，Core 不负责关掉它的连接池。
+
+
+## 分页、代理与宿主快照
+
+`stream` 的块预算与 `read` 的全文容量不同；完整来源可任意大，由模型决定读取范围及是否续读。每个块不超过 chunkBytes，UTF-8 可跨传输块，空正文也要输出带 MIME/source 的空块。Core 计算全文哈希，再返回所选范围；旧 Reader 只有 read 时采用有界全文回退，不能假定它能分页读取超出回退容量的来源。
+
+源码 HTTP 参考的 agentForUrl 可接收宿主 ProxyAgent（Node 20/22/24），不向模型暴露代理认证。宿主负责关闭 Agent；Reader.close 关闭实际连接和自己创建的快照子目录。snapshot.directory 为仓库外的宿主专用绝对路径，maxBytes/maxEntries/ttlMs 控制缓存，不限制文档总大小。可靠强 ETag 的 304 复用已有完整快照；无验证器、弱 ETag 或超缓存预算回退全文 GET。200 更新由正文哈希拒绝旧 cursor，206/重定向/压缩响应被拒绝。原始文本 URL 与渲染 HTML 是不同来源，HTML 提取需独立 Reader 和转换溯源。
+
+外部索引即使不使用 access，也必须配置实际来源 Reader；Core 会核验每个最终文档和片段。利用 access.scan 可以复用当前查询的核验，减少重复读取。参考文本索引配置 maxCachedBytes/maxCachedEntries 控制保留成本，超额继续流式 Top-K，不截断正文；cachedBytes 是保守计账值，不是堆内存峰值。

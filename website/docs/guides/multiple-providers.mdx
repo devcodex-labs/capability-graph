@@ -19,7 +19,7 @@ description: 在明确 Effective Provider Scope 内联合发现多个 Provider�
 }
 ```
 
-```json title="providers/acme-database/query.capability.json"
+```json title="providers/acme-database/capabilities/query.json"
 {
   "capabilityId": "query",
   "name": "Database query",
@@ -38,9 +38,9 @@ const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['acme.http', 'acme.database'],
   integrationEnabledProviders: ['acme.http', 'acme.database'],
   providers: [
-    { providerId: 'acme.http', authority: { kind: 'file',
+    { providerId: 'acme.http', authority: { kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url)) } },
-    { providerId: 'acme.database', authority: { kind: 'file',
+    { providerId: 'acme.database', authority: { kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-database/', import.meta.url)) } }
   ]
 });
@@ -82,3 +82,11 @@ const selectedDetail = await selectedProvider.getCapabilities(['route']);
 | 指定的权威修订不可读 | 查询级失败 | 按错误动作重新发现或修复来源，不能静默切换修订 |
 
 可复现故障注入见[多 Provider 隔离测试](../examples/multi-provider)。跨 Provider 组合由 Agent 或上层工作流完成，不写入静态关系。
+
+## VextJS 与 MonSQLize 的真实来源
+
+推荐分别创建 providers/vextjs/provider.json、providers/vextjs/capabilities/*.json，以及 providers/monsqlize/ 下相同结构。每个 Provider 可选 knowledge/，无需复制所有指南。provider 或 providers 只是容器名称；Core 分别显式注册每个根，不自动发现多个 Provider。
+
+在各 providers[] 配置 knowledgeRoots：directory 绑定获准官方文档目录；package 使用 packageName 和消费项目 resolveFrom 固定实际安装包根。locator 的 root 引用别名；HTTP URL 则通过已配置 Reader 读取。定义根、文档根与 Runtime 的业务项目根是三个不同用途。
+
+真实验证入口为根 scripts/validation/provider-sources.mjs，覆盖原始官方长/短文、外部目录、实际安装包 README 和可选固定 HTTPS。vextjs.mjs 另核验原生 MCP 回读。两 Provider 可有相同本地 capabilityId/knowledgeId，结果仍按 providerId 隔离；不建立跨 Provider requires。固定 Vext 安装包未包含 website，不能假定完整指南在 node_modules 内。

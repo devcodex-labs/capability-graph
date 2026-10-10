@@ -15,10 +15,11 @@ export function staticCapability(providerId: string, record: CapabilityRecord, s
 
 /** Validate a complete file snapshot before publishing any part of it. */
 export async function validateSnapshot(source: UnvalidatedProviderSnapshot): Promise<ValidatedProviderSnapshot> {
-  const provider = await validateProvider(source.provider, source.knowledgeRootDir);
+  const roots = { ...(source.knowledgeRootDir === undefined ? {} : { defaultRoot: source.knowledgeRootDir }), aliases: source.knowledgeRoots ?? {} };
+  const provider = await validateProvider(source.provider, roots);
   const records = new Map<string, CapabilityRecord>();
   for (const raw of source.capabilities) {
-    const record = await validateCapability(raw, source.knowledgeRootDir);
+    const record = await validateCapability(raw, roots);
     if (records.has(record.capabilityId)) invalid({ id: record.capabilityId, reason: "duplicate_capability" });
     records.set(record.capabilityId, record);
   }
@@ -32,5 +33,5 @@ export async function validateSnapshot(source: UnvalidatedProviderSnapshot): Pro
   return { provider: freeze({ ...provider, authorityKind: "file" }),
     capabilities: new Map(sorted.map((record) => [record.capabilityId, staticCapability(provider.providerId, record, revision)])),
     staticRevision: revision, loadedAt: new Date().toISOString(), sourceContext: freeze({ providerId: provider.providerId,
-      authorityKind: "file", sourceRevision: revision, knowledgeRootDir: source.knowledgeRootDir }) };
+      authorityKind: "file", sourceRevision: revision, knowledgeRootDir: source.knowledgeRootDir, knowledgeRoots: source.knowledgeRoots }) };
 }

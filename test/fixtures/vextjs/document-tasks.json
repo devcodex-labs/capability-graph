@@ -1,0 +1,21 @@
+[
+  { "path": "api/app.md", "query": "VextApp", "evidence": "VextApp" },
+  { "path": "api/config.md", "query": "bodyParser", "evidence": "bodyParser" },
+  { "path": "api/context.md", "query": "VextRequest", "evidence": "VextRequest" },
+  { "path": "api/jobs.md", "query": "Job", "evidence": "Job" },
+  { "path": "api/route-definition.md", "query": "defineRoutes", "evidence": "defineRoutes" },
+  { "path": "api/testing-api.md", "query": "createTestApp", "evidence": "createTestApp" },
+  { "path": "examples/opentelemetry.md", "query": "OpenTelemetry", "evidence": "OpenTelemetry" },
+  { "path": "guide/cli.md", "query": "vext", "evidence": "vext" },
+  { "path": "guide/configuration.md", "query": "default", "evidence": "default" },
+  { "path": "guide/database.md", "query": "MonSQLize", "evidence": "MonSQLize" },
+  { "path": "guide/deployment.md", "query": "production", "evidence": "production" },
+  { "path": "guide/fetch.md", "query": "fetch", "evidence": "fetch" },
+  { "path": "guide/logger.md", "query": "logger", "evidence": "logger" },
+  { "path": "guide/openapi.md", "query": "OpenAPI", "evidence": "OpenAPI" },
+  { "path": "guide/plugins.md", "query": "setup", "evidence": "setup" },
+  { "path": "guide/project-structure.md", "query": "frontend", "evidence": "frontend" },
+  { "path": "guide/validation.md", "query": "schema", "evidence": "schema" },
+  { "path": "examples/hello-world.md", "query": "defineRoutes", "evidence": "defineRoutes" },
+  { "path": "frontend/project-structure.md", "query": "frontend", "evidence": "frontend" }
+]

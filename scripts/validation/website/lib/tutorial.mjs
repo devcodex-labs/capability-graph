@@ -5,10 +5,10 @@ import path from 'node:path';
 import { websiteRoot } from '../../../lib/website-paths.mjs';
 
 const contracts = {
-  G0: ['provider.json', 'route.capability.json', 'discover.mjs'],
-  G1: ['route-http.capability.json', 'discover.mjs'],
-  G2: ['route-http.capability.json', 'knowledge/routing.md', 'discover.mjs'],
-  G3: ['route-validation.capability.json', 'schema-request.capability.json', 'discover.mjs'],
+  G0: ['provider.json', 'capabilities/route.json', 'discover.mjs'],
+  G1: ['capabilities/route-http.json', 'discover.mjs'],
+  G2: ['capabilities/route-http.json', 'knowledge/routing.md', 'discover.mjs'],
+  G3: ['capabilities/route-validation.json', 'capabilities/schema-request.json', 'discover.mjs'],
   G4: ['provider.json', 'PROVIDER.md', 'discover.mjs'],
   MCP: ['server.mjs', 'client.mjs']
 };
@@ -136,8 +136,8 @@ export async function verifyTutorialSuite(consumer) {
     await mkdir(contaminatedRoot);
     const contaminated = await materializeTutorial(contaminatedRoot, await loadTutorial('G4'));
     const g1 = await loadTutorial('G1');
-    await writeFile(path.join(contaminatedRoot, 'providers/acme-spec/route-http.capability.json'),
-      g1.files.get('providers/acme-http/route-http.capability.json'), 'utf8');
+    await writeFile(path.join(contaminatedRoot, 'providers/acme-spec/capabilities/route-http.json'),
+      g1.files.get('providers/acme-http/capabilities/route-http.json'), 'utf8');
     const polluted = run(contaminated.script);
     assert.throws(() => assert.deepEqual(polluted.catalog, ['route']), 'hidden advanced inputs must not satisfy G4');
     return { checkpoints: ['G0', 'G1', 'G2', 'G3', 'G4'], g4Cases: ['G4-01', 'G4-02', 'G4-03', 'G4-04'] };

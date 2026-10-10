@@ -16,8 +16,8 @@ test('native Provider preserves roles, stable source identities and optional con
     const a = await exportVextProvider({ ...options, outputDir: path.join(root, 'a') });
     const b = await exportVextProvider({ ...options, outputDir: path.join(root, 'b') });
     assert.deepEqual(a.manifest, b.manifest);
-    for (const item of catalog.items) assert.deepEqual(await readFile(path.join(a.rootDir, `native.${item.id.toLowerCase()}.capability.json`)), await readFile(path.join(b.rootDir, `native.${item.id.toLowerCase()}.capability.json`)));
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'], providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: a.rootDir } }] });
+    for (const item of catalog.items) assert.deepEqual(await readFile(path.join(a.rootDir, 'capabilities', `native.${item.id.toLowerCase()}.json`)), await readFile(path.join(b.rootDir, 'capabilities', `native.${item.id.toLowerCase()}.json`)));
+    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'], providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: a.rootDir, definitionLayout: 'directory' } }] });
     const detail = await graph.forProvider('vextjs').getCapabilities(['native.id2']); assert(detail.results[0].ok);
     const selection = await graph.forProvider('vextjs').resolveSelection({ selected: ['native.id2'] }); assert.equal(selection.added.length, 0);
     const page = await graph.forProvider('vextjs').readDocumentPage({ capabilityId: 'native.id2', knowledgeId: 'ID2' }); assert.match(page.text, /exact source/); assert(page.complete);
@@ -37,4 +37,21 @@ test('native stopped snapshots remain partial and unverified; revision binding r
   await assert.rejects(adapter.query({ ...input, project: 'other' }), { code: 'CG_RUNTIME_RESULT_MISMATCH' });
   sourceRevision = 'edited-project'; await assert.rejects(adapter.query({ ...input, cursor: first.nextCursor }), { code: 'CG_REVISION_MISMATCH' });
   sourceRevision = 'new'; state = 'running'; await assert.rejects(adapter.query({ ...input, cursor: first.nextCursor }), { code: 'CG_REVISION_MISMATCH' });
+  const root = await createTemporaryDirectory('capability-graph-vext-public-runtime-');
+  let graph;
+  try {
+    const exported = await exportVextProvider({ outputDir: path.join(root, 'provider'), repositoryRoot, version: '2.0.0',
+      source: { identity: 'controlled-contract-fixture' }, catalog: { digest: 'controlled-catalog', items: [
+        { id: 'C18', kind: 'capability', title: 'Native runtime', summary: 'Contract fixture', body: 'Fixture', status: 'partial', sourceRefs: [], relatedIds: [] },
+      ] } });
+    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
+      providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' } }], runtimeAdapters: [adapter] });
+    const provider = graph.forProvider('vextjs');
+    const page = await provider.queryRuntime({ project: 'p', environment: 'e', limit: 1 }); assert(page.nextCursor);
+    sourceRevision = 'public-source-change';
+    await assert.rejects(provider.queryRuntime({ project: 'p', environment: 'e', limit: 1, cursor: page.nextCursor }), (error) => {
+      assert.equal(error.code, 'CG_REVISION_MISMATCH'); assert.equal(error.nextAction, 'refresh');
+      assert.equal(JSON.stringify(error).includes('/owned'), false); return true;
+    });
+  } finally { await graph?.close(); await rm(root, { recursive: true, force: true }); }
 });

@@ -12,7 +12,7 @@ const code = (value: string) => (error: unknown) => error instanceof CapabilityG
 test("R1: unrelated offline authority does not block local discovery or knowledge; mixed slots stay aligned", async () => {
   const db = new FakeDatabase([record("a")]);
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http", "seed"], integrationEnabledProviders: ["seed.http", "seed"],
-    providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir: seedProviderRoot } },
+    providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory", rootDir: seedProviderRoot } },
       { providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => db } } }],
     knowledgeRetriever: fakeKnowledgeRetriever });
   try {

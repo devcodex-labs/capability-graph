@@ -77,7 +77,7 @@ try {
   const { listMainCapabilities } = await import(pathToFileURL(path.join(scratch, 'compiled', 'getting-started-provider-owned-api.mjs')).href);
   const graph = await CapabilityGraph.open({
     hostAllowedProviders: ['acme.http'], integrationEnabledProviders: ['acme.http'],
-    providers: [{ providerId: 'acme.http', authority: { kind: 'file', rootDir: providerRoot } }]
+    providers: [{ providerId: 'acme.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir: providerRoot } }]
   });
   try {
     const main = await listMainCapabilities(graph);
@@ -91,13 +91,13 @@ try {
   // A contract fixture proves the skeleton's content hash through the Core,
   // but does not claim a production HTTP transport has been implemented.
   const { createHttpReader } = await import(pathToFileURL(path.join(scratch, 'compiled', 'reader-skeleton.mjs')).href);
-  const definitionFile = path.join(providerRoot, 'route-http.capability.json');
+  const definitionFile = path.join(providerRoot, 'capabilities/route-http.json');
   const definition = JSON.parse(await readFile(definitionFile, 'utf8'));
   definition.knowledge[0].locator = { type: 'http', url: 'https://example.test/routing' };
   await writeFile(definitionFile, JSON.stringify(definition), 'utf8');
   const remote = await CapabilityGraph.open({
     hostAllowedProviders: ['acme.http'], integrationEnabledProviders: ['acme.http'],
-    providers: [{ providerId: 'acme.http', authority: { kind: 'file', rootDir: providerRoot } }],
+    providers: [{ providerId: 'acme.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir: providerRoot } }],
     readers: [createHttpReader(async () => new TextEncoder().encode('Reader contract example'))]
   });
   try {

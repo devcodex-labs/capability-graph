@@ -1,6 +1,7 @@
 {
   "schemaVersion": "CapabilityGraphReferenceCoverageV1",
   "entries": [
+    { "symbol": "KnowledgeRootSpec", "page": "reference/capability-graph.mdx", "status": "Available" },
     { "symbol": "DocumentBodyQuery", "page": "reference/knowledge.mdx", "status": "Available" },
     { "symbol": "SpecificationBodyQuery", "page": "reference/knowledge.mdx", "status": "Available" },
     { "symbol": "DocumentBodyPage", "page": "reference/knowledge.mdx", "status": "Available" },

@@ -97,9 +97,8 @@ test("DB query pagination rejects cross-page duplicate catalog and neighbor rows
     db.neighbors = async (_id, _kind, request) => request.cursor === undefined
       ? { items: [endpoint("a"), endpoint("b")], nextCursor: "neighbors-2" }
       : { items: [endpoint("b"), endpoint("c")] };
-    const neighbors = await view.neighbors("root", "children", { ...page, limit: 2 });
-    assert.ok(neighbors.nextCursor);
-    await assert.rejects(view.neighbors("root", "children", { ...page, limit: 2, cursor: neighbors.nextCursor }), code("CG_ADAPTER_CONTRACT_INVALID"));
+    // Complete inverse proof rejects the bad second source page before exposing the first public page.
+    await assert.rejects(view.neighbors("root", "children", { ...page, limit: 2 }), code("CG_ADAPTER_CONTRACT_INVALID"));
   } finally { await view.close(); }
 });
 

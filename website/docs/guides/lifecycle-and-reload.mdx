@@ -21,13 +21,14 @@ description: 正确管理 open、reload、current/previous 视图和 close 的�
 
 ```js title="lifecycle-demo.mjs"
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'cg-lifecycle-demo-'));
-const capabilityFile = path.join(root, 'route.capability.json');
+await mkdir(path.join(root, 'capabilities'));
+const capabilityFile = path.join(root, 'capabilities/route.json');
 const initial = { capabilityId: 'route', name: 'Routing v1',
   description: 'Route requests.', whenToUse: 'Change a request entrypoint.' };
 const save = (value) => writeFile(capabilityFile, JSON.stringify(value), 'utf8');
@@ -39,7 +40,7 @@ try {
   await save(initial);
   graph = await CapabilityGraph.open({
     hostAllowedProviders: ['acme.http'], integrationEnabledProviders: ['acme.http'],
-    providers: [{ providerId: 'acme.http', authority: { kind: 'file', rootDir: root } }]
+    providers: [{ providerId: 'acme.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir: root } }]
   });
   const provider = graph.forProvider('acme.http');
   const s1 = (await provider.listCatalog()).meta.staticRevision;

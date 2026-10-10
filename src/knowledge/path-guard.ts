@@ -8,9 +8,9 @@ function traversal(relative: string): never {
 
 /** Reject lexical escapes before touching the filesystem, even when the target is absent. */
 export function assertProviderRelative(relative: string): readonly string[] {
-  if (typeof relative !== "string" || !relative || /[\\:~]/.test(relative)) traversal(relative);
+  if (typeof relative !== "string" || !relative || /[\\:\x00-\x1f\x7f]/.test(relative)) traversal(relative);
   const segments = relative.split("/");
-  if (segments.some((segment) => !/^[A-Za-z0-9._-]+$/.test(segment) || segment === "." || segment === "..")) {
+  if (segments.some((segment) => !segment || segment === "." || segment === ".." || /[. ]$/.test(segment) || segment.startsWith("~"))) {
     traversal(relative);
   }
   return segments;

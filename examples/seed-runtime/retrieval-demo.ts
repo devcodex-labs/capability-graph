@@ -45,13 +45,13 @@ export async function createHttpRetrievalExample() {
     const address = source.address();
     if (!address || typeof address === 'string') throw new Error('Missing source address');
     const origin = `http://127.0.0.1:${address.port}`;
-    const definitionFile = path.join(root, 'route-validation.capability.json');
+    const definitionFile = path.join(root, 'capabilities/route-validation.json');
     const definition = JSON.parse(await readFile(definitionFile, 'utf8'));
     definition.knowledge.push({ kind: 'document', knowledgeId: 'HTTP-GUIDE', role: 'guide', locale: 'zh',
       locator: { type: 'http', url: `${origin}/guide` } });
     await writeFile(definitionFile, JSON.stringify(definition));
     const config: OpenConfig = { hostAllowedProviders: ['seed.http'], integrationEnabledProviders: ['seed.http'],
-      providers: [{ providerId: 'seed.http', authority: { kind: 'file', rootDir: root } }] };
+      providers: [{ providerId: 'seed.http', authority: { kind: 'file', definitionLayout: "directory" as const, rootDir: root } }] };
     const snapshot = await CapabilityGraph.open(config);
     let staticRevision: string;
     try { staticRevision = (await snapshot.getProvider('seed.http')).staticRevision; } finally { await snapshot.close(); }

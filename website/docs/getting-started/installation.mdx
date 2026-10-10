@@ -5,9 +5,11 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 
 # 安装
 
-<span className="cg-status">已发布 1.0.1</span>
+<span className="cg-status">待发布 1.1.0 / Registry 1.0.1</span>
 
-本页及后续示例以已发布的 1.0.1 为接口基线。无版本安装使用 Registry 的 `latest`；安装后用 `npm ls @devcodex/capability-graph` 核对实际版本，镜像延迟时同时检查 Registry 配置。
+后续教程使用仓库待发布的 1.1.0，包含 directory 布局、知识根别名与正文分页。Registry 的 1.0.1 不支持新增接口；旧库可能忽略新布局选项后返回空目录。无版本安装仍取得 Registry 的 latest，请核对实际版本。
+
+当前验证教程，请在源码仓库运行 `npm ci`、`npm run build`，再执行 `npm pack --pack-destination /absolute/external/packages`。在消费项目安装该目录中的 `devcodex-capability-graph-1.1.0.tgz`。产物目录由宿主选在源码仓库外；发布 1.1.0 后再使用 Registry 安装。这些命令不会发布包。
 
 把包装在负责加载 Provider、向 Agent 提供 API/MCP 的 Node.js 接入项目中。Provider 定义目录只是数据目录，不必单独安装一份包；一个接入项目可以加载多个 Provider。
 

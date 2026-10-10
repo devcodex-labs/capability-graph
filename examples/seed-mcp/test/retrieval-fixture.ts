@@ -12,7 +12,7 @@ export async function fixture(run: (root: string) => Promise<void>) {
   const root: string = await createTemporaryDirectory('cg-mcp-retrieval-');
   try {
     await cp(fileURLToPath(new URL("../../../seed-provider/", import.meta.url)), root, { recursive: true });
-    const file = path.join(root, "route-validation.capability.json");
+    const file = path.join(root, "capabilities/route-validation.json");
     const definition = JSON.parse(await readFile(file, "utf8"));
     definition.knowledge.push({ kind: "collection", knowledgeId: collectionId,
       members: ["CM-01", "CM-02"].map((knowledgeId) => ({ kind: "document", knowledgeId, role: "guide", locale: "en",
@@ -33,7 +33,7 @@ export async function createRetrieverGraph(root: string) {
   let indexedRevision = "";
   const graph = await CapabilityGraph.open({
     hostAllowedProviders: [providerId], integrationEnabledProviders: [providerId],
-    providers: [{ providerId, authority: { kind: "file", rootDir: root } }],
+    providers: [{ providerId, authority: { kind: "file", definitionLayout: "directory" as const, rootDir: root } }],
     capabilityRetriever: { id: "controlled-recall", async retrieve(input) {
       const names = mode.capabilities === "zero" ? [] : mode.capabilities === "mixed"
         ? ["route.validation", "missing", "schema.request"] : ["route.validation", "schema.request"];

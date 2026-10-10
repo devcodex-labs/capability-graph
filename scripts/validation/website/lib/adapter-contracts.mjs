@@ -1,7 +1,7 @@
 import { createTemporaryDirectory } from '../../../lib/website-paths.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '../../../../dist/index.js';
 
@@ -49,13 +49,14 @@ export async function verifyAdapterContracts(docsRoot) {
   let graph;
   try {
     await writeFile(path.join(root, 'provider.json'), JSON.stringify({ providerId: 'acme.audit', name: 'Audit', version: '1' }));
-    await writeFile(path.join(root, 'route.capability.json'), JSON.stringify({
+    await mkdir(path.join(root, 'capabilities'));
+    await writeFile(path.join(root, 'capabilities/route.json'), JSON.stringify({
       capabilityId: 'route', name: 'Route', description: 'Adapter contract', whenToUse: 'Audit',
       knowledge: [{ kind: 'document', knowledgeId: 'guide', role: 'guide', locator: { type: 'http', url: 'https://example.invalid/guide' } }]
     }));
     graph = await CapabilityGraph.open({
       hostAllowedProviders: ['acme.audit'], integrationEnabledProviders: ['acme.audit'],
-      providers: [{ providerId: 'acme.audit', authority: { kind: 'file', rootDir: root } }],
+      providers: [{ providerId: 'acme.audit', authority: { kind: 'file', definitionLayout: 'directory', rootDir: root } }],
       readers: [{ id: 'audit-reader', canRead: () => true, async read(ref) {
         return { bytes, contentType: 'text/plain', source: ref.locator.url, contentId: readerId };
       } }],

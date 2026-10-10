@@ -3,7 +3,7 @@ import path from 'node:path';
 import { generatedRoot, websiteRoot, websiteFixtureRoot } from '../../scripts/lib/website-paths.mjs';
 
 const fixtureRoot = path.join(websiteFixtureRoot, 'advanced-provider');
-const files = ['provider.json', 'route.capability.json', 'route-http.capability.json'];
+const files = ['provider.json', 'capabilities/route.json', 'capabilities/route-http.json'];
 const snapshot = {};
 for (const file of files) {
   snapshot[file] = JSON.parse(await readFile(path.join(fixtureRoot, file), 'utf8'));

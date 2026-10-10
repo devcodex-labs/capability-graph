@@ -8,3 +8,15 @@
 - 文档测试移到根 `test/website`，固定材料移到 `test/fixtures/website`，验证工具移到 `scripts/validation/website`。站点生成片段、制品、临时消费者、截图与报告位于仓库同级 `capability-graph-artifacts`；Docs CI 同步输入路径并增加 Firefox/WebKit 代表性冒烟。
 
 以上为仓库中的未发布改动，不能据此认为 Registry 的 `1.0.1` 或公网站点已经更新。Core 变化须走新版本的包发布，再部署匹配文档；保留现有发布、防回退和制品身份校验。
+
+
+## 待发布 1.1.0
+
+- 新增显式 directory 文件布局：capabilities/**/*.json；旧配置缺省 legacy。能力身份取 capabilityId，布局迁移不改变同记录修订。错误目录、混用、嵌套 manifest 和文件冲突明确失败；Seed、MCP 与站点消费者教程一起迁移。
+- 新增每 Provider knowledgeRoots 与 relative-file locator.root。显式获准目录、scoped/普通安装包、pnpm 真实根和 Unicode/空格路径可直接读取；私有路径不进入 Retriever 或结果。
+- 检索对未使用 access 的外部后端也实际核验全部来源与片段，包括零命中；数据库目录和全部八类关系完整性受核验。
+- 全文/Specification 保留 BOM/CRLF，MDX MIME 与分页一致；Runtime 白名单保留修订/上下文错误，去除 Adapter 私有诊断。
+- HTTP 源码参考支持宿主代理 Agent、强 ETag 完整快照复用和无验证器/超缓存预算流式回退；参考索引按计账字节/条目预算保留，超额流式 Top-K，文档总大小不设准入上限。
+- VextJS 固定源码/安装构建指纹、原生回读、独立任务召回门槛、官方章节关联与 VextJS/MonSQLize 双 Provider 来源矩阵可复现。无官方章节关联的原生条目明确单列，文档验证不等同于执行或 Agent 成功。
+
+外部索引须配置真实来源 Reader；无需调用 access 才能接入，但未经核验的自报哈希不能继续充当 current 证据。数据库 Adapter 须完整返回八类关系，漏项会明确拒绝。新 API 当前仅仓库构建可用；本次不发布 Registry/tag 或部署站点。

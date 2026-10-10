@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, readdir } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import path from "node:path";
 import test from "node:test";
@@ -10,11 +10,82 @@ import { HttpKnowledgeReader } from "../examples/seed-runtime/knowledge-reader.j
 import { createHttpRetrievalExample, runHttpRetrievalDemo } from "../examples/seed-runtime/retrieval-demo.js";
 import { TextKnowledgeRetriever } from "../examples/seed-runtime/text-retrieval.js";
 import { assertPortReleased } from "./contract/http-service-process.js";
+import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 const context: KnowledgeReadContext = { providerId: 'seed.http', staticRevision: 's:test',
   sourceContext: { providerId: 'seed.http', authorityKind: 'file', sourceRevision: 's:test' } };
 const ref = (url: string): KnowledgeDocumentRef => ({ kind: 'document', knowledgeId: 'HTTP', role: 'guide', locator: { type: 'http', url } });
 const contentId = (bytes: Uint8Array) => `k:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}`;
+
+test('strong ETag snapshot downloads a long source once, revalidates each page and rejects changed cursors', async () => {
+  const directory = await createTestDirectory('http-snapshot-');
+  let body = Buffer.from('source 中文🙂\n'.repeat(10000)); let version = '"1"'; let downloads = 0; let conditional = 0;
+  const server = createServer((request, response) => {
+    if (request.headers['if-none-match'] === version) { conditional++; response.writeHead(304, { etag: version }); response.end(); }
+    else { downloads++; response.writeHead(200, { etag: version, 'content-type': 'text/markdown' }); response.end(body); }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address(); assert(address && typeof address !== 'string'); const origin = `http://127.0.0.1:${address.port}`;
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [origin], snapshot: { directory, maxBytes: 1_000_000 } });
+  const db = new FakeDatabase([record('a', { knowledge: [ref(origin + '/guide')] })]);
+  const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'], readers: [reader],
+    providers: [{ providerId: 'seed', authority: { kind: 'database', adapter: { id: 'metadata', openView: async () => db } } }] });
+  try {
+    const query = { capabilityId: 'a', knowledgeId: 'HTTP' }; const bound = graph.forProvider('seed');
+    let cursor: string | undefined; let text = ''; let firstCursor: string | undefined; let pages = 0;
+    do { const page = await bound.readDocumentPage({ ...query, ...(cursor ? { cursor } : {}) }); text += page.text;
+      firstCursor ??= page.nextCursor; cursor = page.nextCursor; pages++; } while (cursor);
+    assert.deepEqual(Buffer.from(text), body); assert.equal(downloads, 1); assert.equal(conditional, pages - 1);
+    assert.equal(reader.cachedSnapshotBytes, body.length);
+    body = Buffer.from('changed 中文🙂\n'.repeat(10000)); version = '"2"';
+    await assert.rejects(bound.readDocumentPage({ ...query, cursor: firstCursor }), { code: 'CG_REVISION_MISMATCH' });
+    assert.equal(downloads, 2);
+  } finally {
+    await graph.close(); await reader.close(); assert.deepEqual(await readdir(directory), []);
+    await new Promise<void>((resolve) => { server.close(() => resolve()); server.closeAllConnections(); }); await removeTestDirectory(directory);
+  }
+});
+
+test('weak validators and oversized snapshots remain fully readable; HTML and unsolicited partial bodies fail', async () => {
+  const directory = await createTestDirectory('http-fallback-'); let calls = 0;
+  const body = Buffer.from('exact large body '.repeat(1000));
+  const source = await httpSource((url, response) => {
+    calls++; response.writeHead(url === '/range' ? 206 : 200, { etag: url === '/weak' ? 'W/"1"' : '"1"', 'content-type': url === '/html' ? 'text/html' : 'text/plain' }); response.end(body);
+  });
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin], snapshot: { directory, maxBytes: 100 } });
+  try {
+    for (const route of ['/weak', '/large']) for (let i = 0; i < 2; i++) {
+      const value = await reader.read(ref(source.origin + route), context, { maxBytes: body.length }); assert.deepEqual(Buffer.from(value.bytes), body);
+    }
+    assert.equal(reader.cachedSnapshotBytes, 0); assert.equal(calls, 4);
+    for (const route of ['/html', '/range']) await assert.rejects(reader.read(ref(source.origin + route), context, { maxBytes: body.length }));
+  } finally { await reader.close(); assert.deepEqual(await readdir(directory), []); await source.close(); await removeTestDirectory(directory); }
+});
+
+test('cached snapshots are content-verified and recovery/capacity work while streams hold a lease', async () => {
+  const directory = await createTestDirectory('snapshot-proof-'); const body = Buffer.from('original 中文 source\n');
+  const server = createServer((request, response) => {
+    if (request.headers['if-none-match'] === '"fixed"') { response.writeHead(304, { etag: '"fixed"' }); response.end(); }
+    else { response.writeHead(200, { etag: '"fixed"', 'content-type': 'text/plain' }); response.end(body); }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address(); assert(address && typeof address !== 'string'); const origin = `http://127.0.0.1:${address.port}`;
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [origin], maxConcurrent: 1, snapshot: { directory, maxEntries: 1, maxBytes: 1024 } });
+  try {
+    const document = ref(origin + '/guide'); await reader.read(document, context, { maxBytes: 1024 });
+    const folder = path.join(directory, (await readdir(directory))[0]!); const file = path.join(folder, (await readdir(folder))[0]!);
+    await writeFile(file, Buffer.alloc(body.length, 120));
+    await assert.rejects(reader.read(document, context, { maxBytes: 1024 }), /Snapshot changed/);
+    assert.equal(reader.cachedSnapshotBytes, 0); assert.deepEqual(Buffer.from((await reader.read(document, context, { maxBytes: 1024 })).bytes), body);
+    const iterator = reader.stream(document, context, { chunkBytes: 4 }); await iterator.next();
+    await assert.rejects(reader.read(document, context, { maxBytes: 1024 }), /Source unavailable/);
+    await iterator.return(); assert.equal(reader.activeRequests, 0);
+    await reader.read(ref(origin + '/second'), context, { maxBytes: 1024 }); assert.equal((await readdir(folder)).length, 1);
+  } finally {
+    await reader.close(); assert.deepEqual(await readdir(directory), []);
+    await new Promise<void>((resolve) => { server.close(() => resolve()); server.closeAllConnections(); }); await removeTestDirectory(directory);
+  }
+});
 
 for (const finishOlderFirst of [true, false]) test(`HTTP invalidation blocks old cache publication; older query finishes first=${finishOlderFirst}`, async () => {
   const example = await createHttpRetrievalExample();
@@ -25,7 +96,7 @@ for (const finishOlderFirst of [true, false]) test(`HTTP invalidation blocks old
   let reads = 0, graph: CapabilityGraph | undefined, pending: Promise<unknown> | undefined;
   try {
     graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed.http'], integrationEnabledProviders: ['seed.http'],
-      providers: [{ providerId: 'seed.http', authority: { kind: 'file', rootDir: example.root } }],
+      providers: [{ providerId: 'seed.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir: example.root } }],
       knowledgeRetriever: retriever, readers: [{ id: 'held-real-http', canRead: (ref) => example.reader.canRead(ref),
         read: async (...args) => {
           try {
@@ -163,7 +234,7 @@ test('lexical indexes keep UTF-8 offsets, evidence on zero hits and explicit con
     await assert.rejects(provider.queryKnowledge({ ...query, text: 'absentxyz' }), { code: 'CG_INDEX_STALE' });
     await example.knowledge.invalidate(change('configuration'));
     assert((await provider.queryKnowledge(query)).items.length > 0);
-    const file = path.join(example.root, 'route-validation.capability.json');
+    const file = path.join(example.root, 'capabilities/route-validation.json');
     const definition = JSON.parse(await readFile(file, 'utf8')); definition.name = 'Updated validation';
     await writeFile(file, JSON.stringify(definition));
     await example.graph.reload({ providerId: 'seed.http' });

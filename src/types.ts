@@ -13,7 +13,7 @@ export type KnowledgeContentId = string;
 export type RuntimeCompatibility = "compatible" | "unknown" | "refresh_required";
 
 export type KnowledgeLocator =
-  | { readonly type: "relative-file"; readonly path: string }
+  | { readonly type: "relative-file"; readonly path: string; readonly root?: string }
   | { readonly type: "http"; readonly url: string };
 
 export type KnowledgeKind = "document" | "collection";

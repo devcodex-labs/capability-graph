@@ -23,6 +23,8 @@ Core 验证：
 
 Adapter 自己管理连接、取消、重试和清理。Core 的 5 秒默认超时只停止等待，并处理返回给 Core 的 `query()` Promise 的迟到拒绝。Adapter 另行启动的后台任务仍须自行处理拒绝与资源释放；不能把超时视为底层任务已经取消。
 
+Adapter 抛出的 CapabilityGraphError 中，CG_REVISION_MISMATCH 保留 nextAction=refresh；CG_RUNTIME_RESULT_MISMATCH / CG_RUNTIME_CONTEXT_REQUIRED 保留 fix_input。私有 message/details 被剥离；未知异常和期限到期仍为 CG_RUNTIME_UNAVAILABLE。
+
 ## CapabilityRetriever
 
 <span className="cg-status">合同与可运行参考</span>
@@ -59,7 +61,7 @@ context 的 sourceContext 仅供本地进程 Reader 使用，其结构包含必�
 
 `openView(providerId)` 返回稳定 `DatabaseReadView`，暴露 Provider metadata、sourceRevision、可选知识根，以及 `getCapability()`、`scanCapabilities()`、`neighbors()` 和 `close()`。
 
-同一 view 的 Provider、知识根、sourceRevision 和记录必须稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。Core 先完整扫描和收集 ID，再进行端点检查和 `parents`/`specializes`/`requires` 三类无环检查，不能边扫边判不存在。随后交叉验证完整的 `requires`/`requiredBy` 流，缺失或伪造的反向依赖也必须使装载失败。Static Revision 使用与文件模式相同的规范序列化算法。
+同一 view 的 Provider、知识根、sourceRevision 和记录必须稳定。扫描记录按 capabilityId 严格升序且恰好一次；之后点读必须重现同一记录。Core 先完整扫描和收集 ID，再进行端点检查和 `parents`/`specializes`/`requires` 三类无环检查，不能边扫边判不存在。随后核对全部八类正反关系流。公开 Catalog 校验有序身份连续性及终止位置；关系查询核验完整来源流，再按 Core 位置分页。缺头、缺中、缺尾与假空流不能返回 complete。保留 O(V) 身份/摘要，不缓存全量数据库定义。Static Revision 使用与文件模式相同的规范序列化算法。
 
 Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有查询 pin 时延迟关闭。Adapter 不提供通用写入、CRUD 或迁移能力。
 

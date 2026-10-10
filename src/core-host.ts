@@ -1,4 +1,5 @@
 import path from "node:path";
+import { bindKnowledgeRoots, rootAliasValid, type KnowledgeRootSpec } from "./knowledge/roots.js";
 import { resolveBudgets, type ResolvedBudgetConfig, type BudgetOverrides } from "./budgets.js";
 import { CapabilityGraphError, type ErrorShape } from "./errors.js";
 import { isId } from "./identity.js";
@@ -12,9 +13,10 @@ import type { ResultMeta, StaticRevision } from "./types.js";
 import { validateSnapshot } from "./validate/index.js";
 
 /** One source per enabled provider. File roots are resolved at open, independent of subsequent cwd changes. */
-export type AuthoritySpec = { readonly kind: "file"; readonly rootDir: string } |
+export type AuthoritySpec = { readonly kind: "file"; readonly rootDir: string; readonly definitionLayout?: "directory" | "legacy" } |
   { readonly kind: "database"; readonly adapter: DatabaseAuthorityAdapter };
-export interface ProviderLoadSpec { readonly providerId: string; readonly authority: AuthoritySpec }
+export interface ProviderLoadSpec { readonly providerId: string; readonly authority: AuthoritySpec;
+  readonly knowledgeRoots?: Readonly<Record<string, KnowledgeRootSpec>> }
 export interface StaticOpenConfig {
   readonly hostAllowedProviders: readonly string[];
   readonly integrationEnabledProviders: readonly string[];
@@ -64,10 +66,21 @@ export class CoreHost {
       seen.add(spec.providerId);
       if (!this.scope.has(spec.providerId)) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
       const authority = spec.authority;
+      if (authority.kind === "file" && authority.definitionLayout !== undefined && !["legacy", "directory"].includes(authority.definitionLayout)) throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
+      const roots: Record<string, KnowledgeRootSpec> = Object.create(null);
+      if (spec.knowledgeRoots !== undefined) {
+        if (!spec.knowledgeRoots || typeof spec.knowledgeRoots !== "object" || Array.isArray(spec.knowledgeRoots)) throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
+        for (const [alias, root] of Object.entries(spec.knowledgeRoots as Readonly<Record<string, KnowledgeRootSpec>>)) {
+          if (!rootAliasValid(alias) || !root || (root.kind !== "directory" && root.kind !== "package") ||
+              (root.kind === "directory" && (typeof root.rootDir !== "string" || !root.rootDir)) ||
+              (root.kind === "package" && (typeof root.resolveFrom !== "string" || !root.resolveFrom || typeof root.packageName !== "string" || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(root.packageName) || root.packageName.split("/").some((part) => [".", ".."].includes(part))))) throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
+          roots[alias] = Object.freeze(root.kind === "directory" ? { ...root, rootDir: path.resolve(cwd, root.rootDir) } : { ...root, resolveFrom: path.resolve(cwd, root.resolveFrom) });
+        }
+      }
       if ((authority.kind === "file" && typeof authority.rootDir === "string" && authority.rootDir.length && !("adapter" in authority)) ||
           (authority.kind === "database" && authority.adapter && typeof authority.adapter.openView === "function" && !("rootDir" in authority))) {
-        return Object.freeze({ providerId: spec.providerId, authority: Object.freeze(authority.kind === "file"
-          ? { kind: "file" as const, rootDir: path.resolve(cwd, authority.rootDir) } : { ...authority }) });
+        return Object.freeze({ providerId: spec.providerId, knowledgeRoots: Object.freeze(roots), authority: Object.freeze(authority.kind === "file"
+          ? { ...authority, rootDir: path.resolve(cwd, authority.rootDir) } : { ...authority }) });
       }
       throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
     });
@@ -79,8 +92,10 @@ export class CoreHost {
 
   private async load(spec: ProviderLoadSpec): Promise<ValidatedProviderView> {
     try {
-      if (spec.authority.kind === "database") return await databaseAuthorityStore(await spec.authority.adapter.openView(spec.providerId), spec.providerId);
-      const snapshot = await validateSnapshot(await new FileAuthorityStore().load(spec.authority.rootDir));
+      const roots = await bindKnowledgeRoots(spec.knowledgeRoots);
+      if (spec.authority.kind === "database") return await databaseAuthorityStore(await spec.authority.adapter.openView(spec.providerId), spec.providerId, roots);
+      const source = await new FileAuthorityStore().load(spec.authority.rootDir, spec.authority.definitionLayout);
+      const snapshot = await validateSnapshot({ ...source, knowledgeRoots: roots });
       if (snapshot.provider.providerId !== spec.providerId) throw new CapabilityGraphError("CG_VALIDATION_FAILED", { nextAction: "repair_source" });
       return memoryGraphStore(snapshot);
     } catch (error) {

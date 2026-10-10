@@ -65,7 +65,13 @@ for (const operation of ["catalog", "neighbors"] as const) {
     try {
       const query = operation === "catalog" ? graph.listCatalog({ limit: 1 }) :
         graph.forProvider("seed").getNeighbors("a", { limitPerKind: 1, kinds: ["related"] });
-      await assert.rejects(query, { code: "CG_BUDGET_EXCEEDED" });
+      if (operation === "catalog") await assert.rejects(query, { code: "CG_BUDGET_EXCEEDED" });
+      else {
+        // Verified relation streams use Core-owned numeric positions rather than exposing huge source cursors.
+        const result = await query;
+        assert.ok("groups" in result); assert.equal(result.groups.related.items[0]?.id.capabilityId, "b");
+        assert.ok(result.groups.related.nextCursor!.length <= MAX_PUBLIC_CURSOR_LENGTH);
+      }
     } finally { await graph.close(); }
   });
 }

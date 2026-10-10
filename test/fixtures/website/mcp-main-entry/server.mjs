@@ -15,7 +15,7 @@ export async function createMainEntryServer({ mainEntries = ['route'] } = {}) {
   const rootDir = fileURLToPath(new URL('../../seed-provider/', import.meta.url));
   const graph = await CapabilityGraph.open({
     hostAllowedProviders: ['seed.http'], integrationEnabledProviders: ['seed.http'],
-    providers: [{ providerId: 'seed.http', authority: { kind: 'file', rootDir } }]
+    providers: [{ providerId: 'seed.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir } }]
   });
   const server = new McpServer({ name: 'seed-main-entry', version: '0.1.0' });
   const call = async (operation) => {

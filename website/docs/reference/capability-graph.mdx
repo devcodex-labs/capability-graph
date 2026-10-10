@@ -74,9 +74,20 @@ interface OpenConfig {
 }
 
 type AuthoritySpec =
-  | { kind: 'file'; rootDir: string }
+  | { kind: 'file'; rootDir: string; definitionLayout?: 'directory' | 'legacy' }
   | { kind: 'database'; adapter: DatabaseAuthorityAdapter };
+
+interface ProviderLoadSpec {
+  providerId: string;
+  authority: AuthoritySpec;
+  knowledgeRoots?: Readonly<Record<string, KnowledgeRootSpec>>;
+}
+type KnowledgeRootSpec =
+  | { kind: 'directory'; rootDir: string }
+  | { kind: 'package'; packageName: string; resolveFrom: string };
 ```
+
+1.1.0 新示例显式启用 directory：只读取 capabilities/**/*.json（后缀不必为 .capability）。目录必须存在，可为空；所有 JSON 候选经过完整 Schema 校验。目录外旧定义混用、嵌套 Provider、链接定义、大小写冲突及重复 capabilityId 明确失败。legacy 缺省保持旧递归 *.capability.json，provider.json-only 空 Provider 继续合法。同记录同 locator 在两模式中逻辑身份与静态修订一致。新增选项需匹配版本，旧 Registry 不支持。
 
 每个有效启用 Provider 必须恰有一个 Authority。文件根在 `open()` 时解析并固定；数据库 read view 在交给 Core 后成为稳定逻辑快照。
 

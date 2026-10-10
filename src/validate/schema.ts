@@ -34,7 +34,7 @@ function relations(value: unknown, relation: string): readonly string[] {
   }).sort();
 }
 
-export async function validateProvider(value: unknown, root?: string): Promise<UnvalidatedProviderRecord> {
+export async function validateProvider(value: unknown, root?: import("../knowledge/roots.js").KnowledgeRootContext): Promise<UnvalidatedProviderRecord> {
   const raw = object(jsonRecord(value), ["providerId", "name", "version", "specification"], ["providerId", "name", "version"]);
   let specification: UnvalidatedProviderRecord["specification"];
   if (raw.specification !== undefined) {
@@ -52,7 +52,7 @@ export async function validateProvider(value: unknown, root?: string): Promise<U
     ...(specification === undefined ? {} : { specification }) });
 }
 
-export async function validateCapability(value: unknown, root?: string, checkExistingPaths = true): Promise<CapabilityRecord> {
+export async function validateCapability(value: unknown, root?: import("../knowledge/roots.js").KnowledgeRootContext, checkExistingPaths = true): Promise<CapabilityRecord> {
   const raw = object(jsonRecord(value), ["capabilityId", "name", "description", "whenToUse", "distinction", "examples", "parents", "specializes", "related", "requires", "knowledge"],
     ["capabilityId", "name", "description", "whenToUse"]);
   return freeze({ capabilityId: identity(raw.capabilityId), name: text(raw.name), description: text(raw.description),

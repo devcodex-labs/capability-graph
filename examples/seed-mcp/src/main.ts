@@ -5,7 +5,7 @@ import { createSeedServer } from "./server.js";
 
 const rootDir = fileURLToPath(new URL("../../../seed-provider/", import.meta.url));
 const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http"], integrationEnabledProviders: ["seed.http"],
-  providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir } }] });
+  providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory" as const, rootDir } }] });
 const server = createSeedServer(graph, rootDir);
 let closed = false;
 async function close() { if (closed) return; closed = true; try { await server.close(); } finally { await graph.close(); } }

@@ -7,7 +7,7 @@ const graph = await CapabilityGraph.open({
   providers: [{
     providerId: 'acme.http',
     authority: {
-      kind: 'file',
+      kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
     }
   }]

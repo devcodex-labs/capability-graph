@@ -19,7 +19,7 @@ function payload(value: Awaited<ReturnType<Client["callTool"]>>) {
 }
 async function connected(run: (client: Client, graph: CapabilityGraph) => Promise<void>, adapter?: RuntimeAdapter) {
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http"], integrationEnabledProviders: ["seed.http"],
-    providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir: root } }], runtimeAdapters: adapter ? [adapter] : [] });
+    providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory" as const, rootDir: root } }], runtimeAdapters: adapter ? [adapter] : [] });
   const server = createSeedServer(graph, root);
   const client = new Client({ name: "protocol-test", version: "1.0.0" });
   const [a, b] = InMemoryTransport.createLinkedPair();

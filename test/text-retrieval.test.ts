@@ -150,3 +150,23 @@ test('capability index rebuild is atomic when a real Catalog exceeds configured 
     assert.equal((await bound.retrieveCapabilities({ text: 'validation' })).items.length, 2);
   } finally { await graph?.close(); await source.close(); }
 });
+
+test('oversized indexes use streaming Top-K with exact ranking, offsets and hashes without retaining the body', async () => {
+  const source = await sources();
+  const bounded = new TextKnowledgeRetriever(); bounded.configure({ maxCachedBytes: 4096, maxCachedEntries: 16, chunkBytes: 64 });
+  const baseline = new TextKnowledgeRetriever(); baseline.configure({ maxCachedBytes: 16_777_216, maxCachedEntries: 100000, chunkBytes: 64 });
+  const body = 'validation 中文🙂\n'.repeat(12000) + 'validation exactneedle 中文🙂\n';
+  await writeFile(path.join(source.first, 'a.md'), body); await writeFile(path.join(source.first, 'b.md'), body);
+  let first: CapabilityGraph | undefined; let second: CapabilityGraph | undefined;
+  try {
+    first = await CapabilityGraph.open({ ...config(source.first), knowledgeRetriever: bounded });
+    second = await CapabilityGraph.open({ ...config(source.first), knowledgeRetriever: baseline });
+    const input = { selected: [{ capabilityId: 'a' }, { capabilityId: 'b' }], text: 'validation exactneedle', limit: 3 };
+    const actual = await first.forProvider('alpha').queryKnowledge(input); const expected = await second.forProvider('alpha').queryKnowledge(input);
+    assert.deepEqual(actual.items, expected.items); assert(actual.items.some((hit) => hit.snippet.includes('exactneedle')));
+    assert.equal(actual.meta.completeness, 'complete'); assert.equal(bounded.cachedSelections, 0); assert.equal(bounded.cachedBytes, 0); assert.equal(bounded.cachedEntries, 0);
+    assert.deepEqual((await first.forProvider('alpha').queryKnowledge(input)).items, actual.items);
+    assert((await first.forProvider('alpha').queryKnowledge(query('c'))).items.length > 0);
+    assert(bounded.cachedBytes <= 4096 && bounded.cachedEntries <= 16);
+  } finally { await first?.close(); await second?.close(); await source.close(); }
+});

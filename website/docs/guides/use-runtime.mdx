@@ -21,7 +21,7 @@ const graph = await CapabilityGraph.open({
   integrationEnabledProviders: ['seed.http'],
   providers: [{
     providerId: 'seed.http',
-    authority: { kind: 'file', rootDir: '/absolute/path/to/examples/seed-provider' }
+    authority: { kind: 'file', definitionLayout: 'directory', rootDir: '/absolute/path/to/examples/seed-provider' }
   }],
   runtimeAdapters: [runtimeAdapter]
 });

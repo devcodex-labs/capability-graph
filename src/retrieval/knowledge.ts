@@ -6,6 +6,7 @@ import { canonicalJson } from "../hash.js";
 import { formatQualifiedId, isKnowledgeId } from "../identity.js";
 import { locatorSource, readContext, readDocument, validateDocumentFilters, validateSelection } from "../knowledge/read.js";
 import { scanDocument, documentRanges } from "../knowledge/stream.js";
+import { knowledgeRoot } from "../knowledge/roots.js";
 import type { KnowledgeScanResult } from "../knowledge/types.js";
 import type { KnowledgeIndexEvidence, KnowledgeReader, KnowledgeReadContext, KnowledgeResultHit, KnowledgeRetriever, KnowledgeRetrievalAccess, KnowledgeSearchTarget } from "../knowledge/types.js";
 import { bytes, capability, identity, inputInvalid, limit } from "../query/common.js";
@@ -22,7 +23,7 @@ const stale = (): never => { throw new CapabilityGraphError("CG_INDEX_STALE", { 
 /** Project every nested field; internal read contexts never enter the transport request. */
 export function projectKnowledgeTarget(target: KnowledgeSearchTarget): KnowledgeSearchTarget {
   return { id: { providerId: target.id.providerId, capabilityId: target.id.capabilityId }, knowledgeId: target.knowledgeId,
-    locator: target.locator.type === "relative-file" ? { type: "relative-file", path: target.locator.path } : { type: "http", url: target.locator.url },
+    locator: target.locator.type === "relative-file" ? { type: "relative-file", path: target.locator.path, ...(target.locator.root === undefined ? {} : { root: target.locator.root }) } : { type: "http", url: target.locator.url },
     viaCollectionIds: [...target.viaCollectionIds], role: target.role,
     ...(target.locale === undefined ? {} : { locale: target.locale }), ...(target.title === undefined ? {} : { title: target.title }),
     ...(target.summary === undefined ? {} : { summary: target.summary }),
@@ -108,7 +109,8 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
   // Mapping identity changes with bindings/source roots, independently of document content identity.
   const mappingRevision = `m:${hash(entries.map(([, entry]) => ({ target: projectKnowledgeTarget(entry.target),
     contextDigest: hash({ providerId: entry.context.providerId, authorityKind: entry.context.sourceContext.authorityKind,
-      knowledgeRootDir: entry.context.sourceContext.knowledgeRootDir ?? null }) })))}`;
+      knowledgeRootDir: entry.ref.locator.type === "relative-file" ? knowledgeRoot({ defaultRoot: entry.context.sourceContext.knowledgeRootDir, aliases: entry.context.sourceContext.knowledgeRoots ?? {} }, entry.ref.locator.root) ?? null : null,
+      rootIdentity: entry.ref.locator.type === "relative-file" && entry.ref.locator.root !== undefined ? entry.context.sourceContext.knowledgeRoots?.[entry.ref.locator.root]?.identity ?? null : null }) })))}`;
   // Authorization scope is not an index dependency: only expanded, selected targets contribute revisions.
   const staticRevisionByProvider = Object.fromEntries(entries.map(([, entry]) => [entry.context.providerId, entry.context.staticRevision]));
   const request = freeze({ text: query.text, staticRevisionByProvider, mappingRevision,
@@ -183,6 +185,19 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
   // Stop new reads immediately, but retain the query pin until already-started reads settle.
   finally { active = false; await Promise.allSettled([...pending]); }
   if (!raw || !Array.isArray(raw.hits) || raw.hits.length > count) contract("knowledge_page_invalid");
+  // A retriever's matching hashes are claims, not proof. Verify even documents with zero hits.
+  // Reuse the exact query snapshot/scan when the backend already used the constrained access.
+  for (const [targetKey, entry] of entries) {
+    if (observed.has(targetKey) || scanned.has(targetKey)) continue;
+    let snapshot: Uint8Array[] | undefined = []; let snapshotBytes = 0;
+    const result = await scanDocument(entry.ref, entry.context, readers, (part) => {
+      snapshotBytes += part.length;
+      if (snapshotBytes > budgets.read.maxBytes) snapshot = undefined;
+      snapshot?.push(Uint8Array.from(part));
+    }, { chunkBytes: budgets.read.maxBytes, fallbackMaxBytes: budgets.read.maxResponseBytes ?? 4_194_304 });
+    scanned.set(targetKey, result);
+    if (snapshot) observed.set(targetKey, { ...result, bytes: Buffer.concat(snapshot, snapshotBytes) });
+  }
   const evidence = raw.evidence;
   // Even zero hits require evidence for every allowed document; empty output does not prove a fresh index.
   let evidenceIds: Map<string, KnowledgeIndexEvidence["documents"][number]>;

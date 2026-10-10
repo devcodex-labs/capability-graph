@@ -20,7 +20,7 @@ test("R9: mixed recall retains file candidates and original ranks when a databas
   const db = new FakeDatabase([record("a")]);
   const base = config(db);
   const graph = await CapabilityGraph.open({ ...base, hostAllowedProviders: ["seed", "seed.http"], integrationEnabledProviders: ["seed", "seed.http"],
-    providers: [...base.providers, { providerId: "seed.http", authority: { kind: "file", rootDir: seedProviderRoot } }],
+    providers: [...base.providers, { providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory", rootDir: seedProviderRoot } }],
     capabilityRetriever: { id: "mixed", retrieve: async (input) => ({ candidates: [
       { id, sourceStaticRevision: input.staticRevisionByProvider.seed! },
       { id: local, sourceStaticRevision: input.staticRevisionByProvider["seed.http"]!, score: 0.7 },

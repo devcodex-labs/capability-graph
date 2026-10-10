@@ -9,7 +9,7 @@ import { launchService, assertPortReleased } from "./contract/http-service-proce
 const scope = { project: "app-a", environment: "test" };
 const code = (value: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === value;
 const open = (adapter?: RuntimeAdapter) => CapabilityGraph.open({ hostAllowedProviders: ["seed.http"], integrationEnabledProviders: ["seed.http"],
-  providers: [{ providerId: "seed.http", authority: { kind: "file", rootDir: seedProviderRoot } }], runtimeAdapters: adapter ? [adapter] : [] });
+  providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory", rootDir: seedProviderRoot } }], runtimeAdapters: adapter ? [adapter] : [] });
 async function staticRevision() { const graph = await open(); try { return (await graph.getProvider("seed.http")).staticRevision; } finally { await graph.close(); } }
 const adapterAt = (url: string, extra: { timeoutMs?: number; maxBytes?: number } = {}) => new HttpRuntimeAdapter({ endpoint: `${url}/__capabilities/runtime`, ...extra });
 

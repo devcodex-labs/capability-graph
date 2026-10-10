@@ -24,9 +24,9 @@ description: 从最小能力分步加入子能力、文档、必要上下文和�
 
 ## G1. 添加并发现子能力
 
-保留 G0 的 `provider.json`、`route.capability.json`，在 `providers/acme-http/` 新建：
+保留 G0 的 `provider.json`、`capabilities/route.json`，在 `providers/acme-http/` 新建：
 
-```json title="route-http.capability.json"
+```json title="capabilities/route-http.json"
 {
   "capabilityId": "route.http",
   "name": "HTTP routing",
@@ -51,7 +51,7 @@ const graph = await CapabilityGraph.open({
   providers: [{
     providerId: 'acme.http',
     authority: {
-      kind: 'file',
+      kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
     }
   }]
@@ -94,7 +94,7 @@ try {
 
 在 G1 基础上，用下列完整内容替换子能力文件：
 
-```json title="route-http.capability.json"
+```json title="capabilities/route-http.json"
 {
   "capabilityId": "route.http",
   "name": "HTTP routing",
@@ -147,7 +147,7 @@ const graph = await CapabilityGraph.open({
   providers: [{
     providerId: 'acme.http',
     authority: {
-      kind: 'file',
+      kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
     }
   }]
@@ -192,7 +192,7 @@ try {
 
 本节只需要 G0，不需要 G1/G2。保持仅有 `route` 的初始目录，增加：
 
-```json title="route-validation.capability.json"
+```json title="capabilities/route-validation.json"
 {
   "capabilityId": "route.validation",
   "name": "Request validation",
@@ -204,7 +204,7 @@ try {
 }
 ```
 
-```json title="schema-request.capability.json"
+```json title="capabilities/schema-request.json"
 {
   "capabilityId": "schema.request",
   "name": "Request schema",
@@ -227,7 +227,7 @@ const graph = await CapabilityGraph.open({
   providers: [{
     providerId: 'acme.http',
     authority: {
-      kind: 'file',
+      kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
     }
   }]
@@ -297,12 +297,13 @@ try {
 ```text
 providers/acme-spec/
 ├── provider.json
-├── route.capability.json
+├── capabilities/
+│   └── route.json
 ├── PROVIDER.md
 └── discover.mjs
 ```
 
-`route.capability.json` 使用 G0 的完整内容，不能复制含子能力/依赖/知识的高级 Fixture。项目 `package.json/node_modules` 留在外层。用下列内容创建/替换该目录的 `provider.json`：
+`capabilities/route.json` 使用 G0 的完整内容，不能复制含子能力/依赖/知识的高级 Fixture。项目 `package.json/node_modules` 留在外层。用下列内容创建/替换该目录的 `provider.json`：
 
 ```json title="provider.json"
 {
@@ -354,7 +355,7 @@ const graph = await CapabilityGraph.open({
   providers: [{
     providerId: 'acme.http',
     authority: {
-      kind: 'file',
+      kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./', import.meta.url))
     }
   }]

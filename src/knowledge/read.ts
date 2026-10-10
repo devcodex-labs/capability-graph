@@ -30,7 +30,7 @@ export interface ReadSpecificationQuery {
   readonly providerId: string; readonly knowledgeIds?: readonly string[]; readonly locales?: readonly string[];
   readonly requiredStaticRevision?: string;
 }
-export const locatorSource = (ref: KnowledgeDocumentRef): string => ref.locator.type === "relative-file" ? ref.locator.path : ref.locator.url;
+export const locatorSource = (ref: KnowledgeDocumentRef): string => ref.locator.type === "relative-file" ? (ref.locator.root === undefined ? ref.locator.path : `root:${ref.locator.root}/${ref.locator.path}`) : ref.locator.url;
 export function readContext(context: QueryContext, providerId: string): KnowledgeReadContext {
   const view = context.graph.getView(providerId)!;
   return freeze({ providerId, staticRevision: view.staticRevision, sourceContext: { ...view.sourceContext } });
@@ -118,7 +118,7 @@ async function readValue(ref: KnowledgeDocumentRef, providerId: string, context:
   budgets: BudgetConfig, readers: readonly KnowledgeReader[]): Promise<Omit<DocumentRead, "id">> {
   const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxResponseBytes ?? 4_194_304, readers);
   let text: string;
-  try { text = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes); }
+  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(read.bytes); }
   catch { throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { reason: "invalid_utf8" } }); }
   return { knowledgeId: ref.knowledgeId, contentId: read.contentId, source: read.source,
     contentType: read.contentType, text, byteLength: read.bytes.length, role: ref.role,

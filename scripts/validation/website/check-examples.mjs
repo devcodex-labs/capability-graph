@@ -43,7 +43,7 @@ const vextjs = statuses.find(({ id }) => id === 'vextjs-integration');
 assert(vextjs?.status === 'Contract-only' && vextjs.source === '../examples/vextjs', 'VextJS must disclose its fixed-source opt-in verification boundary');
 
 const fixtureRoot = path.join(websiteFixtureRoot, 'advanced-provider');
-const fixtureFiles = ['provider.json', 'route.capability.json', 'route-http.capability.json'];
+const fixtureFiles = ['provider.json', 'capabilities/route.json', 'capabilities/route-http.json'];
 const fixtureDocuments = ['PROVIDER.md', 'knowledge/routing.md', 'discover.mjs'];
 const fixture = Object.fromEntries(await Promise.all(fixtureFiles.map(async (file) => [
   file,
@@ -59,7 +59,7 @@ await compareFixture(await loadTutorial('MCP'), path.join(websiteFixtureRoot, 'm
 const graph = await CapabilityGraph.open({
   hostAllowedProviders: ['acme.http'],
   integrationEnabledProviders: ['acme.http'],
-  providers: [{ providerId: 'acme.http', authority: { kind: 'file', rootDir: fixtureRoot } }]
+  providers: [{ providerId: 'acme.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir: fixtureRoot } }]
 });
 try {
   const provider = graph.forProvider('acme.http');

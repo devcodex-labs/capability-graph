@@ -11,6 +11,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [本地开发](#development)
 - [未发布改动](changelogs/unreleased.md)
 - [1.0.1 迁移与变更](changelogs/1.0.1.md)
+- [1.1.0 待发布变更](changelogs/1.1.0.md)
 - [1.0.0 变更](changelogs/1.0.0.md)
 - [许可证](#license)
 
@@ -18,7 +19,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 
 ## 当前状态
 
-当前已发布 `1.0.1`。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
+Registry 当前已发布 `1.0.1`；仓库为待发布 `1.1.0`。新目录模式、知识根别名及正文分页需使用本仓库构建的安装包；提交源码不会发布 npm 包或部署站点。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
 
 ```sh
 npm install @devcodex/capability-graph
@@ -32,7 +33,7 @@ npm install @devcodex/capability-graph
 
 ## 定义与接入
 
-Provider 在独立目录提供 `provider.json`、`*.capability.json` 和可选知识文件。Core 不导入业务源码，不执行能力，不自动推断图关系。可运行样本见 [Seed Provider](examples/seed-provider/PROVIDER.md)。
+Provider 在独立目录提供 `provider.json`、`capabilities/**/*.json` 和可选知识文件，显式启用 `definitionLayout: "directory"`。旧配置默认 `legacy`，继续递归收集 `*.capability.json`。Core 不导入业务源码，不执行能力，不自动推断图关系。可运行样本见 [Seed Provider](examples/seed-provider/PROVIDER.md)。
 
 ```json
 {
@@ -61,7 +62,7 @@ const graph = await CapabilityGraph.open({
   integrationEnabledProviders: ["seed.http"],
   providers: [{
     providerId: "seed.http",
-    authority: { kind: "file", rootDir: "/absolute/path/to/seed-provider" },
+    authority: { kind: "file", rootDir: "/absolute/path/to/seed-provider", definitionLayout: "directory" },
   }],
 });
 try {
@@ -86,7 +87,9 @@ try {
 
 文件 `rootDir` 在 `open` 时解析为固定绝对根，后续工作目录变化不会重定位 `reload`。数据库 `knowledgeRootDir` 若为相对路径，在 Core 收到该只读视图时立即固定；current/previous 分别保留自己的根。知识 locator 仍是作者声明的相对路径，私有根不出现在公共结果或检索请求中。
 
-文件模式从根目录的 `provider.json` 和递归的 `*.capability.json` 收集定义；任何层级均跳过目录 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache`、`.tmp`，按精确名称匹配。正式定义不要放在这些目录内；其他嵌套目录继续支持，不要求迁移到固定 `capabilities/` 布局。每个定义文件最多 262_144 UTF-8 字节，超限会在 JSON 解析前返回 `CG_BUDGET_EXCEEDED`。
+directory 只收集 capabilities/**/*.json，缺少目录、目录外遗留定义、嵌套 Provider、链接定义及大小写文件冲突明确失败；空目录合法。legacy 保持旧递归规则。两模式均跳过 .git、node_modules、dist、dist-test、coverage、.cache、.tmp。每个定义最多 262_144 UTF-8 字节，这是定义 Schema 预算；知识文档总大小不设准入上限。
+
+每个 Provider 可用 knowledgeRoots 显式绑定获准外部目录或实际安装包根；locator 的可选 root 只引用稳定别名。旧相对路径保持原义。真实根与包身份固定，支持中文、空格、scoped 包及 pnpm；拒绝路径逃逸，不执行包入口，私有根不进入输出。URL 使用 http locator 和宿主 Reader，canonicalUrl 只是展示链接。
 
 <a id="queries"></a>
 

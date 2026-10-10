@@ -55,16 +55,16 @@ interface Chunk { startOffset: number; endOffset: number; snippet: string; terms
 interface IndexedDocument { id: CanonicalCapabilityId; knowledgeId: string; contentId: string; source: string; chunks: Chunk[] }
 interface Index {
   staticRevisionByProvider: KnowledgeIndexEvidence["staticRevisionByProvider"];
-  mappingRevision: string; configurationRevision: string; documents: IndexedDocument[];
+  mappingRevision: string; configurationRevision: string; documents: IndexedDocument[]; bytes: number; entries: number;
 }
-interface Configuration { chunkBytes: number; maxDocumentBytes: number; stopWords: readonly string[] }
+interface Configuration { chunkBytes: number; maxDocumentBytes: number; stopWords: readonly string[]; maxCachedBytes: number; maxCachedEntries: number }
 
 /** Query-bound lexical indexes. Every query rechecks exact source bytes; host invalidation rebuilds stale entries. */
 export class TextKnowledgeRetriever implements KnowledgeRetriever {
   readonly id = "seed-text-knowledge";
   private readonly cache = new Map<string, Index>();
   private readonly pending = new Set<{ providers: ReadonlySet<string>; invalidated: boolean }>();
-  private configuration: Configuration = { chunkBytes: 512, maxDocumentBytes: 32768, stopWords: [] };
+  private configuration: Configuration = { chunkBytes: 512, maxDocumentBytes: 32768, stopWords: [], maxCachedBytes: 8_388_608, maxCachedEntries: 10_000 };
   constructor(private readonly maxCachedSelections = 4) {
     if (!Number.isSafeInteger(maxCachedSelections) || maxCachedSelections < 1) throw new Error("Invalid cache capacity");
   }
@@ -73,11 +73,12 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
     if (options.pageBytes !== undefined && options.maxDocumentBytes !== undefined && options.pageBytes !== options.maxDocumentBytes) throw new Error("Conflicting page sizes");
     const { pageBytes, ...legacy } = options;
     const next = { ...this.configuration, ...legacy, ...(pageBytes === undefined ? {} : { maxDocumentBytes: pageBytes }) };
-    if (![next.chunkBytes, next.maxDocumentBytes].every((value) => Number.isSafeInteger(value) && value > 0) ||
+    if (![next.chunkBytes, next.maxDocumentBytes, next.maxCachedBytes, next.maxCachedEntries].every((value) => Number.isSafeInteger(value) && value > 0) ||
         next.chunkBytes < 4 || next.chunkBytes > 2048 || !Array.isArray(next.stopWords) || next.stopWords.some((value) => typeof value !== "string")) {
       throw new Error("Invalid text index configuration");
     }
     this.configuration = { ...next, stopWords: [...new Set(next.stopWords.map((value) => value.normalize("NFKC").toLowerCase()))].sort() };
+    while (this.cachedBytes > next.maxCachedBytes || this.cachedEntries > next.maxCachedEntries) this.cache.delete(this.cache.keys().next().value!);
   }
   private configRevision(configuration: Configuration): string { return `text:${createHash("sha256").update(JSON.stringify(configuration)).digest("hex").slice(0, 16)}`; }
   private indexTerms(text: string, configuration: Configuration): ReadonlySet<string> {
@@ -114,7 +115,29 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
       // Sequential access avoids overflowing an injected Reader's connection limit
       // and leaves no detached reads after a failed retrieve invocation.
       const bodies: { target: (typeof input.targets)[number]; body: { contentId: string; source: string }; chunks: Chunk[] }[] = [];
+      const wanted = [...this.indexTerms(input.text, configuration)];
+      const best: { target: Pick<(typeof input.targets)[number], "id" | "knowledgeId">; chunk: Chunk; score: number }[] = [];
+      let retainedBytes = 0; let retainedEntries = 0; let retain = !cached;
+      const consider = (target: Pick<(typeof input.targets)[number], "id" | "knowledgeId">, chunk: Chunk, chunks: Chunk[]) => {
+        const value = score(wanted, chunk.terms);
+        if (value > 0) {
+          best.push({ target, chunk, score: value });
+          best.sort((a, b) => b.score - a.score || identity(a.target).localeCompare(identity(b.target)) || a.chunk.startOffset - b.chunk.startOffset);
+          if (best.length > input.limit) best.pop();
+        }
+        if (retain) {
+          retainedBytes += 128 + Buffer.byteLength(chunk.snippet) + [...chunk.terms].reduce((sum, term) => sum + 48 + Buffer.byteLength(term), 0);
+          retainedEntries++;
+          if (retainedBytes > configuration.maxCachedBytes || retainedEntries > configuration.maxCachedEntries) {
+            retain = false; for (const body of bodies) body.chunks.length = 0; chunks.length = 0;
+          } else chunks.push(chunk);
+        }
+      };
       for (const target of input.targets) {
+        if (retain) {
+          retainedBytes += 256 + Buffer.byteLength(identity(target));
+          if (retainedBytes > configuration.maxCachedBytes) { retain = false; for (const body of bodies) body.chunks.length = 0; }
+        }
         if (access.scan && configuration.maxDocumentBytes >= 4) {
           const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
           const chunks: Chunk[] = []; let pendingText = ""; let offset = 0;
@@ -128,7 +151,7 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
                 snippet += char; length += size;
                 if (char === "\n") break;
               }
-              chunks.push({ startOffset: offset, endOffset: offset + length, snippet, terms: this.indexTerms(snippet, configuration) });
+              consider(target, { startOffset: offset, endOffset: offset + length, snippet, terms: this.indexTerms(snippet, configuration) }, chunks);
               offset += length; pendingText = pendingText.slice(snippet.length);
             }
           };
@@ -140,29 +163,29 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
           bodies.push({ target, body, chunks });
         } else {
           const body = await access.read({ id: target.id, knowledgeId: target.knowledgeId }, { maxBytes: configuration.maxDocumentBytes });
-          bodies.push({ target, body, chunks: cached ? [] : this.chunks(body.bytes, configuration) });
+          const chunks: Chunk[] = [];
+          if (!cached) for (const chunk of this.chunks(body.bytes, configuration)) consider(target, chunk, chunks);
+          bodies.push({ target, body, chunks });
         }
       }
       let index = cached;
       if (!index) {
         index = { staticRevisionByProvider: { ...input.staticRevisionByProvider }, mappingRevision: input.mappingRevision,
-          configurationRevision, documents: bodies.map(({ target, body, chunks }) => ({ id: target.id, knowledgeId: target.knowledgeId,
+          configurationRevision, bytes: retainedBytes, entries: retainedEntries, documents: bodies.map(({ target, body, chunks }) => ({ id: target.id, knowledgeId: target.knowledgeId,
             contentId: body.contentId, source: body.source, chunks })) };
       }
       // An old request may finish its snapshot, but cannot republish after host
       // invalidation or configure(). Only active invocations retain these tokens.
-      if (!invocation.invalidated && configuration === this.configuration) {
+      if ((cached || retain) && !invocation.invalidated && configuration === this.configuration) {
         this.cache.delete(selection);
-        if (this.cache.size >= this.maxCachedSelections) this.cache.delete(this.cache.keys().next().value!);
+        while (this.cache.size && (this.cache.size >= this.maxCachedSelections || this.cachedBytes + index.bytes > configuration.maxCachedBytes || this.cachedEntries + index.entries > configuration.maxCachedEntries)) this.cache.delete(this.cache.keys().next().value!);
         this.cache.set(selection, index);
       }
-      const wanted = [...this.indexTerms(input.text, configuration)];
-      const hits: KnowledgeHit[] = index.documents.flatMap((document) => document.chunks.map((chunk) => ({
-        id: document.id, knowledgeId: document.knowledgeId, contentId: document.contentId, source: document.source,
-        startOffset: chunk.startOffset, endOffset: chunk.endOffset, snippet: chunk.snippet, score: score(wanted, chunk.terms),
-      }))).filter((hit) => hit.score > 0).sort((a, b) => b.score - a.score || identity(a).localeCompare(identity(b)) || a.startOffset - b.startOffset)
-        .slice(0, input.limit);
       const indexed = new Map(index.documents.map((document) => [identity(document), document]));
+      if (cached) for (const document of index.documents) for (const chunk of document.chunks) consider(document, chunk, []);
+      const hits: KnowledgeHit[] = best.map(({ target, chunk, score }) => ({ id: target.id, knowledgeId: target.knowledgeId,
+        contentId: indexed.get(identity(target))!.contentId, source: indexed.get(identity(target))!.source,
+        startOffset: chunk.startOffset, endOffset: chunk.endOffset, snippet: chunk.snippet, score }));
       return { hits, evidence: {
         staticRevisionByProvider: index.staticRevisionByProvider, mappingRevision: index.mappingRevision,
         observedAt: new Date().toISOString(), freshness: "current", sourceConfigRevision: configurationRevision,
@@ -177,4 +200,7 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
     for (const [selection, index] of this.cache) if (change.providerId in index.staticRevisionByProvider) this.cache.delete(selection);
   }
   get cachedSelections(): number { return this.cache.size; }
+  /** Conservative accounted payload/object bytes, not a measurement of JavaScript heap usage. */
+  get cachedBytes(): number { return [...this.cache.values()].reduce((sum, index) => sum + index.bytes, 0); }
+  get cachedEntries(): number { return [...this.cache.values()].reduce((sum, index) => sum + index.entries, 0); }
 }

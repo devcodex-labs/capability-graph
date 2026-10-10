@@ -23,7 +23,8 @@ capability-graph-demo/
 ├── discover.mjs
 └── providers/acme-http/
     ├── provider.json
-    └── route.capability.json
+    └── capabilities/
+        └── route.json
 ```
 
 `package.json` 来自 npm 初始化和安装；其余文件按下面内容创建。所有命令在项目根执行，脚本以自身位置定位 Provider，不受终端后续切换目录影响。
@@ -50,7 +51,7 @@ Specification 是可选的全局使用规则，本次无需填写空对象或空
 
 ## 2. 定义主能力
 
-```json title="route.capability.json"
+```json title="capabilities/route.json"
 {
   "capabilityId": "route",
   "name": "Routing",
@@ -60,7 +61,7 @@ Specification 是可选的全局使用规则，本次无需填写空对象或空
 }
 ```
 
-保存到 `providers/acme-http/route.capability.json`。
+保存到 `providers/acme-http/capabilities/route.json`。
 
 | 字段 | 必填 | 如何填写 |
 |---|---|---|
@@ -70,7 +71,7 @@ Specification 是可选的全局使用规则，本次无需填写空对象或空
 | `whenToUse` | 是 | 哪些任务应该考虑它，不写成自动执行指令 |
 | `distinction` | 否 | 说明它与容易混淆的能力或 Runtime 实例有什么不同 |
 
-完成本教程需要 `provider.json` 和一个 `*.capability.json`。文件 Authority 也允许只含 `provider.json` 的空 Provider，此时 Catalog 返回完整空目录。Core 收集定义并完整校验，不从能力 ID 中的点号猜关系。本例没有关系和 Knowledge，均可直接省略。
+完成本教程需要 `provider.json` 和一个 `capabilities/*.json`。文件 Authority 也允许legacy 模式只含 `provider.json` 的空 Provider，此时 Catalog 返回完整空目录。Core 收集定义并完整校验，不从能力 ID 中的点号猜关系。本例没有关系和 Knowledge，均可直接省略。
 
 增加子能力、关系和本地知识，见[渐进发现与按需读取](../guides/progressive-discovery)。Core 按精确目录名跳过 `.git`、`node_modules`、`dist`、`dist-test`、`coverage`、`.cache`、`.tmp`；正式定义不要放进这些目录。
 
@@ -103,7 +104,7 @@ const graph = await CapabilityGraph.open({
   providers: [{
     providerId: 'acme.http',
     authority: {
-      kind: 'file',
+      kind: 'file', definitionLayout: 'directory',
       rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
     }
   }]
@@ -152,7 +153,7 @@ node discover.mjs
 | `CG_CONFIG_INCOMPLETE` | 有效启用的 Provider 是否有唯一来源配置 |
 | `CG_LOAD_FAILED` | 文件目录、读权限和 JSON 是否能加载 |
 | `CG_VALIDATION_FAILED` | 必填字段、Provider ID 与关系端点是否有效 |
-| Catalog 没有 `route` | 两个 JSON 是否保存到配置的 Provider 根内，文件名是否以 `.capability.json` 结尾 |
+| Catalog 没有 `route` | 两个 JSON 是否保存到配置的 Provider 根内，是否启用 `definitionLayout: 'directory'`，定义是否在 `capabilities/` 中 |
 | 输出 `partial` 或有下一页 | 保留过滤条件与修订续查，不把这一页当全集 |
 
 后续详情与文档返回批量 `results`，要逐项检查 `ok`，不能仅凭 Promise 成功就认定每项都成功。更多症状见[故障排查](../troubleshooting/index)。

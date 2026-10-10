@@ -1,4 +1,5 @@
 import type { CanonicalCapabilityId, KnowledgeDocumentRef, NeighborKind, ProviderRecord, StaticCapability, StaticRevision } from "../types.js";
+import type { BoundKnowledgeRoots } from "../knowledge/roots.js";
 
 export interface UnvalidatedProviderRecord {
   readonly providerId: string;
@@ -36,6 +37,7 @@ export interface UnvalidatedProviderSnapshot {
   readonly provider: UnvalidatedProviderRecord;
   readonly capabilities: readonly UnvalidatedCapabilityRecord[];
   readonly knowledgeRootDir?: string;
+  readonly knowledgeRoots?: BoundKnowledgeRoots;
 }
 export interface ProviderSourceContext {
   readonly providerId: string;
@@ -43,6 +45,7 @@ export interface ProviderSourceContext {
   readonly sourceRevision: string;
   /** Private absolute root captured for this view; never include it in public query output. */
   readonly knowledgeRootDir?: string;
+  readonly knowledgeRoots?: BoundKnowledgeRoots;
 }
 export interface ValidatedProviderSnapshot {
   readonly provider: ProviderRecord;

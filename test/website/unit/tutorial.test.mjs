@@ -28,8 +28,8 @@ test('all checkpoints use page inputs; independent G4 has exactly four files', a
     if (checkpoint === 'G0') assert.equal(tutorial.files.size, 3);
     if (checkpoint === 'G4') {
       assert.deepEqual([...tutorial.files.keys()].sort(), [
-        'providers/acme-spec/PROVIDER.md', 'providers/acme-spec/discover.mjs',
-        'providers/acme-spec/provider.json', 'providers/acme-spec/route.capability.json'
+        'providers/acme-spec/PROVIDER.md', 'providers/acme-spec/capabilities/route.json',
+        'providers/acme-spec/discover.mjs', 'providers/acme-spec/provider.json'
       ]);
       assert.deepEqual(tutorial.expected.catalog, ['route']);
     }
@@ -58,7 +58,7 @@ test('materialization refuses existing inputs and leaves cleanup to caller', asy
 
 test('page-only regressions distinguish incomplete inputs, empty results and invalid context', async () => {
   const root = await createTemporaryDirectory('.tutorial-negative-');
-  const capabilityFile = 'providers/acme-http/route.capability.json';
+  const capabilityFile = 'providers/acme-http/capabilities/route.json';
   const run = (script) => JSON.parse(execFileSync(process.execPath, [script], {
     encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe']
   }));
@@ -70,7 +70,7 @@ test('page-only regressions distinguish incomplete inputs, empty results and inv
   const open = (destination) => CapabilityGraph.open({
     hostAllowedProviders: ['acme.http'], integrationEnabledProviders: ['acme.http'],
     providers: [{ providerId: 'acme.http', authority: {
-      kind: 'file', rootDir: path.join(destination, 'providers/acme-http')
+      kind: 'file', definitionLayout: 'directory', rootDir: path.join(destination, 'providers/acme-http')
     } }]
   });
   try {

@@ -20,7 +20,7 @@ import Contracts from '@generated/snippets/contracts-provider-definition.mdx';
 
 文件 Authority 的 `provider.json` 必须与配置中的 `providerId` 一致。每个有效启用 Provider 必须恰有一个 Authority。
 
-文件 Authority 必须有 `provider.json`；没有任何 `*.capability.json` 的空 Provider 也可加载，Catalog 返回完整空目录。要完成首次能力发现，使用[最小 Provider](../getting-started/first-provider)的一个能力定义，不需要 specification。需要跨能力规则时使用[独立 G4](../guides/progressive-discovery#g4-provider-specification)的完整文件；不要用空 specification 对象作占位。Provider/specification 版本、包版本与修订各自含义见[版本与内容身份](../concepts/provider-and-specification#版本与内容身份)。
+文件 Authority 必须有 `provider.json`；legacy 模式没有任何 `*.capability.json` 的空 Provider 也可加载；directory 模式必须有 capabilities/，允许空目录，Catalog 返回完整空目录。要完成首次能力发现，使用[最小 Provider](../getting-started/first-provider)的一个能力定义，不需要 specification。需要跨能力规则时使用[独立 G4](../guides/progressive-discovery#g4-provider-specification)的完整文件；不要用空 specification 对象作占位。Provider/specification 版本、包版本与修订各自含义见[版本与内容身份](../concepts/provider-and-specification#版本与内容身份)。
 
 ## ID 格式与值约束
 

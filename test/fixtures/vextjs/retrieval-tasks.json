@@ -2,13 +2,13 @@
   { "id": "validation", "query": "请求响应 schema", "expected": ["C04"] },
   { "id": "mongo", "query": "原生分页 多数据库 Models", "expected": ["C08", "K05"] },
   { "id": "plugin", "query": "插件 setup onReady onClose", "expected": ["C07", "RCP-08"] },
-  { "id": "frontend", "query": "服务端页面 layout document", "expected": ["C09", "RCP-03"] },
+  { "id": "frontend", "query": "服务端页面 layout document", "expected": ["C09", "RCP-03"], "minimumNativeRecall": 0.5 },
   { "id": "jobs", "query": "jobs worker scheduler retry", "expected": ["K07", "C34"] },
   { "id": "cluster", "query": "Cluster rolling reload 状态检查", "expected": ["C17"] },
   { "id": "openapi", "query": "OpenAPI Docs 机器文档", "expected": ["C13"] },
   { "id": "cookies", "query": "cookie session csrf", "expected": ["C21", "K06"] },
   { "id": "typed", "query": "构建 typegen", "expected": ["C16"] },
-  { "id": "negation", "query": "页面不需要客户端 JavaScript 只输出 HTML", "expected": ["C09"], "semanticChallenge": true },
-  { "id": "synonym", "query": "把耗时任务交给后台异步处理失败后重试", "expected": ["K07"], "semanticChallenge": true },
+  { "id": "negation", "query": "页面不需要客户端 JavaScript 只输出 HTML", "expected": ["C09"], "semanticChallenge": true, "minimumNativeRecall": 0 },
+  { "id": "synonym", "query": "把耗时任务交给后台异步处理失败后重试", "expected": ["K07"], "semanticChallenge": true, "minimumNativeRecall": 0 },
   { "id": "unknown", "query": "quantum teleportation zyxunavailable", "expected": [] }
 ]

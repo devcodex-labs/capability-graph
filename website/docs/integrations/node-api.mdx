@@ -25,7 +25,7 @@ const config: OpenConfig = {
   hostAllowedProviders: ['acme.http'],
   integrationEnabledProviders: ['acme.http'],
   providers: [{ providerId: 'acme.http', authority: {
-    kind: 'file', rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
+    kind: 'file', definitionLayout: 'directory', rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
   } }]
 };
 const graph = await CapabilityGraph.open(config);

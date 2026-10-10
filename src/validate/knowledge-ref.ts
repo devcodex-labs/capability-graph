@@ -3,6 +3,7 @@ import { canonicalJson } from "../hash.js";
 import { isKnowledgeId } from "../identity.js";
 import { normalizeLocale } from "../locale.js";
 import { assertProviderRelative, resolveProviderRelative } from "../knowledge/path-guard.js";
+import { knowledgeRoot, rootAliasValid, type KnowledgeRootContext } from "../knowledge/roots.js";
 import type { KnowledgeCollectionRef, KnowledgeDocumentRef, KnowledgeLocator, KnowledgeRef } from "../types.js";
 import { array, invalid, object, text } from "./values.js";
 
@@ -12,16 +13,18 @@ function knowledgeId(value: unknown): string {
   return id;
 }
 
-export async function locator(value: unknown, root?: string, checkExistingPaths = true): Promise<KnowledgeLocator> {
-  const raw = object(value, ["type", "path", "url"], ["type"]);
+export async function locator(value: unknown, root?: KnowledgeRootContext, checkExistingPaths = true): Promise<KnowledgeLocator> {
+  const raw = object(value, ["type", "path", "url", "root"], ["type"]);
   if (raw.type === "relative-file") {
-    object(raw, ["type", "path"], ["path"]);
+    object(raw, ["type", "path", "root"], ["path"]);
     if (typeof raw.path !== "string") invalid({ reason: "path_string_required" });
     const relative = raw.path as string;
     assertProviderRelative(relative);
-    if (!root) invalid({ reason: "relative_file_requires_knowledge_root" });
-    if (checkExistingPaths) await resolveProviderRelative(root, relative);
-    return { type: "relative-file", path: relative };
+    if (raw.root !== undefined && !rootAliasValid(raw.root)) invalid({ reason: "knowledge_root_alias_invalid" });
+    const alias = raw.root as string | undefined; const effectiveRoot = knowledgeRoot(root, alias);
+    if (!effectiveRoot) invalid({ reason: alias === undefined ? "relative_file_requires_knowledge_root" : "knowledge_root_unbound" });
+    if (checkExistingPaths) await resolveProviderRelative(effectiveRoot, relative);
+    return { type: "relative-file", path: relative, ...(alias === undefined ? {} : { root: alias }) };
   }
   if (raw.type === "http") {
     object(raw, ["type", "url"], ["url"]);
@@ -33,7 +36,7 @@ export async function locator(value: unknown, root?: string, checkExistingPaths 
   return invalid({ reason: "locator_type" });
 }
 
-async function document(value: unknown, root?: string, checkExistingPaths = true): Promise<KnowledgeDocumentRef> {
+async function document(value: unknown, root?: KnowledgeRootContext, checkExistingPaths = true): Promise<KnowledgeDocumentRef> {
   const raw = object(value, ["kind", "knowledgeId", "locator", "role", "locale", "title", "summary", "canonicalUrl"],
     ["kind", "knowledgeId", "locator", "role"]);
   if (raw.kind !== "document") invalid({ reason: "document_member_required" });
@@ -63,7 +66,7 @@ async function document(value: unknown, root?: string, checkExistingPaths = true
     ...(canonicalUrl === undefined ? {} : { canonicalUrl }) };
 }
 
-export async function specificationDocuments(value: unknown, root?: string, checkExistingPaths = true): Promise<readonly KnowledgeDocumentRef[]> {
+export async function specificationDocuments(value: unknown, root?: KnowledgeRootContext, checkExistingPaths = true): Promise<readonly KnowledgeDocumentRef[]> {
   const ids = new Set<string>();
   const result: KnowledgeDocumentRef[] = [];
   for (const entry of array(value)) {
@@ -100,7 +103,7 @@ export function validateKnowledgeMappings(groups: Iterable<readonly KnowledgeRef
 }
 
 /** Resolve references only; never read document or Specification bodies. */
-export async function knowledgeRefs(value: unknown, root?: string, checkExistingPaths = true): Promise<readonly KnowledgeRef[]> {
+export async function knowledgeRefs(value: unknown, root?: KnowledgeRootContext, checkExistingPaths = true): Promise<readonly KnowledgeRef[]> {
   const result: KnowledgeRef[] = [];
   const topIds = new Set<string>();
   const collectionIds = new Set<string>();

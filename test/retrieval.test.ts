@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 import { CapabilityGraph, CapabilityGraphError, type OpenConfig, type KnowledgeRetriever, type KnowledgeRetrievalAccess, type KnowledgeReader } from "../src/index.js";
 import { contentId } from "../src/knowledge/local-file-reader.js";
 import { FakeDatabase, record } from "./contract/fake-database.js";
@@ -213,10 +216,14 @@ test("access checks composite whitelist, disallows source overrides and expires 
   } finally { await graph.close(); }
 });
 
-test("mapping changes with root but not description; previous retrieval receives its own revision", async () => {
-  let name = "first"; let root = "C:/private/one"; const mappings: string[] = []; const received: string[] = [];
+test("mapping changes with an effective local root but not description; previous retrieval receives its own revision", async () => {
+  const temporary = await createTestDirectory("mapping-roots-");
+  const first = path.join(temporary, "one"); const second = path.join(temporary, "two");
+  await mkdir(first); await mkdir(second);
+  await writeFile(path.join(first, "intro.md"), "text:intro"); await writeFile(path.join(second, "intro.md"), "text:intro");
+  let name = "first"; let root = first; const mappings: string[] = []; const received: string[] = [];
   const graph = await CapabilityGraph.open(config({ providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => {
-    const db = new FakeDatabase([record("a", { name, knowledge: [document("intro")] })]); db.knowledgeRootDir = root; return db;
+    const db = new FakeDatabase([record("a", { name, knowledge: [{ ...document("intro"), locator: { type: "relative-file", path: "intro.md" } }] })]); db.knowledgeRootDir = root; return db;
   } } } }], knowledgeRetriever: wrap((input, _access, result) => { mappings.push(input.mappingRevision); received.push(input.staticRevisionByProvider.seed!); return result; }) }));
   try {
     const old = (await graph.getProvider("seed")).staticRevision;
@@ -224,9 +231,9 @@ test("mapping changes with root but not description; previous retrieval receives
     name = "second"; await graph.reload(); await graph.queryKnowledge({ text: "find", selected: [id()] });
     assert.equal(mappings[0], mappings[1]); assert.notEqual(received[0], received[1]);
     await graph.queryKnowledge({ text: "find", selected: [id()], requiredStaticRevision: old }); assert.equal(received[2], old);
-    root = "C:/private/two"; await graph.reload(); await graph.queryKnowledge({ text: "find", selected: [id()] });
+    root = second; await graph.reload(); await graph.queryKnowledge({ text: "find", selected: [id()] });
     assert.notEqual(mappings[3], mappings[1]);
-  } finally { await graph.close(); }
+  } finally { await graph.close(); await removeTestDirectory(temporary); }
 });
 
 test("E-18: removing a collection member changes mapping but preserves shared content and previous selection", async () => {

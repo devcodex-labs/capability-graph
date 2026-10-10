@@ -40,7 +40,13 @@ async function invoke(adapter: RuntimeAdapter, input: Parameters<RuntimeAdapter[
     return await Promise.race([Promise.resolve().then(() => adapter.query(input)), new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => reject(new Error("runtime timeout")), timeoutMs);
     })]);
-  } catch { throw new CapabilityGraphError("CG_RUNTIME_UNAVAILABLE", { nextAction: "repair_source" }); }
+  } catch (error) {
+    // Preserve actionable contract errors, without exposing adapter details or private paths.
+    if (error instanceof CapabilityGraphError && ["CG_REVISION_MISMATCH", "CG_RUNTIME_RESULT_MISMATCH", "CG_RUNTIME_CONTEXT_REQUIRED"].includes(error.code)) {
+      throw new CapabilityGraphError(error.code, { nextAction: error.code === "CG_REVISION_MISMATCH" ? "refresh" : "fix_input" });
+    }
+    throw new CapabilityGraphError("CG_RUNTIME_UNAVAILABLE", { nextAction: "repair_source" });
+  }
   finally { if (timer !== undefined) clearTimeout(timer); }
 }
 

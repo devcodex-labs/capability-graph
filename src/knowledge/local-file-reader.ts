@@ -3,6 +3,8 @@ import { open } from "node:fs/promises";
 import path from "node:path";
 import { CapabilityGraphError } from "../errors.js";
 import { resolveProviderRelative } from "./path-guard.js";
+import { knowledgeRoot, assertKnowledgeRoot } from "./roots.js";
+import { locatorSource } from "./read.js";
 import type { KnowledgeReader, KnowledgeReadContext } from "./types.js";
 import type { KnowledgeDocumentRef } from "../types.js";
 
@@ -14,12 +16,13 @@ export class LocalFileReader implements KnowledgeReader {
   async *stream(ref: KnowledgeDocumentRef, context: KnowledgeReadContext,
     options: { chunkBytes: number; signal?: AbortSignal }) {
     if (ref.locator.type !== "relative-file") throw new CapabilityGraphError("CG_READER_UNCONFIGURED", { nextAction: "configure_backend" });
-    const root = context.sourceContext.knowledgeRootDir;
+    const root = knowledgeRoot({ defaultRoot: context.sourceContext.knowledgeRootDir, aliases: context.sourceContext.knowledgeRoots ?? {} }, ref.locator.root);
     if (!root) throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source" });
     const relative = ref.locator.path;
     let handle: Awaited<ReturnType<typeof open>> | undefined;
     try {
       options.signal?.throwIfAborted();
+      await assertKnowledgeRoot(context.sourceContext.knowledgeRoots, ref.locator.root);
       handle = await open(await resolveProviderRelative(root, relative, true), "r");
       const before = await handle.stat({ bigint: true });
       const check = await open(await resolveProviderRelative(root, relative, true), "r");
@@ -34,11 +37,12 @@ export class LocalFileReader implements KnowledgeReader {
         const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
         if (!bytesRead) break;
         total += bytesRead;
-        yield { bytes: Uint8Array.from(buffer.subarray(0, bytesRead)), contentType, source: relative };
+        yield { bytes: Uint8Array.from(buffer.subarray(0, bytesRead)), contentType, source: locatorSource(ref) };
       }
       const after = await handle.stat({ bigint: true });
+      await assertKnowledgeRoot(context.sourceContext.knowledgeRoots, ref.locator.root);
       if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs || BigInt(total) !== after.size) throw new Error("Source changed");
-      if (!total) yield { bytes: new Uint8Array(), contentType, source: relative };
+      if (!total) yield { bytes: new Uint8Array(), contentType, source: locatorSource(ref) };
     } catch (error) {
       if (error instanceof CapabilityGraphError) throw error;
       throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { path: relative } });
@@ -46,11 +50,12 @@ export class LocalFileReader implements KnowledgeReader {
   }
   read: KnowledgeReader["read"] = async (ref, context, budget) => {
     if (ref.locator.type !== "relative-file") throw new CapabilityGraphError("CG_READER_UNCONFIGURED", { nextAction: "configure_backend" });
-    const root = context.sourceContext.knowledgeRootDir;
+    const root = knowledgeRoot({ defaultRoot: context.sourceContext.knowledgeRootDir, aliases: context.sourceContext.knowledgeRoots ?? {} }, ref.locator.root);
     if (!root) throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source" });
     const relative = ref.locator.path;
     let handle: Awaited<ReturnType<typeof open>> | undefined;
     try {
+      await assertKnowledgeRoot(context.sourceContext.knowledgeRoots, ref.locator.root);
       const file = await resolveProviderRelative(root, relative, true);
       handle = await open(file, "r");
       const before = await handle.stat({ bigint: true });
@@ -72,8 +77,9 @@ export class LocalFileReader implements KnowledgeReader {
       const after = await handle.stat({ bigint: true });
       if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || BigInt(total) !== after.size) throw new Error("Source changed");
       const bytes = Uint8Array.from(buffer.subarray(0, total));
-      const contentType = path.extname(relative).toLowerCase() === ".md" ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8";
-      return { bytes, contentType, contentId: contentId(bytes), source: relative };
+      await assertKnowledgeRoot(context.sourceContext.knowledgeRoots, ref.locator.root);
+      const contentType = /\.mdx?$/i.test(path.extname(relative)) ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8";
+      return { bytes, contentType, contentId: contentId(bytes), source: locatorSource(ref) };
     } catch (error) {
       if (error instanceof CapabilityGraphError) throw error;
       throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { path: relative } });

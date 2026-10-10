@@ -1,139 +1,162 @@
 import { createHash } from "node:crypto";
-import { request as httpRequest, type ClientRequest, type IncomingMessage } from "node:http";
+import { request as httpRequest, type Agent, type ClientRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
+import { mkdir, mkdtemp, open, rm, type FileHandle } from "node:fs/promises";
+import path from "node:path";
 import type { KnowledgeReader, KnowledgeDocumentRef, KnowledgeReadContext } from "@devcodex/capability-graph";
 
 type ReadResult = Awaited<ReturnType<KnowledgeReader["read"]>>;
+interface Snapshot { file: string; etag: string; sha256: string; contentType: string; bytes: number; expires: number; leases: number; retired: boolean }
+interface SnapshotOptions { directory: string; maxBytes?: number; maxEntries?: number; ttlMs?: number }
+interface Options { allowedOrigins: readonly string[]; timeoutMs?: number; maxConcurrent?: number;
+  /** Host-owned Agent (e.g. proxy-agent on Node 20/22/24); Reader never closes it. */
+  agentForUrl?: (url: URL) => Agent | false; snapshot?: SnapshotOptions }
 
-/** Private HTTP reference: exact bytes, explicit origins, no redirects or pooled connections. */
+/** Source reference, not an npm export. Exact bytes, explicit origins and optional host-managed snapshots. */
 export class HttpKnowledgeReader implements KnowledgeReader {
   readonly id = "seed-http-knowledge";
   private readonly origins: ReadonlySet<string>;
   private readonly timeoutMs: number;
   private readonly maxConcurrent: number;
   private readonly requests = new Set<ClientRequest>();
-  private readonly pending = new Set<Promise<ReadResult>>();
   private readonly streams = new Set<Promise<void>>();
+  private readonly snapshots = new Map<string, Snapshot>();
+  private readonly snapshotLimits?: { maxBytes: number; maxEntries: number; ttlMs: number };
+  private directory?: Promise<string>;
   private closed = false;
-
-  constructor(options: { allowedOrigins: readonly string[]; timeoutMs?: number; maxConcurrent?: number }) {
-    this.timeoutMs = options.timeoutMs ?? 2000;
-    this.maxConcurrent = options.maxConcurrent ?? 4;
-    if (![this.timeoutMs, this.maxConcurrent].every((value) => Number.isSafeInteger(value) && value > 0) || !options.allowedOrigins.length) {
-      throw new Error("Explicit origins and positive HTTP limits are required");
-    }
+  constructor(private readonly options: Options) {
+    this.timeoutMs = options.timeoutMs ?? 2000; this.maxConcurrent = options.maxConcurrent ?? 4;
+    if (![this.timeoutMs, this.maxConcurrent].every((value) => Number.isSafeInteger(value) && value > 0) || !options.allowedOrigins.length) throw new Error("Explicit origins and positive HTTP limits are required");
     this.origins = new Set(options.allowedOrigins.map((value) => {
       const url = new URL(value);
       if (!["http:", "https:"].includes(url.protocol) || url.origin !== value || url.username || url.password) throw new Error("Invalid origin");
       return url.origin;
     }));
+    if (options.snapshot) {
+      if (!path.isAbsolute(options.snapshot.directory)) throw new Error("Snapshot directory must be an absolute host-owned path outside the source checkout");
+      this.snapshotLimits = { maxBytes: options.snapshot.maxBytes ?? 16_777_216, maxEntries: options.snapshot.maxEntries ?? 8, ttlMs: options.snapshot.ttlMs ?? 300_000 };
+      if (!Object.values(this.snapshotLimits).every((value) => Number.isSafeInteger(value) && value > 0)) throw new Error("Invalid snapshot budgets");
+    }
   }
   get activeRequests(): number { return this.requests.size; }
+  get cachedSnapshotBytes(): number { return [...this.snapshots.values()].reduce((sum, value) => sum + value.bytes, 0); }
   canRead(ref: Parameters<KnowledgeReader["canRead"]>[0]): boolean { return ref.kind === "document" && ref.locator.type === "http"; }
-  /** Full-body streaming also supports servers without Range/ETag. Core computes the full hash.
-   * The deadline covers the entire transfer and abort destroys the actual socket. */
+  private async retire(source: string) {
+    const snapshot = this.snapshots.get(source); if (!snapshot) return;
+    this.snapshots.delete(source); snapshot.retired = true;
+    if (!snapshot.leases) await rm(snapshot.file, { force: true });
+  }
+  private async snapshotDirectory(): Promise<string> {
+    return this.directory ??= (async () => { await mkdir(this.options.snapshot!.directory, { recursive: true }); return mkdtemp(path.join(this.options.snapshot!.directory, "cg-http-")); })();
+  }
+  /** Strong ETag validates a previously complete local snapshot; weak/no validator falls back to full GET.
+   * No 206 is accepted: Core still hashes the complete source for every page/query. */
   async *stream(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, options: { chunkBytes: number; signal?: AbortSignal }) {
-    if (this.closed || ref.locator.type !== "http") throw new Error("Reader unavailable");
+    if (this.closed || ref.locator.type !== "http" || !Number.isSafeInteger(options.chunkBytes) || options.chunkBytes < 1) throw new Error("Reader unavailable");
     const source = ref.locator.url; const url = new URL(source);
-    if (!this.origins.has(url.origin) || url.username || url.password || this.requests.size >= this.maxConcurrent) throw new Error("Source unavailable");
+    if (!this.origins.has(url.origin) || url.username || url.password || this.streams.size >= this.maxConcurrent) throw new Error("Source unavailable");
     options.signal?.throwIfAborted();
-    let finish!: () => void;
-    const done = new Promise<void>((resolve) => { finish = resolve; }); this.streams.add(done);
+    let finish!: () => void; const done = new Promise<void>((resolve) => { finish = resolve; }); this.streams.add(done);
     let request: ClientRequest | undefined; let timer: ReturnType<typeof setTimeout> | undefined;
+    let snapshot = this.snapshots.get(source); let handle: FileHandle | undefined; let temporary: string | undefined;
+    let writer: FileHandle | undefined; let published = false; let leased = false; let expired = false;
     const abort = () => request?.destroy(new Error("HTTP knowledge transfer aborted"));
     try {
+      if (snapshot && snapshot.expires <= Date.now()) { await this.retire(source); snapshot = undefined; }
+      if (snapshot) {
+        snapshot.leases++; leased = true;
+        try { handle = await open(snapshot.file, "r"); }
+        catch {
+          if (this.snapshots.get(source) === snapshot) await this.retire(source);
+          snapshot.leases--;
+          if (snapshot.retired && !snapshot.leases) await rm(snapshot.file, { force: true });
+          snapshot = undefined; leased = false;
+        }
+      }
+      options.signal?.throwIfAborted(); if (this.closed) throw new Error("Reader closed");
       const response = await new Promise<IncomingMessage>((resolve, reject) => {
         request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
-          method: "GET", agent: false, headers: { "accept-encoding": "identity", accept: "text/plain, text/markdown" },
+          method: "GET", agent: this.options.agentForUrl?.(url) ?? false,
+          headers: { "accept-encoding": "identity", accept: "text/plain, text/markdown, application/json", ...(snapshot ? { "if-none-match": snapshot.etag } : {}) },
         }, resolve);
-        this.requests.add(request);
-        request.on("error", reject);
-        options.signal?.addEventListener("abort", abort, { once: true });
-        timer = setTimeout(() => request?.destroy(new Error("HTTP knowledge deadline exceeded")), this.timeoutMs);
-        request.end();
+        this.requests.add(request); request.on("error", reject); options.signal?.addEventListener("abort", abort, { once: true });
+        timer = setTimeout(() => { expired = true; request?.destroy(new Error("HTTP knowledge deadline exceeded")); }, this.timeoutMs); request.end();
       });
       const encoding = response.headers["content-encoding"];
-      if (response.statusCode !== 200 || (encoding && encoding !== "identity")) throw new Error("Source unavailable");
+      if (encoding && encoding !== "identity") throw new Error("Encoded source unsupported");
+      if (response.statusCode === 304) {
+        if (!snapshot || !handle || (response.headers.etag !== undefined && response.headers.etag !== snapshot.etag)) throw new Error("Unbound conditional response");
+        response.resume(); await new Promise<void>((resolve, reject) => { response.once("end", resolve); response.once("error", reject); });
+        const buffer = Buffer.alloc(Math.min(options.chunkBytes, Math.max(1, snapshot.bytes))); let total = 0;
+        const snapshotHash = createHash("sha256");
+        while (true) {
+          options.signal?.throwIfAborted(); if (this.closed || expired) throw new Error("Reader unavailable");
+          const { bytesRead } = await handle.read(buffer, 0, buffer.length, null); if (!bytesRead) break;
+          total += bytesRead; snapshotHash.update(buffer.subarray(0, bytesRead)); yield { bytes: Uint8Array.from(buffer.subarray(0, bytesRead)), source, contentType: snapshot.contentType };
+        }
+        if (total !== snapshot.bytes || snapshotHash.digest("hex") !== snapshot.sha256) {
+          if (this.snapshots.get(source) === snapshot) await this.retire(source);
+          throw new Error("Snapshot changed");
+        }
+        if (this.snapshots.get(source) === snapshot) { this.snapshots.delete(source); this.snapshots.set(source, snapshot); }
+        if (!total) yield { bytes: new Uint8Array(), source, contentType: snapshot.contentType };
+        return;
+      }
+      if (response.statusCode !== 200) throw new Error("Source unavailable");
       const contentType = response.headers["content-type"] ?? "text/plain; charset=utf-8";
-      let emitted = false;
+      if (!/^(?:text\/(?:plain|markdown|x-markdown)|application\/(?:json|[^;]+\+json))(?:;|$)/i.test(contentType)) throw new Error("Use a raw UTF-8 document URL; HTML/binary extraction requires a separate Reader");
+      const etag = response.headers.etag; const reliable = typeof etag === "string" && /^"[^"\r\n]*"$/.test(etag);
+      await this.retire(source);
+      if (this.snapshotLimits && reliable) {
+        temporary = path.join(await this.snapshotDirectory(), `${createHash("sha256").update(source).update(String(Math.random())).digest("hex")}.body`);
+        writer = await open(temporary, "wx", 0o600);
+      }
+      let total = 0; let emitted = false; const sourceHash = createHash("sha256");
       for await (const chunk of response) {
-        options.signal?.throwIfAborted();
-        const bytes = Buffer.from(chunk);
+        options.signal?.throwIfAborted(); if (this.closed || expired) throw new Error("Reader unavailable");
+        const bytes = Buffer.from(chunk); total += bytes.length; sourceHash.update(bytes);
+        if (writer && total > this.snapshotLimits!.maxBytes) { await writer.close(); writer = undefined; await rm(temporary!, { force: true }); temporary = undefined; }
+        if (writer) await writer.writeFile(bytes);
         for (let offset = 0; offset < bytes.length; offset += options.chunkBytes) {
           emitted = true; yield { bytes: bytes.subarray(offset, offset + options.chunkBytes), source, contentType };
         }
       }
       if (!response.complete) throw new Error("Incomplete source");
       if (!emitted) yield { bytes: new Uint8Array(), source, contentType };
+      if (writer && temporary && !this.closed) {
+        await writer.close(); writer = undefined;
+        while (this.snapshots.size && (this.snapshots.size >= this.snapshotLimits!.maxEntries || this.cachedSnapshotBytes + total > this.snapshotLimits!.maxBytes)) await this.retire(this.snapshots.keys().next().value!);
+        await this.retire(source);
+        this.snapshots.set(source, { file: temporary, etag: etag!, sha256: sourceHash.digest("hex"), bytes: total, contentType, expires: Date.now() + this.snapshotLimits!.ttlMs, leases: 0, retired: false }); published = true;
+      }
     } finally {
       clearTimeout(timer); options.signal?.removeEventListener("abort", abort);
-      if (request) {
-        request.destroy();
-        if (!request.closed) await new Promise<void>((resolve) => request!.once("close", resolve));
-        this.requests.delete(request);
-      }
-      finish(); this.streams.delete(done);
-    }
-  }
-  read(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, budget: { maxBytes: number }): Promise<ReadResult> {
-    const task = this.transfer(ref, budget.maxBytes);
-    this.pending.add(task);
-    return task.finally(() => { this.pending.delete(task); });
-  }
-  private async transfer(ref: KnowledgeDocumentRef, maxBytes: number): Promise<ReadResult> {
-    if (this.closed || ref.locator.type !== "http" || !Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error("Reader unavailable");
-    const source = ref.locator.url;
-    const url = new URL(source);
-    if (!this.origins.has(url.origin) || url.username || url.password || this.requests.size >= this.maxConcurrent) throw new Error("Source unavailable");
-    let request: ClientRequest | undefined;
-    try {
-      return await new Promise<ReadResult>((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        let length = 0;
-        let settled = false;
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        const fail = () => {
-          if (settled) return;
-          settled = true; clearTimeout(timer); request?.destroy(); reject(new Error("HTTP knowledge transfer failed"));
-        };
-        request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
-          method: "GET", agent: false, headers: { "accept-encoding": "identity", accept: "text/plain, text/markdown" },
-        }, (response) => {
-          response.on("error", fail); response.on("aborted", fail);
-          const encoding = response.headers["content-encoding"];
-          if (response.statusCode !== 200 || (encoding && encoding !== "identity")) { fail(); response.destroy(); return; }
-          const advertised = response.headers["content-length"];
-          if (advertised !== undefined && (!/^\d+$/.test(advertised) || Number(advertised) > maxBytes)) { fail(); response.destroy(); return; }
-          response.on("data", (chunk: Buffer) => {
-            length += chunk.length;
-            if (length > maxBytes) { fail(); response.destroy(); return; }
-            chunks.push(Buffer.from(chunk));
-          });
-          response.once("end", () => {
-            if (settled) return;
-            if (!response.complete) { fail(); return; }
-            settled = true; clearTimeout(timer);
-            const bytes = Buffer.concat(chunks, length);
-            resolve({ bytes, source, contentType: response.headers["content-type"] ?? "text/plain; charset=utf-8",
-              contentId: `k:${createHash("sha256").update(bytes).digest("hex").slice(0, 16)}` });
-          });
-        });
-        this.requests.add(request);
-        request.once("error", fail);
-        timer = setTimeout(fail, this.timeoutMs);
-        request.end();
-      });
-    } finally {
-      if (request) {
-        if (!request.closed) await new Promise<void>((resolve) => request!.once("close", resolve));
-        this.requests.delete(request);
+      try {
+        const cleanup = await Promise.allSettled([handle?.close(), writer?.close()]);
+        if (snapshot && leased) { snapshot.leases--; if (snapshot.retired && !snapshot.leases) await rm(snapshot.file, { force: true }); }
+        if (temporary && !published) await rm(temporary, { force: true });
+        if (cleanup.some((result) => result.status === "rejected")) throw new Error("Snapshot cleanup failed");
+      } finally {
+        if (request) { request.destroy(); if (!request.closed) await new Promise<void>((resolve) => request!.once("close", resolve)); this.requests.delete(request); }
+        finish(); this.streams.delete(done);
       }
     }
   }
-  /** Host-owned lifecycle; Core does not close injected Readers. */
+  async read(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, budget: { maxBytes: number }): Promise<ReadResult> {
+    if (!Number.isSafeInteger(budget.maxBytes) || budget.maxBytes < 1) throw new Error("Invalid read budget");
+    const chunks: Buffer[] = []; let length = 0; let contentType = "";
+    for await (const chunk of this.stream(ref, context, { chunkBytes: Math.min(32768, budget.maxBytes) })) {
+      length += chunk.bytes.length; if (length > budget.maxBytes) throw new Error("Read budget exceeded");
+      chunks.push(Buffer.from(chunk.bytes)); contentType = chunk.contentType;
+    }
+    const bytes = Buffer.concat(chunks, length);
+    return { bytes, contentType, source: ref.locator.type === "http" ? ref.locator.url : "", contentId: `k:${createHash("sha256").update(bytes).digest("hex").slice(0, 16)}` };
+  }
+  /** Host owns Reader/Agent lifecycle. Close removes this Reader's unique snapshot subdirectory. */
   async close(): Promise<void> {
-    this.closed = true;
-    for (const request of this.requests) request.destroy(new Error("Reader closed"));
-    await Promise.allSettled([...this.pending, ...this.streams]);
+    this.closed = true; for (const request of this.requests) request.destroy(new Error("Reader closed"));
+    await Promise.allSettled([...this.streams]);
+    for (const source of this.snapshots.keys()) await this.retire(source);
+    if (this.directory) await rm(await this.directory, { recursive: true, force: true });
   }
 }

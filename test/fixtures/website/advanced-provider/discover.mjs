@@ -8,7 +8,7 @@ const graph = await CapabilityGraph.open({
   integrationEnabledProviders: ['acme.http'],
   providers: [{
     providerId: 'acme.http',
-    authority: { kind: 'file', rootDir: providerRoot }
+    authority: { kind: 'file', definitionLayout: 'directory', rootDir: providerRoot }
   }]
 });
 

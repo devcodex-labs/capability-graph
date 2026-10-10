@@ -16,6 +16,7 @@ export type { ReadDocumentsQuery, DocumentRead, DocumentReadBatch, ReadSpecifica
   SpecificationDocumentRead, SpecificationReadBatch } from "./knowledge/read.js";
 export type * from "./retrieval/types.js";
 export type * from "./runtime/types.js";
+export type { KnowledgeRootSpec } from "./knowledge/roots.js";
 export type {
   CanonicalCapabilityId, QualifiedCapabilityId, StaticRevision, RuntimeRevision,
   KnowledgeContentId, RuntimeCompatibility, CurrentCapabilityView,
