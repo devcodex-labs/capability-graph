@@ -43,10 +43,14 @@ vextjs.mjs 会核验完整 Git SHA、跟踪源未改变、源输入及实际安�
 node scripts/validation/provider-sources.mjs /external/fixed-vextjs-source /external/installed-project FIXED_COMMIT --https
 ```
 
-该项目需实际安装对应 Vext 快照及 MonSQLize。分别注册 providers/vextjs、providers/monsqlize；使用相同本地能力/知识 ID 验证隔离和 reload。覆盖 17 篇原始长文、2 篇短文、安装包 README 与固定公开 HTTPS；--https 还按 lockfile integrity 下载 MonSQLize 注册包并核对安装文档原字节。默认 CI 用已由 npm ci 核验的安装依赖执行本地矩阵；公开 HTTPS opt-in 实测单独记录。
+该项目需实际安装对应 Vext 快照及 MonSQLize。分别注册 providers/vextjs、providers/monsqlize；使用相同本地能力/知识 ID 验证隔离和 reload。覆盖 19 篇官方章节、两个包各三篇 README/CHANGELOG/MIGRATION、一个显式绑定安装目录，以及固定公开 HTTPS 的长文和短文，共 28 个来源用例。每页核对连续字节偏移、全文/本页哈希及续读标记，完整拼接必须等于原始正文。--https 还按 lockfile integrity 下载 MonSQLize 注册包并核对安装文档原字节。默认 CI 用已由 npm ci 核验的安装依赖执行本地矩阵；公开 HTTPS opt-in 实测单独记录。
 
 每条记录含原始路径/URL、commit 或包身份、角色、语言、转换方式和 SHA-256；真实源、原生封装、作者关联与受控 Fixture 分开标明。完整安装 Vext 包不包含 website，因此网站指南须另绑定官方目录或固定 raw URL。
+
+原生验证的报告另含 nativeExports：每个条目的原始正文哈希、原生 sourceRefs、导出路径、导出哈希、角色及归一化说明。knowledge/*.json 是原生 MCP 正文加来源包装，不是官网章节全文；集成作者只维护包装与章节关联。官方章节、安装包文档和 HTTP 正文直接读取原字节，不经过手写正文替换。站点的[多来源与正文出处](../../website/docs/examples/vextjs-integration.mdx)说明配置与证明边界。
 
 Core 的 11 个已知检索任务必须召回全部预期能力，未知需求不得误推荐；逐条知识证据必须非零且片段匹配原字节。原生 MCP 的 frontend 基线为 0.5，否定/同义词挑战基线为 0，明确保留上游能力限制而不声称原生全召回。正式文档任务用独立查询/期望文本验收，零命中会失败；不是根据文件名产生查询。
 
 HTTP Reader 可注入 Node 20/22/24 兼容的宿主 ProxyAgent，代理凭据不进入报告。强 ETag 完整快照复用，弱/无验证器或超缓存预算回退全文流式扫描。快照在宿主指定的仓库外目录，Reader close 清理自有子目录。参考词法索引超过字节/条目预算时流式 Top-K，不拒绝大文档。以上为源码参考，主包不导出专用 Vext/HTTP 后端。
+
+URL 使用相同分页接口和原始 UTF-8 字节偏移；无需更换 Core 分段算法。当前 Reader 不依赖 Range，每次读取都校验完整正文身份，正文改变拒绝旧游标。弱/无验证器或缓存无法保留全文时，每页可能重新传输整篇正文；缓存预算控制保留成本，不是文档准入门槛。

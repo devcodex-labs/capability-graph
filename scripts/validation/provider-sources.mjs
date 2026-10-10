@@ -37,12 +37,13 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
     const cases = []; const provenance = [];
     const add = async (providerId, capabilityId, knowledgeId, locator, originalFile, query, evidence, role = 'guide', originalUrl) => {
       const original = await readFile(originalFile);
-      const locale = locator.type === 'relative-file' && locator.root === 'installed' ? 'en' : 'zh';
+      const installed = locator.type === 'relative-file' && ['installed', 'installed-directory'].includes(locator.root);
+      const locale = installed ? 'en' : 'zh';
       const record = { capabilityId, name: capabilityId, description: 'Integration-authored association to original published documentation', whenToUse: query,
         knowledge: [{ kind: 'document', knowledgeId, role, locale, locator, ...(originalUrl ? { canonicalUrl: originalUrl } : {}) }] };
       await writeFile(path.join(providers, providerId, 'capabilities', `${capabilityId}.json`), JSON.stringify(record, null, 2) + '\n');
       cases.push({ providerId, capabilityId, knowledgeId, locator, original, query, evidence });
-      provenance.push({ providerId, capabilityId, knowledgeId, locator, originalPath: providerId === 'monsqlize' ? path.relative(monsqlizeRoot, originalFile) : path.relative(locator.root === 'installed' ? frameworkRoot : sourceRoot, originalFile),
+      provenance.push({ providerId, capabilityId, knowledgeId, locator, originalPath: providerId === 'monsqlize' ? path.relative(monsqlizeRoot, originalFile) : path.relative(installed ? frameworkRoot : sourceRoot, originalFile),
         originalUrl, originalSha256: sha256(original), readSha256: null, transformation: 'none; direct exact bytes', role, locale,
         sourceIdentity: providerId === 'monsqlize' ? `installed:${monsqlize.name}@${monsqlize.version}` : source.identity });
     };
@@ -52,10 +53,24 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
     const monRoot = path.join(providers, 'monsqlize'); await mkdir(path.join(monRoot, 'capabilities'), { recursive: true });
     await writeFile(path.join(monRoot, 'provider.json'), JSON.stringify({ providerId: 'monsqlize', name: 'MonSQLize installed documentation', version: monsqlize.version }));
     await add('monsqlize', 'documentation', 'PKG-README', { type: 'relative-file', root: 'installed', path: 'README.md' }, path.join(monsqlizeRoot, 'README.md'), 'MonSQLize', 'MonSQLize');
+    for (const [providerId, packageRoot, file, query, evidence, role] of [
+      ['vextjs', frameworkRoot, 'CHANGELOG.md', 'Semantic Versioning', 'Semantic Versioning', 'reference'],
+      ['vextjs', frameworkRoot, 'MIGRATION.md', 'app.db', 'app.db', 'guide'],
+      ['monsqlize', monsqlizeRoot, 'CHANGELOG.md', 'schema-dsl', 'schema-dsl', 'reference'],
+      ['monsqlize', monsqlizeRoot, 'MIGRATION.md', 'schema-dsl/runtime', 'schema-dsl/runtime', 'guide'],
+    ]) await add(providerId, `installed.${file.toLowerCase()}`, `PKG-${file}`,
+      { type: 'relative-file', root: 'installed', path: file }, path.join(packageRoot, file), query, evidence, role);
+    // An installed directory can also be bound explicitly without the package resolver.
+    await add('vextjs', 'installed.directory', 'DIRECTORY-MIGRATION',
+      { type: 'relative-file', root: 'installed-directory', path: 'MIGRATION.md' }, path.join(frameworkRoot, 'MIGRATION.md'), 'app.db', 'app.db');
     if (includeHttps) {
-      const originalPath = 'website/docs/zh/api/config.md';
-      const url = `https://raw.githubusercontent.com/devcodex-labs/vextjs/${source.commit}/${originalPath}`;
-      await add('vextjs', 'docs.https', 'HTTPS-CONFIG', { type: 'http', url }, path.join(sourceRoot, originalPath), 'bodyParser', 'bodyParser', 'guide', url);
+      for (const [capabilityId, knowledgeId, originalPath, query, evidence] of [
+        ['docs.https', 'HTTPS-CONFIG', 'website/docs/zh/api/config.md', 'bodyParser', 'bodyParser'],
+        ['docs.https.short', 'HTTPS-HELLO', 'website/docs/zh/examples/hello-world.md', 'defineRoutes', 'defineRoutes'],
+      ]) {
+        const url = `https://raw.githubusercontent.com/devcodex-labs/vextjs/${source.commit}/${originalPath}`;
+        await add('vextjs', capabilityId, knowledgeId, { type: 'http', url }, path.join(sourceRoot, originalPath), query, evidence, 'guide', url);
+      }
     }
     const knowledge = new TextKnowledgeRetriever();
     const monsqlizeRegistry = includeHttps ? await verifyInstalledDocuments({ packageRoot: monsqlizeRoot, lockRoot: sourceRoot,
@@ -63,16 +78,27 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
     graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs', 'monsqlize'], integrationEnabledProviders: ['vextjs', 'monsqlize'], readers: [reader], knowledgeRetriever: knowledge,
       providers: [
         { providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' }, knowledgeRoots: {
-          official: { kind: 'directory', rootDir: sourceRoot }, installed: { kind: 'package', packageName: 'vextjs', resolveFrom: installedProject } } },
+          official: { kind: 'directory', rootDir: sourceRoot }, installed: { kind: 'package', packageName: 'vextjs', resolveFrom: installedProject },
+          'installed-directory': { kind: 'directory', rootDir: frameworkRoot } } },
         { providerId: 'monsqlize', authority: { kind: 'file', rootDir: monRoot, definitionLayout: 'directory' }, knowledgeRoots: {
           installed: { kind: 'package', packageName: 'monsqlize', resolveFrom: installedProject } } },
       ] });
     const results = [];
     for (const [index, item] of cases.entries()) {
-      const bound = graph.forProvider(item.providerId); let cursor; let reconstructed = ''; let pages = 0;
+      const bound = graph.forProvider(item.providerId); let cursor; let reconstructed = ''; let pages = 0; let expectedOffset = 0;
       const query = { capabilityId: item.capabilityId, knowledgeId: item.knowledgeId };
       do { const page = await bound.readDocumentPage({ ...query, ...(cursor ? { cursor } : {}) });
-        assert.equal(page.totalBytes, item.original.length); reconstructed += page.text; cursor = page.nextCursor; pages++; } while (cursor);
+        assert.equal(page.totalBytes, item.original.length); assert.equal(page.startOffset, expectedOffset);
+        assert.equal(page.contentId, `k:${sha256(item.original).slice(0, 16)}`);
+        const bytes = Buffer.from(page.text); assert.equal(page.byteLength, bytes.length);
+        assert(bytes.length <= 32768); assert(page.endOffset > page.startOffset || item.original.length === 0);
+        assert.deepEqual(bytes, item.original.subarray(page.startOffset, page.endOffset));
+        assert.equal(page.pageContentId, `k:${sha256(bytes).slice(0, 16)}`);
+        assert.equal(page.hasMore, page.endOffset < item.original.length); assert.equal(Boolean(page.nextCursor), page.hasMore);
+        assert.equal(page.complete, page.startOffset === 0 && !page.hasMore);
+        expectedOffset = page.endOffset; reconstructed += page.text; cursor = page.nextCursor; pages++; } while (cursor);
+      assert.equal(expectedOffset, item.original.length);
+      assert.equal(pages > 1, item.original.length > 32768);
       assert.deepEqual(Buffer.from(reconstructed), item.original); provenance[index].readSha256 = sha256(Buffer.from(reconstructed));
       const search = await bound.queryKnowledge({ selected: [{ capabilityId: item.capabilityId }], knowledgeIds: [item.knowledgeId], text: item.query, limit: 3 });
       assertKnowledgeEvidence(search, `${item.providerId}/${item.capabilityId}`);

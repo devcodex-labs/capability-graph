@@ -68,6 +68,7 @@ export async function validateVextjs({ frameworkRoot, projectRoot, sourceIdentit
     assert(observation.items.every((item) => item.facts.liveness === 'unverified'));
     const sorted = durations.sort((a, b) => a - b);
     return { node: process.version, platform: process.platform, sourceIdentity, source, officialDocuments, nativeCatalogDigest: catalog.digest, exportedCount: exported.count,
+      sourceVerification: exported.manifest.sourceVerification, nativeExports: exported.manifest.nativeExports,
       kinds: Object.fromEntries([...new Set(catalog.items.map((item) => item.kind))].map((kind) => [kind, catalog.items.filter((item) => item.kind === kind).length])),
       modelCalls: 0, responseBytes: bytes, p50Ms: sorted[Math.ceil(sorted.length * .5) - 1], p95Ms: sorted[Math.ceil(sorted.length * .95) - 1],
       results, runtime: { count: observation.items.length, observation: observation.observation },

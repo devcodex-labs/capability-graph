@@ -17,6 +17,23 @@ Provider 从原生 MCP 回读 capability、rule、recipe、knowledge、workflow�
 
 同来源重新导出内容稳定；来源更新后重新导出并 reload，宿主按 Provider 失效/重建检索器。不能只用 package.version 固定来源：VextJS main 的固定提交与 npm 2.0.0 虽然版本文本相同，目录与依赖可能不同。
 
+## 多来源与正文出处
+
+`knowledge/` 是本例存放原生导出材料的约定，文件 locator 还支持其他获准本地目录、实际安装包；远程文档使用 HTTP locator 和显式配置的 Reader。每个 Provider 可以组合多种来源，不必把官网或安装包文档复制到 `knowledge/`。
+
+| 材料 | 正文出处 | 读取方式 |
+|---|---|---|
+| `knowledge/C03.json` 等原生导出 | 固定 VextJS 原生 MCP 回读条目，保留原文并加上来源、身份及角色字段 | 默认 Provider 根内的 relative-file |
+| 官方站点章节 | 固定源码 `website/docs/zh/` 中的原始 Markdown | relative-file，绑定 `knowledgeRoots.official` 目录 |
+| 安装包 README、CHANGELOG、MIGRATION | 实际 `node_modules/vextjs/` 或 `node_modules/monsqlize/` 中的原文 | relative-file，绑定 package 类型知识根；也可显式绑定已安装目录 |
+| 固定公开 URL | 带完整提交 SHA 的官方 raw URL，正文与同提交本地文件逐字节比较 | HTTP locator，配置宿主 Reader |
+
+导出 JSON 是原生条目的归一化封装，不是官网完整章节的副本。官网章节直接绑定原文；能力与章节的关联表由接入示例作者维护，不冒称 VextJS 官方声明。合同测试中的受控 Fixture 用来验证边界，不能充当官方正文或真实框架证据。
+
+定位字段分别类似 `{"type":"relative-file","path":"knowledge/C03.json"}`、`{"type":"relative-file","root":"official","path":"website/docs/zh/api/config.md"}`、`{"type":"relative-file","root":"installed","path":"MIGRATION.md"}` 和 `{"type":"http","url":"https://raw.githubusercontent.com/devcodex-labs/vextjs/固定提交SHA/website/docs/zh/api/config.md"}`。这些是 locator 字段示意；`official`、`installed` 须由接入方在该 Provider 的 `knowledgeRoots` 中显式绑定，URL 中的占位 SHA 必须替换。
+
+VextJS 与 MonSQLize 分别注册独立 Provider，即使本地 capabilityId、knowledgeId 相同，也按 Provider 隔离。只有启用 directory 布局时，定义才从 `capabilities/**/*.json` 收集；知识来源不因此受限于某个目录名称。
+
 ## 实际执行入口
 
 克隆本仓库并在根运行 `npm test`，在仓库外安装固定 VextJS 快照、准备实际项目，再将占位路径替换为真实目录：
@@ -24,9 +41,14 @@ Provider 从原生 MCP 回读 capability、rule、recipe、knowledge、workflow�
 ```bash
 node scripts/validation/vextjs.mjs /external/fixed-vextjs /external/project SOURCE_ID
 node scripts/validation/vextjs-session.mjs /external/fixed-vextjs
+node scripts/validation/provider-sources.mjs /external/fixed-vextjs-source /external/installed-project SOURCE_ID --https
 ```
 
 第一项回读原生 MCP、导出 Provider、运行独立检索任务并核验片段偏移和运行证据；第二项通过实际 TCP HTTP 验证 Session、CSRF、失效/退出和 Store 关闭。临时应用、Provider、日志和报告放在项目同级专用目录；正式入口在根 scripts/，固定任务及回归在根 test/。外部框架与数据库不加入 website。
+
+第三项要求消费项目实际安装对应固定 VextJS 快照与 MonSQLize；固定源码目录须与安装构建匹配。它读取 19 篇官方章节、两个安装包各三篇文档、一个显式绑定的安装目录，以及两篇公开 HTTPS 长/短文。每页核对连续字节偏移、全文/本页哈希、续读标记，完整拼接须等于原始字节；检索必须命中独立期望文本并核对片段偏移。报告保留路径/URL、提交或包身份、原文与读取哈希及转换方式。`--https` 还核验 MonSQLize 注册包的 lockfile integrity；不带此参数的本地矩阵不能证明公网读取。
+
+如果第一项使用实际 tarball 安装根，而不是源码 checkout 的构建目录，第四个参数须传入对应固定源码目录。安装包不包含完整 `website/`，官网章节不能凭空从包中读取。
 
 ## 运行证据的覆盖边界
 
@@ -42,6 +64,10 @@ node scripts/validation/vextjs-session.mjs /external/fixed-vextjs
 ## 分段与检索
 
 大文档通过 [正文分段接口](../reference/knowledge#正文分段读取)读取，模型决定范围和是否继续。每页分别返回全文和本页哈希；总大小不作为不可读门槛。参考检索器通过 scan 消费大正文，不要求人工拆文档。
+
+URL 使用相同的分页 API、游标与原始 UTF-8 字节偏移规则，无需按来源另设一套分段算法。传输由 HTTP Reader 实现：流式读取、来源限制、完整传输时限及 AbortSignal 均须生效。无 Range 的服务器也可读取；当前参考 Reader 通过完整 GET 校验全文身份，再保留所选页面，不请求或接受任意 206 部分正文冒充完整来源。
+
+强 ETag 可复核已完整保存的本地快照；304 后仍核对快照长度与全文哈希。弱/无验证器或正文超出缓存预算时继续全文流式扫描，代价是每次续读可能重新传输整篇正文。正文变化会拒绝旧游标；超时或取消会终止真实 I/O。分页范围和缓存预算是不同约束，不能用缓存容量拒绝大文档。
 
 固定任务来自根 `test/fixtures/vextjs/retrieval-tasks.json`，期望身份独立于排名。验证比较原生 MCP 和 CG 的召回、未知需求、知识片段、响应量及 P50/P95，模型调用为零。词法召回对否定、同义表达与中文单字容易产生误推荐，不能把这组基线称为 Agent 任务成功率。
 
