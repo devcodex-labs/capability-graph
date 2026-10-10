@@ -68,7 +68,7 @@ test("known and unknown requested knowledge IDs both retain slots, in determinis
 
 test("read limits apply to expanded slots; page budgets do not reject full small documents", async () => fixture(async (root) => {
   await writeFile(path.join(root, "large.md"), "12345");
-  const graph = await CapabilityGraph.open(config(root, [record("a", { knowledge: [doc("large"), doc("other")] })], { budgets: { read: { maxBytes: 4, maxDocumentsPerCall: 1 } } }));
+  const graph = await CapabilityGraph.open(config(root, [record("a", { knowledge: [doc("large"), doc("other")] })], { budgets: { read: { maxPageBytes: 4, maxDocumentsPerCall: 1 } } }));
   try {
     await assert.rejects(graph.readDocuments({ selected: [id("a")] }), code("CG_BUDGET_EXCEEDED"));
     const page = await graph.readDocuments({ selected: [id("a")], knowledgeIds: ["large"] });

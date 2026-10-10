@@ -7,7 +7,9 @@ const queries = [
   ['Knowledge', /知识模型|知识读取|KnowledgeReader 接入|KnowledgeRetriever 接入/],
   ['CG_REVISION_MISMATCH', /错误与恢复动作|修订、预算与分页/],
   ['MCP', /Provider 自有 MCP|Seed MCP 示例/],
-  ['必要上下文', /渐进发现与按需读取|查询接口|身份与关系/]
+  ['必要上下文', /渐进发现与按需读取|查询接口|身份与关系/],
+  ['文档太大', /文档太大|知识与 Adapter/],
+  ['1.0.1 升级', /从 1.0.1 升级|安装/]
 ] as const;
 
 for (const [query, expectedResult] of queries) {

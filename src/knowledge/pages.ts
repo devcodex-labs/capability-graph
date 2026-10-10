@@ -31,7 +31,7 @@ export function validateBodyQuery(query: Omit<DocumentBodyQuery, "capability">, 
   if (!isKnowledgeId(query.knowledgeId) || (query.startOffset !== undefined && (!Number.isSafeInteger(query.startOffset) || query.startOffset < 0)) ||
       (query.cursor !== undefined && query.startOffset !== undefined) || (query.maxBytes !== undefined && (!Number.isSafeInteger(query.maxBytes) || query.maxBytes < 1)) ||
       (query.signal !== undefined && !(query.signal instanceof AbortSignal))) inputInvalid();
-  if ((query.maxBytes ?? budgets.read.maxBytes) > budgets.read.maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  if ((query.maxBytes ?? budgets.read.maxPageBytes) > budgets.read.maxPageBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
 }
 
 async function page(context: QueryContext, ref: KnowledgeDocumentRef, providerId: string, query: Omit<DocumentBodyQuery, "capability">,
@@ -49,7 +49,7 @@ async function page(context: QueryContext, ref: KnowledgeDocumentRef, providerId
     } catch { inputInvalid(); }
   }
   const result = await documentRange(ref, readContext(context, providerId), readers, { startOffset,
-    maxBytes: query.maxBytes ?? budgets.read.maxBytes, fallbackMaxBytes: budgets.read.maxResponseBytes,
+    maxBytes: query.maxBytes ?? budgets.read.maxPageBytes, fallbackMaxBytes: budgets.read.maxResponseBytes,
     preferBoundary: true, ...(query.signal ? { signal: query.signal } : {}) });
   if (requiredContentId && requiredContentId !== result.contentId) throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh", details: { reason: "document_content_changed" } });
   const hasMore = result.endOffset < result.totalBytes;
@@ -60,7 +60,7 @@ async function page(context: QueryContext, ref: KnowledgeDocumentRef, providerId
     complete: startOffset === 0 && !hasMore, hasMore,
     ...(hasMore ? { nextCursor: encodeCursor(binding, JSON.stringify({ offset: result.endOffset, contentId: result.contentId })) } : {}),
     meta: { ...context.meta, completeness: startOffset === 0 && !hasMore ? "complete" : "partial",
-      budgets: { "read.maxBytes": budgets.read.maxBytes, "read.maxResponseBytes": budgets.read.maxResponseBytes } } };
+      budgets: { "read.maxPageBytes": budgets.read.maxPageBytes, "read.maxResponseBytes": budgets.read.maxResponseBytes } } };
   if (bytes(value) > budgets.read.maxResponseBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
   return value;
 }

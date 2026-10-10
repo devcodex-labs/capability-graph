@@ -8,7 +8,7 @@
 
 原生 MCP 没有分页枚举全部 knowledge 的资源。验证入口从固定安装快照的 `dist/assistant/catalog.js` 读取发现材料，随后通过原生 MCP 回读全部条目并核对目录 digest/身份/正文。这是特定 schema 2 的接入边界，不能假定任意未来版本都支持。接入方也可以提供经过固定来源核验的目录 JSON。
 
-先在根目录运行 `npm test`。真实验证要求已安装且固定的 VextJS 快照，以及该快照可检查的实际项目；占位路径须替换为外部目录：
+首次使用请按[站点完整接入步骤](../../website/docs/examples/vextjs-integration.mdx#首次接入官方文档-provider)取得固定源码、导出 Provider 并用实际安装的 Core 分页读取。它是有前置条件的可运行源码示例；根 `npm test` 只验证默认接入合同。进一步真实验证要求已安装且固定的 VextJS 快照，以及该快照可检查的实际项目；占位路径须替换为外部目录：
 
 ```bash
 node scripts/validation/vextjs-documentation.mjs /external/fixed-vextjs SOURCE_ID
@@ -28,7 +28,7 @@ node scripts/validation/vextjs-service-lifecycle.mjs /external/fixed-vextjs redi
 
 并行运行不同 Node 版本的上游 dev/cluster 验证时，每个矩阵单元须使用独立的仓库外 `TMPDIR`。VextJS 的进程 owner 注册目录依赖系统临时目录；共享目录会导致验证之间的 owner 冲突。框架构建也须串行或使用独立安装副本。
 
-`.github/workflows/vextjs-ci.yml` 固定源码提交，在 Linux/Windows、Node 20/22/24 上验证全部官方原文、主题检索、原生目录和实际 TCP Session。另一个 Linux 作业在全新安装项目执行 HTTP、MongoDB、任务与 HTTPS 业务验收。框架下载、构建、临时应用及报告均在仓库外。Redis/MongoDB、cluster 和浏览器的扩展验证单独记录，不归为这个兼容矩阵的覆盖内容。
+`.github/workflows/vextjs-ci.yml` 固定源码提交，在 Linux/Windows、Node 20/22/24 上验证全部官方原文、主题检索、原生目录和实际 TCP Session。另一个 Linux 作业在全新安装项目执行 HTTP/MongoDB/Session 业务与 HTTPS 来源验收。框架下载、构建、临时应用及报告均在仓库外。Redis/MongoDB、cluster 和浏览器的扩展验证单独记录，不归为这个兼容矩阵的覆盖内容。
 
 该固定框架在 Windows Node 22.12.0 的源码构建失败：只读诊断确认同一未改变文件的 `lstat.dev=0`，而 `fstat.dev` 为实际设备号，框架将差异判为实现改变；inode、大小、时间与正文均一致。它是该框架的身份检查兼容边界，Core 的 Windows 22.12 回归仍通过。框架 CI 的 Windows Node 22 改用固定补丁 22.23.3；此前失败及诊断保留，未修改框架或绕过检查。已核验的 Windows 20.19.0/24.19.0 也是可用选择。
 

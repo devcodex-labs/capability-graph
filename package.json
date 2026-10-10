@@ -27,6 +27,7 @@
     "preevaluate:capacity": "npm run build",
     "evaluate:capacity": "node scripts/validation/capacity.mjs",
     "test:docs": "node --test test/website/unit/*.test.mjs",
+    "test:docs:vextjs": "node scripts/validation/website/check-vextjs-tutorial.mjs",
     "test:site": "playwright test --config test/website/playwright.config.ts",
     "demo:http": "npm run build && npm run build:tests && node dist-test/examples/seed-runtime/retrieval-demo.js",
     "pretest:docs": "npm run build",
@@ -35,9 +36,13 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/node": "22.18.6",
+    "axe-core": "4.11.1",
     "proxy-agent": "6.5.0",
     "typescript": "5.9.2",
-    "yaml": "2.8.2"
+    "yaml": "2.9.1"
+  },
+  "overrides": {
+    "basic-ftp": "6.2.3"
   },
   "private": false,
   "repository": {

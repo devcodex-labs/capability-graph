@@ -148,7 +148,8 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
           best.sort((a, b) => b.score - a.score || identity(a.target).localeCompare(identity(b.target)) || a.chunk.startOffset - b.chunk.startOffset);
           if (best.length > input.limit) best.pop();
         }
-        if (retain) {
+        // A chunk without indexed terms cannot match any query. Keep its byte offsets, not a cache entry.
+        if (retain && chunk.terms.size > 0) {
           retainedBytes += 128 + Buffer.byteLength(chunk.snippet) + [...chunk.terms].reduce((sum, term) => sum + 48 + Buffer.byteLength(term), 0);
           retainedEntries++;
           if (retainedBytes > configuration.maxCachedBytes || retainedEntries > configuration.maxCachedEntries) {
@@ -163,10 +164,10 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
         }
         if (access.scan && configuration.maxDocumentBytes >= 4) {
           const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-          const chunks: Chunk[] = []; let pendingText = ""; let offset = 0;
+          const chunks: Chunk[] = []; let pendingText = ""; let pendingBytes = 0; let offset = 0;
           const flush = (final: boolean) => {
             // Keep only one unfinished chunk. Do not retain full document bytes.
-            while (pendingText && (final || Buffer.byteLength(pendingText) >= configuration.chunkBytes)) {
+            while (pendingText && (final || pendingBytes >= configuration.chunkBytes)) {
               let snippet = ""; let length = 0;
               for (const char of pendingText) {
                 const size = Buffer.byteLength(char);
@@ -175,14 +176,20 @@ export class TextKnowledgeRetriever implements KnowledgeRetriever {
                 if (char === "\n") break;
               }
               consider(target, { startOffset: offset, endOffset: offset + length, snippet, terms: this.indexTerms(snippet, configuration) }, chunks);
-              offset += length; pendingText = pendingText.slice(snippet.length);
+              offset += length; pendingBytes -= length; pendingText = pendingText.slice(snippet.length);
             }
           };
           const body = await access.scan({ id: target.id, knowledgeId: target.knowledgeId }, (bytes) => {
             // A cached index needs a fresh content identity, not a second copy of its chunks.
-            if (!cached) { pendingText += decoder.decode(bytes, { stream: true }); flush(false); }
+            if (!cached) {
+              const text = decoder.decode(bytes, { stream: true });
+              pendingText += text; pendingBytes += Buffer.byteLength(text); flush(false);
+            }
           }, { chunkBytes: configuration.maxDocumentBytes });
-          if (!cached) { pendingText += decoder.decode(); flush(true); }
+          if (!cached) {
+            const text = decoder.decode();
+            pendingText += text; pendingBytes += Buffer.byteLength(text); flush(true);
+          }
           bodies.push({ target, body, chunks });
         } else {
           const body = await access.read({ id: target.id, knowledgeId: target.knowledgeId }, { maxBytes: configuration.maxDocumentBytes });

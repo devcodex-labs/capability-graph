@@ -127,9 +127,14 @@ export async function documentRange(ref: KnowledgeDocumentRef, context: Knowledg
   if (options.preferBoundary && options.startOffset + end < summary.totalBytes) {
     // Prefer paragraph/fence boundaries; overlong blocks remain readable by UTF-8 ranges.
     const text = buffer.subarray(0, end).toString("utf8");
-    const boundaries = [...text.matchAll(/\n\n|\n(?:```|~~~)[^\n]*\n/g)].map((match) => Buffer.byteLength(text.slice(0, match.index! + match[0].length)));
-    const preferred = boundaries.filter((value) => value >= end / 2).at(-1);
-    if (preferred) end = preferred;
+    // Offsets increase monotonically: only the last candidate needs UTF-8 conversion.
+    // Counting every prefix makes short paragraphs quadratic in the page size.
+    let lastBoundary = 0;
+    for (const match of text.matchAll(/\r?\n\r?\n|\r?\n(?:```|~~~)[^\r\n]*\r?\n/g)) {
+      lastBoundary = match.index! + match[0].length;
+    }
+    const preferred = Buffer.byteLength(text.slice(0, lastBoundary));
+    if (preferred >= end / 2 && preferred > 0) end = preferred;
   }
   const bytes = Uint8Array.from(buffer.subarray(0, end));
   return { ...summary, bytes, startOffset: options.startOffset, endOffset: options.startOffset + end };

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
@@ -186,4 +187,65 @@ test('oversized indexes use streaming Top-K with exact ranking, offsets and hash
     assert((await first.forProvider('alpha').queryKnowledge(query('c'))).items.length > 0);
     assert(bounded.cachedBytes <= 4096 && bounded.cachedEntries <= 16);
   } finally { await first?.close(); await second?.close(); await source.close(); }
+});
+
+test('UTF-8 line streaming preserves ranked byte ranges and caches only searchable chunks', async () => {
+  const source = await sources();
+  const body = Buffer.from('\ufeff\r\n\r\n---\r\nskip\r\nvalidation🙂\r\n中文🙂\r\nabcdefghijklmnopqrst\r\nvalidation 中文\r\n');
+  await writeFile(path.join(source.first, 'a.md'), body);
+  const snippets = ['中文🙂\r\n', 'validation 中', 'validation🙂\r\n', '文\r\n'];
+  const expected = snippets.map((snippet, index) => ({ snippet, score: index < 2 ? 2 : 1,
+    startOffset: body.indexOf(Buffer.from(snippet)), endOffset: body.indexOf(Buffer.from(snippet)) + Buffer.byteLength(snippet),
+    contentId: `k:${createHash('sha256').update(body).digest('hex').slice(0, 16)}` }));
+  try {
+    for (const pageBytes of [5, 7, 32768]) for (const scanning of [true, false]) {
+      if (!scanning && pageBytes !== 32768) continue; // Legacy read-only access returns the complete document.
+      const retriever = new TextKnowledgeRetriever();
+      retriever.configure({ chunkBytes: 16, pageBytes, stopWords: ['skip'], maxCachedEntries: 6 });
+      const adapter: KnowledgeRetriever = { id: retriever.id,
+        retrieve: (input, access) => retriever.retrieve(input, scanning ? access : { read: access.read }) };
+      const graph = await CapabilityGraph.open({ ...config(source.first), knowledgeRetriever: adapter });
+      try {
+        const bound = graph.forProvider('alpha');
+        const input = { ...query('a', 'validation中文'), limit: 8 };
+        for (let invocation = 0; invocation < 2; invocation++) {
+          const page = await bound.queryKnowledge(input);
+          assert.equal(page.meta.completeness, 'complete');
+          assert.deepEqual(page.items.map(({ snippet, score, startOffset, endOffset, contentId }) =>
+            ({ snippet, score, startOffset, endOffset, contentId })), expected);
+          assert.equal(retriever.cachedSelections, 1);
+          assert.equal(retriever.cachedEntries, 6, 'blank, punctuation-only and stopped chunks cannot consume the cache budget');
+        }
+        assert.equal((await bound.queryKnowledge(query('a', 'skip'))).items.length, 0);
+        await writeFile(path.join(source.first, 'a.md'), Buffer.from(body.toString().replace('中文🙂', '中文😎')));
+        await assert.rejects(bound.queryKnowledge(input), { code: 'CG_INDEX_STALE' });
+        await retriever.invalidate(change('alpha', (await bound.getProvider()).staticRevision, 'knowledge_body'));
+        assert((await bound.queryKnowledge(input)).items.some((hit) => hit.snippet === '中文😎\r\n'));
+      } finally { await graph.close(); await writeFile(path.join(source.first, 'a.md'), body); }
+    }
+  } finally { await source.close(); }
+});
+
+test('aborted line scans cannot publish partial indexes and later queries recover', async () => {
+  const source = await sources();
+  await writeFile(path.join(source.first, 'a.md'), 'validation 中文🙂\r\n'.repeat(2000));
+  const retriever = new TextKnowledgeRetriever(); retriever.configure({ pageBytes: 7 });
+  let abort = true;
+  const adapter: KnowledgeRetriever = { id: retriever.id, retrieve: (input, access) => {
+    const controller = new AbortController();
+    return retriever.retrieve(input, { read: access.read, scan: (target, consume, options) => access.scan!(target, async (bytes, offset) => {
+      await consume(bytes, offset); if (abort) controller.abort();
+    }, { ...options, signal: controller.signal }) });
+  } };
+  let graph: CapabilityGraph | undefined;
+  try {
+    graph = await CapabilityGraph.open({ ...config(source.first), knowledgeRetriever: adapter });
+    const bound = graph.forProvider('alpha');
+    await assert.rejects(bound.queryKnowledge(query('a')), { code: 'CG_SOURCE_UNREADABLE' });
+    assert.equal(retriever.cachedSelections, 0); assert.equal(retriever.cachedBytes, 0); assert.equal(retriever.cachedEntries, 0);
+    abort = false;
+    const recovered = await bound.queryKnowledge(query('a'));
+    assert.equal(recovered.meta.completeness, 'complete'); assert(recovered.items.length > 0);
+    assert.equal(retriever.cachedSelections, 1);
+  } finally { await graph?.close(); await source.close(); }
 });

@@ -5,9 +5,97 @@ description: 官方文档主题 Provider、原生 MCP 独立审计、分层运�
 
 # VextJS 集成
 
-<span className="cg-status">默认合同回归；固定来源有独立实测</span>
+<span className="cg-status">有前置条件的可运行源码示例；固定来源实测</span>
 
 仓库提供 examples/vextjs/ 的官方文档导出器、原生 MCP 审计工具、stdio 客户端和运行快照适配器。默认回归验证接入合同；真实验证需要固定的 VextJS 安装快照及仓库外实际项目。它们是源码示例，不属于 Core 的 npm 导出。Core 继续保持框架无关。
+
+## 首次接入：官方文档 Provider
+
+这条路径只需要 Git、Node.js 和 npm，不需要 MCP、Redis 或 MongoDB。先按[安装页](../getting-started/installation)将 Core **1.1.0** 安装到独立的 `capability-graph-demo/`，并保留本仓库源码 `source/`；两者位于同一工作目录。以下脚本依赖仓库中的导出器，不能只安装 Core 就导出 VextJS 文档。
+
+本例固定 VextJS 提交为 `ef926649926e17543562b8169982fa1786285ecf`。它的版本文本为 2.0.0，但与 npm `vextjs@2.0.0` 不同：发布包没有原生 `mcp` 命令，也不含完整官网目录。先用这个确切源码验证，之后再单独验证你选择的版本。框架构建推荐 Node 20.19.0 或 24.19.0；Windows Node 22 使用 22.23.3，该框架在 Windows 22.12.0 的文件身份检查失败，具体证据见页末。
+
+终端进入 Core 源码 `source/`，取得并构建同级固定框架：
+
+```sh
+git init ../vextjs-fixed
+git -C ../vextjs-fixed remote add origin https://github.com/devcodex-labs/vextjs.git
+git -C ../vextjs-fixed fetch --depth=1 origin ef926649926e17543562b8169982fa1786285ecf
+git -C ../vextjs-fixed checkout --detach FETCH_HEAD
+npm ci --ignore-scripts --prefix ../vextjs-fixed
+npm --prefix ../vextjs-fixed run build
+cd ../capability-graph-demo
+```
+
+在消费项目创建 `export-vextjs.mjs`。导出器核验完整提交、构建指纹及逐篇 Git blob，输出新的 `providers/vextjs/`；目录已经存在时会拒绝覆盖。
+
+```js title="export-vextjs.mjs"
+import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+
+const [coreSource, frameworkSource] = process.argv.slice(2);
+if (!coreSource || !frameworkSource) throw new Error('需要 Core 源码和固定 VextJS 源码两个目录');
+const repositoryRoot = path.resolve(coreSource);
+const sourceRoot = path.resolve(frameworkSource);
+const { verifyVextSource } = await import(pathToFileURL(path.join(repositoryRoot, 'examples/vextjs/source-provenance.mjs')).href);
+const { exportVextProvider } = await import(pathToFileURL(path.join(repositoryRoot, 'examples/vextjs/documentation-provider.mjs')).href);
+const source = await verifyVextSource({ frameworkRoot: sourceRoot, sourceRoot,
+  sourceIdentity: 'ef926649926e17543562b8169982fa1786285ecf' });
+await mkdir(path.resolve('providers'), { recursive: true });
+const exported = await exportVextProvider({ providerId: 'vextjs', version: source.version,
+  source, sourceRoot, repositoryRoot, outputDir: path.resolve('providers/vextjs') });
+console.log(JSON.stringify({ rootDir: exported.rootDir, capabilities: exported.count,
+  documents: exported.documentCount, commit: source.commit }));
+```
+
+再创建 `discover-vextjs.mjs`，从实际安装的 Core 根入口注册 directory Provider、发现目录并分页读回路由指南：
+
+```js title="discover-vextjs.mjs"
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+const graph = await CapabilityGraph.open({
+  hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
+  providers: [{ providerId: 'vextjs', authority: { kind: 'file', definitionLayout: 'directory',
+    rootDir: path.resolve('providers/vextjs') } }],
+});
+try {
+  const provider = graph.forProvider('vextjs');
+  const catalog = await provider.listCatalog({ limit: 20 });
+  const requiredStaticRevision = catalog.meta.staticRevision;
+  const detail = await provider.getCapabilities(['routing'], { requiredStaticRevision });
+  const routing = detail.results[0];
+  if (!routing?.ok) throw new Error('routing 能力读取失败');
+  let cursor;
+  let firstPage;
+  let text = '';
+  let pages = 0;
+  do {
+    const page = await provider.readDocumentPage({ capabilityId: 'routing', knowledgeId: 'guide.routing',
+      maxBytes: 4096, requiredStaticRevision, ...(cursor ? { cursor } : {}) });
+    firstPage ??= page;
+    text += page.text; pages++; cursor = page.nextCursor;
+  } while (cursor);
+  console.log(JSON.stringify({ catalog: { count: catalog.items.length, hasMore: Boolean(catalog.nextCursor) },
+    capabilityId: routing.value.id.capabilityId,
+    document: { pages, totalBytes: Buffer.byteLength(text), sha256: createHash('sha256').update(text).digest('hex'),
+      contentId: firstPage.contentId, source: firstPage.source, firstPageHasMore: firstPage.hasMore,
+      fullyRead: !cursor, preview: firstPage.text.slice(0, 160) } }));
+} finally { await graph.close(); }
+```
+
+执行：
+
+```sh
+node export-vextjs.mjs ../source ../vextjs-fixed
+node discover-vextjs.mjs
+```
+
+第一条应输出 46 个能力、91 篇文档和上述完整提交；第二条应输出 `routing`、`knowledge/guide/routing.md`、连续分页后的总字节和哈希。Catalog 这里只查第一页，有续页不等于全部能力。示例循环为验证原文完整性而续读全文；Agent 可按需要停止或选择范围。仓库目录名称不同，只需调整第一条的 Core 源码参数。
+
+这个导出结果可交给你自己的 API/MCP；要搜索正文，再按[Reader 与 Retriever 接入](../integrations/knowledge-reader)配置后端。下面的矩阵与业务命令用于进一步验收。
 
 ## 来源与角色
 
@@ -15,7 +103,7 @@ description: 官方文档主题 Provider、原生 MCP 独立审计、分层运�
 
 固定快照共 91 篇文档，关联到 46 个主题能力；5 篇导航或资源材料明确列为 reference-only。清单记录每篇文档的归属、哈希和验证范围。新增未分类章节或必需章节缺失会阻止导出。原文可读取不代表其中全部功能已经执行验证。
 
-官方文档的独立入口是 `node scripts/validation/vextjs-documentation.mjs <已构建的固定框架目录> <完整 commit>`。它核对全部原文字节、正文分页还原和覆盖 46 个主题的 63 条独立任务，包含中文未知需求、否定与组合任务。CI 自动执行该入口；全新安装项目的 HTTP、数据库、任务及 HTTPS 业务验收由另一个 CI 作业执行。词项检索结果不代表模型或 Agent 的成功率。
+官方文档的独立入口是 `node scripts/validation/vextjs-documentation.mjs <已构建的固定框架目录> <完整 commit>`。它核对全部原文字节、正文分页还原和覆盖 46 个主题的 63 条独立任务，包含中文未知需求、否定与组合任务。CI 自动执行该入口；全新安装项目的 HTTP/MongoDB/Session 业务与 HTTPS 来源验收由另一个 CI 作业执行。词项检索结果不代表模型或 Agent 的成功率。
 
 原生 MCP 的 capability、rule、recipe、knowledge、workflow 在独立审计中保留 ID、status、正文、catalog digest 和来源身份。该验证目录的 native.c03 等 ID 不进入公开文档 Provider；正文按原字节保存为 Markdown，机器目录与来源信息存入 metadata/。vext:// 仅是原生来源引用，不是内核支持的 URI Reader。
 
@@ -41,7 +129,7 @@ knowledge/ 只存文档正文；JSON 用于能力定义和来源元数据。原�
 
 VextJS 与 MonSQLize 分别注册独立 Provider，即使本地 capabilityId、knowledgeId 相同，也按 Provider 隔离。只有启用 directory 布局时，定义才从 `capabilities/**/*.json` 收集；知识来源不因此受限于某个目录名称。
 
-## 实际执行入口
+## 可选：原生 MCP 与多来源验收
 
 克隆本仓库并在根运行 `npm test`，在仓库外安装固定 VextJS 快照、准备实际项目，再将占位路径替换为真实目录：
 
@@ -73,7 +161,17 @@ app/providers/notes-example 是集成作者定义的业务 Provider，requires �
 
 入口另验证停库后的失败与新实例恢复、文档漂移/旧游标、旧索引/重建、HTTP 缓存回退、取消/超时和资源释放。结果按阶段记录在仓库同级专用目录，保留应用、Provider、依赖锁、打包文件、日志及报告；结束时移除自建 MongoDB 容器及匿名卷。`--https` 证明真实公网来源，省略则只有本地来源证据。它是需要外部前置条件的独立验收，不属于默认合同回归；不证明模型/Agent 成功、Jobs、SSR、热重载或生产负载。
 
-## 运行证据的覆盖边界
+## 验证覆盖与运行证据
+
+| 阶段 | 本例固定来源的证明 | 不据此推断 |
+|---|---|---|
+| 原文核验 | 91 篇与上游逐字节一致；86 篇任务关联正文经 Core 完整分页，5 篇只作参考 | 全部文档涉及的功能已执行 |
+| 独立检索任务 | 63 条覆盖 46 个主题，核验期望章节与片段；无模型调用 | Agent 成功率、任意自然语言的语义搜索质量 |
+| 原生 MCP 审计 | 73 条原生记录回读、身份和正文一致 | 官方主题 Provider 使用原生编号，或 Core 执行原生 Recipe |
+| 独立实装业务 | HTTP、MongoDB 写入/分页、Session/CSRF/logout、生命周期与故障恢复；另验 HTTPS 来源 | Jobs 调度、SSR、热重载、生产负载全部通过 |
+| 扩展验证 | Redis/Jobs、cluster、浏览器入口各自保留独立前置与报告 | 当前文档/Session CI 矩阵自动覆盖扩展场景 |
+
+运行快照本身还需按证据来源解释：
 
 | 来源 | 能证明什么 | 需要额外核验什么 |
 |---|---|---|
@@ -90,7 +188,7 @@ app/providers/notes-example 是集成作者定义的业务 Provider，requires �
 
 URL 使用相同的分页 API、游标与原始 UTF-8 字节偏移规则，无需按来源另设一套分段算法。传输由 HTTP Reader 实现：流式读取、来源限制、完整传输时限及 AbortSignal 均须生效。无 Range 的服务器也可读取；当前参考 Reader 通过完整 GET 校验全文身份，再保留所选页面，不请求或接受任意 206 部分正文冒充完整来源。
 
-强 ETag 可复核已完整保存的本地快照；304 后仍核对快照长度与全文哈希。弱/无验证器或正文超出缓存预算时继续全文流式扫描，代价是每次续读可能重新传输整篇正文。正文变化会拒绝旧游标；超时或取消会终止真实 I/O。分页范围和缓存预算是不同约束，不能用缓存容量拒绝大文档。
+强 ETag 可复核已完整保存的本地快照；普通 stream/read 在 304 后仍核对快照长度与全文哈希，分页在强来源复核后可复用 Core 已完整核验的私有副本。弱/无验证器或正文超出缓存预算时继续全文流式扫描，代价是每次续读可能重新传输整篇正文。正文变化会拒绝旧游标；超时或取消会终止真实 I/O。分页范围和缓存预算是不同约束，不能用缓存容量拒绝大文档。
 
 固定任务来自根 `test/fixtures/vextjs/retrieval-tasks.json`，期望身份独立于排名。验证比较原生 MCP 和 CG 的召回、未知需求、知识片段、响应量及 P50/P95，模型调用为零。词法召回对否定、同义表达与中文单字容易产生误推荐，不能把这组基线称为 Agent 任务成功率。
 

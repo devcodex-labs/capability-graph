@@ -16,6 +16,10 @@
 
 分块保留 UTF-8 BOM 和补充字符，偏移对应原始正文的字节。缓存按选择做 LRU 淘汰；即便正文和静态修订相同，切换知识根目录仍须失效旧映射。每次检索固定读取预算、分块和停用词配置；invalidate 按 Provider 标记在途请求，旧请求可以完成原来的快照，但不能在失效后回填旧缓存或覆盖新缓存。无关 Provider 的失效保持隔离，查询结束时释放在途标记。来源读取失败不会伪装成缓存成功，能力索引重建超容量也不会发布半个索引。这些边界分别由根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts` 通过真实来源验收。
 
+流式分块增量统计 UTF-8 字节，避免短行密集时反复统计整个剩余字符串。空行、纯标点或停用词过滤后没有词项的块仍推进原始字节偏移，但不占用索引缓存条目；缓存预算不足时仍完成全文扫描和 Top-K 检索。
+
+构建 Core 和测试源码后，可运行 `node scripts/validation/knowledge-profile.mjs` 测量受控 HTTP 来源。基准分别覆盖可缓存、短行密集和容量溢出场景，每个场景使用独立检索器及固定选择，记录实际 `cachedSelections`、`cachedEntries`、`cachedBytes`，分别汇总冷查询、索引缓存命中、未命中和零命中。索引命中仍会核验实际来源，不表示免除 HTTP 读取；无样本的耗时字段为 null，缓存字节计账也不等于堆内存峰值。
+
 检索按已选 targets 重查内容身份，零命中也需要有效证据。静态定义、正文或分块配置变更后，由接入方显式重建或调用 invalidate，Core 不自动刷新。这条路径使用零次模型调用，证明本机 HTTP 和检索链路，不证明语义搜索质量或 Agent 任务成功率。临时 Provider 位于仓库同级 `capability-graph-artifacts`，结束后关闭 Reader、graph、HTTP 服务并清理自建目录。正式回归位于根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts`。
 
 ## 运行

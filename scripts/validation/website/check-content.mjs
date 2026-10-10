@@ -158,8 +158,15 @@ for (const entry of statuses) {
   }
 }
 const vext = statuses.find((entry) => entry.id === 'vextjs-integration');
-if (!vext || vext.status !== 'Contract-only' || vext.source !== '../examples/vextjs' || vext.verify !== 'npm test') {
-  fail('VextJS integration must retain the explicit contract and opt-in real-source boundary');
+if (!vext || vext.status !== 'Runnable' || vext.source !== '../examples/vextjs' || !vext.verify.includes('scripts/validation/vextjs-documentation.mjs') || !vext.verify.includes('ef926649926e17543562b8169982fa1786285ecf')) {
+  fail('VextJS integration must disclose its conditional fixed-source executable entry');
+}
+
+const vextPage = await readFile(path.join(docsRoot, 'examples/vextjs-integration.mdx'), 'utf8');
+const vextNav = JSON.parse(await readFile(path.join(docsRoot, 'examples/_meta.json'), 'utf8'));
+if (!vextPage.includes('有前置条件的可运行源码示例') ||
+    vextNav.find((entry) => entry.name === 'vextjs-integration')?.tag !== '固定来源实测') {
+  fail('VextJS page, manifest and navigation must agree on fixed-source runnable status');
 }
 
 const publicRoutes = new Set(publicPages.map((file) => path.relative(docsRoot, file)

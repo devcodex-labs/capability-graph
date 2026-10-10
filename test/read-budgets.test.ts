@@ -75,8 +75,8 @@ test("read input boundaries preserve deterministic failure slots and filtered-em
   } finally { await f.graph.close(); }
 });
 
-test("expanded document limit rejects without Reader I/O; page size does not gate full documents", async () => {
-  const f = await open({ read: { maxDocumentsPerCall: 1, maxBytes: 4, maxSelected: 2 } }, 2);
+test("expanded document limit rejects without Reader I/O; page budget is independent of full reads", async () => {
+  const f = await open({ read: { maxDocumentsPerCall: 1, maxPageBytes: 4, maxSelected: 2 } }, 2);
   try {
     await assert.rejects(f.graph.readDocuments({ selected: [id("a")] }), { code: "CG_BUDGET_EXCEEDED" });
     assert.equal(f.calls(), 0);
@@ -85,6 +85,28 @@ test("expanded document limit rejects without Reader I/O; page size does not gat
     assert.ok(slot.ok); assert.equal(slot.value.text, "guide");
     assert.equal(response.meta.completeness, "complete");
   } finally { await f.graph.close(); }
+});
+
+test("legacy full-read maxBytes still bounds each document and specification without truncation", async () => {
+  for (const maximum of [1024, 32768]) {
+    const f = await open({ read: { maxBytes: maximum, maxPageBytes: maximum * 2 } });
+    try {
+      for (const size of [maximum, maximum + 1]) {
+        f.setText("x".repeat(size));
+        for (const response of [await f.graph.readDocuments({ selected: [id("a")] }),
+          await f.graph.readSpecification({ providerId: "seed" })]) {
+          const slot = response.results[0]!;
+          assert.equal(slot.ok, size === maximum);
+          if (slot.ok) assert.equal(slot.value.byteLength, size);
+          else assert.equal(slot.error.code, "CG_BUDGET_EXCEEDED");
+        }
+      }
+      // A read-only Reader can still supply a bounded full fallback for a page.
+      const page = await f.graph.forProvider("seed").readDocumentPage({ capabilityId: "a", knowledgeId: "D-0" });
+      assert.equal(page.text, "x".repeat(maximum + 1));
+      assert.equal(page.complete, true);
+    } finally { await f.graph.close(); }
+  }
 });
 
 test("complete-response UTF-8 boundary includes escaped text, failures, metadata and view", async () => {

@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        description: Immutable commit supplied by the release workflow
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -19,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:

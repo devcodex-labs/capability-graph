@@ -121,7 +121,8 @@ Selection 按选择、节点和依赖边数量限制工作量，当前没有独�
 | `selection.maxSelected` | 32 | 去重前显式选择数量 |
 | `selection.maxNodes` | 128 | 完整闭包节点数量 |
 | `selection.maxEdges` | 256 | 完整闭包真实依赖边数量 |
-| `read.maxBytes` | 32768 | 每页/流式块原始字节，不限制整篇大小 |
+| `read.maxBytes` | 32768 | 旧全文接口的单篇返回字节预算，超限逐项失败 |
+| `read.maxPageBytes` | 32768 | 独立分页/流式块字节预算，不限制文档总大小 |
 | `read.maxDocumentsPerCall` | 8 | 整次正文读取文档数量 |
 | `read.maxSelected` | 32 | 文档读取原始 selected 数量，去重前检查 |
 | `read.maxFilterValuesPerDimension` | 128 | 直接读取每维 knowledgeIds/roles/locales 原始数量 |

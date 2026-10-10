@@ -5,7 +5,7 @@ description: 从安装到第一次能力查询，完成 Capability Graph 的最�
 
 # 快速开始
 
-本分区面向第一次接入的 Provider 作者和框架维护者，使用待发布的 1.1.0。先按安装页从源码取得预览版安装包，再在独立 Node.js 项目完成能力发现；API/MCP 是随后按需选择的集成方式。Registry 的 1.0.1 对应线上旧版文档。
+本分区面向第一次接入的 Provider 作者和框架维护者，使用 1.1.0。先按安装页确认并安装对应版本，再在独立 Node.js 项目完成能力发现；API/MCP 是随后按需选择的集成方式。未发布时使用安装页的固定源码回退。
 
 1. [安装](./installation)包并确认 Node.js 版本。
 2. [创建第一个 Provider](./first-provider)，只定义一个 Provider、一个能力并验证目录结果。
@@ -14,8 +14,8 @@ description: 从安装到第一次能力查询，完成 Capability Graph 的最�
 | 你现在的目标 | 前置条件 | 验证后得到什么 |
 |---|---|---|
 | 确认环境能加载包 | 支持的 Node.js 和一个空目录 | [安装](./installation)：入口输出 `function` |
-| 第一次发现能力 | 已按安装页取得 1.1.0 预览包 | [创建第一个 Provider](./first-provider)：两个 JSON、一个脚本、只有一个能力的 Catalog |
-| 从旧版本升级 | 已有 1.0.0 定义或 Adapter | [迁移清单](./installation#从-100-迁移到-101)：替换旧 Schema、补 role 和八类关系，再重新发现修订 |
+| 第一次发现能力 | 已按安装页安装 1.1.0 | [创建第一个 Provider](./first-provider)：两个 JSON、一个脚本、只有一个能力的 Catalog |
+| 从旧版本升级 | 已有 1.0.1 定义或 Adapter | [1.0.1 升级清单](./installation#从-101-升级到-110)：核对布局、知识根与独立分页预算；更早版本先迁移 Schema |
 
 前两项都有页面材料还原后的自动执行验证。Runtime、知识检索和 MCP 都不是最小发现的前置。
 

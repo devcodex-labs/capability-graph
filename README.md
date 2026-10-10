@@ -12,7 +12,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [贡献与维护](CONTRIBUTING.md)
 - [未发布改动](changelogs/unreleased.md)
 - [1.0.1 迁移与变更](changelogs/1.0.1.md)
-- [1.1.0 待发布变更](changelogs/1.1.0.md)
+- [1.1.0 变更](changelogs/1.1.0.md)
 - [1.0.0 变更](changelogs/1.0.0.md)
 - [许可证](#license)
 
@@ -20,13 +20,14 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 
 ## 当前状态
 
-Registry 当前已发布 `1.0.1`；仓库为待发布 `1.1.0`。新目录模式、知识根别名及正文分页需使用本仓库构建的安装包；提交源码不会发布 npm 包或部署站点。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
+本文与仓库教程对应 `1.1.0`。先查询确切版本，确认 Registry 可用后安装；未发布时按[安装页的固定源码步骤](website/docs/getting-started/installation.mdx)构建。网络或镜像失败不代表版本不存在。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。
 
 ```sh
-npm install @devcodex/capability-graph@1.0.1
+npm view @devcodex/capability-graph@1.1.0 version
+npm install @devcodex/capability-graph@1.1.0
 ```
 
-上面的 Registry 命令安装已发布 1.0.1。使用下文的目录模式、知识根和分页功能，请先按[当前预览版安装说明](website/docs/getting-started/installation.mdx)构建并安装 1.1.0。本仓库教程与[已部署站点](https://devcodex-labs.github.io/capability-graph/)可能处于不同版本；首次接入按[最小 Provider](website/docs/getting-started/first-provider.mdx)开始，再按[进阶教程](website/docs/guides/progressive-discovery.mdx)增强。
+首次接入按[最小 Provider](website/docs/getting-started/first-provider.mdx)开始，再按[进阶教程](website/docs/guides/progressive-discovery.mdx)增强。已有 1.0.1 用户参照[升级清单](website/docs/getting-started/installation.mdx#从-101-升级到-110)。[站点](https://devcodex-labs.github.io/capability-graph/)的 `release.json` 记录实际包版本和文档提交；源码提交本身不会发布包或部署站点。
 
 已实现文件权威加载、校验、单 Provider 正式图、跨 Provider 联合目录、范围控制、修订快照、按需知识读取，以及可插拔的数据库、检索和 Runtime 合同。真实 Seed 同时提供普通 API 与 MCP 接入。
 
@@ -108,7 +109,7 @@ directory 只收集 capabilities/**/*.json，缺少目录、目录外遗留定�
 | `queryKnowledge` | 对已选知识执行检索，校验证据、内容版本与片段边界 |
 | `queryRuntime` | 查询单 Provider、指定项目和环境下的运行实例 |
 
-大文档使用 `readDocumentPage` / `readSpecificationPage`，模型决定范围与是否续读。默认 32 KiB 是页大小，文档总大小不设准入门槛；全文与本页哈希分开，内容变化拒绝旧游标。旧全文接口保持完整返回语义，超过单次响应容量时改用分页。
+大文档使用 `readDocumentPage` / `readSpecificationPage`，模型决定范围与是否续读。`read.maxBytes` 保留全文单篇返回预算，默认 32 KiB；`read.maxPageBytes` 独立控制页大小，默认 32 KiB，文档总大小不设准入门槛；全文与本页哈希分开，内容变化拒绝旧游标。旧全文接口保持完整返回语义，超过单次响应容量时改用分页。
 
 已知身份可直接查详情或读取，不强制从目录开始。第一轮目录只含能力摘要；显式选择由调用者决定，Core 只沿 `requires` 补齐必要上下文。分页必须保留过滤条件及修订；检查 `meta.completeness`、`warnings` 和 `nextCursor`，不能把部分结果当成全集。批量结果逐项检查 `ok`。
 

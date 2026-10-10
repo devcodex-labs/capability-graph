@@ -159,17 +159,17 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
       if (!context.scope.has(id.providerId)) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
       const targetKey = key({ id, knowledgeId: target.knowledgeId });
       const entry = allowed.get(targetKey); if (!entry) contract("retrieval_target_not_selected");
-      const chunkBytes = options.chunkBytes ?? budgets.read.maxBytes;
+      const chunkBytes = options.chunkBytes ?? (budgets.read.maxPageBytes ?? 32_768);
       if (!Number.isSafeInteger(chunkBytes) || chunkBytes < 1) inputInvalid();
       // Small sources retain a bounded exact query snapshot. Large sources are verified by range below.
       let snapshot: Uint8Array[] | undefined = []; let snapshotBytes = 0;
       const result = await scanDocument(entry.ref, entry.context, readers, async (bytes, offset) => {
         snapshotBytes += bytes.length;
-        if (snapshotBytes > budgets.read.maxBytes) snapshot = undefined;
+        if (snapshotBytes > (budgets.read.maxPageBytes ?? 32_768)) snapshot = undefined;
         snapshot?.push(Uint8Array.from(bytes));
         await consume(bytes, offset);
       },
-        { chunkBytes: Math.min(chunkBytes, budgets.read.maxBytes), fallbackMaxBytes: budgets.read.maxResponseBytes ?? 4_194_304,
+        { chunkBytes: Math.min(chunkBytes, (budgets.read.maxPageBytes ?? 32_768)), fallbackMaxBytes: budgets.read.maxResponseBytes ?? 4_194_304,
           ...(options.signal ? { signal: options.signal } : {}) });
       scanned.set(targetKey, result);
       if (snapshot) observed.set(targetKey, { bytes: Buffer.concat(snapshot, snapshotBytes), contentId: result.contentId, contentType: result.contentType, source: result.source });
@@ -192,9 +192,9 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
     let snapshot: Uint8Array[] | undefined = []; let snapshotBytes = 0;
     const result = await scanDocument(entry.ref, entry.context, readers, (part) => {
       snapshotBytes += part.length;
-      if (snapshotBytes > budgets.read.maxBytes) snapshot = undefined;
+      if (snapshotBytes > (budgets.read.maxPageBytes ?? 32_768)) snapshot = undefined;
       snapshot?.push(Uint8Array.from(part));
-    }, { chunkBytes: budgets.read.maxBytes, fallbackMaxBytes: budgets.read.maxResponseBytes ?? 4_194_304 });
+    }, { chunkBytes: (budgets.read.maxPageBytes ?? 32_768), fallbackMaxBytes: budgets.read.maxResponseBytes ?? 4_194_304 });
     scanned.set(targetKey, result);
     if (snapshot) observed.set(targetKey, { ...result, bytes: Buffer.concat(snapshot, snapshotBytes) });
   }
@@ -251,7 +251,7 @@ export async function queryKnowledge(context: QueryContext, query: QueryKnowledg
             } catch { return []; }
           });
           verification = (async () => {
-            const verified = await documentRanges(entry.ref, entry.context, readers, candidates.map(({ hit }) => hit), budgets.read.maxResponseBytes ?? 4_194_304, budgets.read.maxBytes);
+            const verified = await documentRanges(entry.ref, entry.context, readers, candidates.map(({ hit }) => hit), budgets.read.maxResponseBytes ?? 4_194_304, (budgets.read.maxPageBytes ?? 32_768));
             if (verified.contentId !== proof.indexedContentId) stale();
             return new Map(candidates.map(({ hit: candidate, index: candidateIndex }, rangeIndex) => [candidateIndex,
               candidate.endOffset <= verified.totalBytes && verified.ranges[rangeIndex]!.equals(Buffer.from(candidate.snippet))]));

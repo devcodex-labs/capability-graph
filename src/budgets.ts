@@ -14,8 +14,10 @@ export interface BudgetConfig {
   readonly specification: { readonly defaultPageSize: number; readonly maxPageSize: number; readonly maxBytes: number; readonly maxItemBytes: number };
   readonly selection: { readonly maxSelected: number; readonly maxNodes: number; readonly maxEdges: number };
   readonly read: {
-    /** Maximum bytes in a page/stream chunk, NOT an admission limit on the document's total size. */
+    /** Legacy full-read per-document response limit. Larger sources remain readable through pages. */
     readonly maxBytes: number;
+    /** Maximum page/stream chunk bytes; independent of the legacy full-read limit. */
+    readonly maxPageBytes?: number;
     readonly maxDocumentsPerCall: number;
     /** Raw selection count, before deduplication. Omission inherits the default. */
     readonly maxSelected?: number;
@@ -49,7 +51,7 @@ export const DEFAULT_BUDGETS: ResolvedBudgetConfig = Object.freeze({
     defaultKnowledgePageSize: 20, maxKnowledgePageSize: 100 }),
   specification: Object.freeze({ defaultPageSize: 20, maxPageSize: 100, maxBytes: 131_072, maxItemBytes: 16_384 }),
   selection: Object.freeze({ maxSelected: 32, maxNodes: 128, maxEdges: 256 }),
-  read: Object.freeze({ maxBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
+  read: Object.freeze({ maxBytes: 32_768, maxPageBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
     maxFilterValuesPerDimension: 128, maxResponseBytes: 4_194_304 }),
   retrieveCapabilities: Object.freeze({ maxCandidates: 20, maxCandidateBytes: 512 }),
   queryKnowledge: Object.freeze({ maxHits: 8, maxSnippetBytes: 2_048, maxSelected: 32,

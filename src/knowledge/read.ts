@@ -116,7 +116,7 @@ function matches(ref: KnowledgeDocumentRef, filters: ReturnType<typeof validateD
 
 async function readValue(ref: KnowledgeDocumentRef, providerId: string, context: QueryContext,
   budgets: BudgetConfig, readers: readonly KnowledgeReader[]): Promise<Omit<DocumentRead, "id">> {
-  const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxResponseBytes ?? 4_194_304, readers);
+  const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxBytes, readers);
   let text: string;
   try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(read.bytes); }
   catch { throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { reason: "invalid_utf8" } }); }

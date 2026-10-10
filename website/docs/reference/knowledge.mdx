@@ -77,10 +77,10 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 | 省略 `knowledgeIds` | 读取匹配的直接 Document；Collection 成员必须显式选择 |
 | 省略 `roles/locales` | 不限制对应维度；locale 规范化后精确匹配，无父语言回退 |
 | `knowledgeIds/roles/locales: []` | 合法但匹配为空；不要与 `queryKnowledge` 不允许空 `knowledgeIds` 的规则混淆 |
-| 正文预算 | 每次最多 8 篇；全文读取受单次完整响应预算保护，文档总大小不设准入门槛；大文档使用下方分页接口 |
+| 正文预算 | 每次最多 8 篇；`read.maxBytes` 限制全文单篇返回，默认 32768 字节，完整 JSON 另受响应预算保护，文档总大小不设准入门槛；大文档使用下方分页接口 |
 | 原始输入预算 | selected 默认最多 32 项；knowledgeIds/roles/locales 每维默认最多 128 项，重复值也计数，超限在点读前失败 |
 | 完整响应预算 | 默认 4 MiB JSON UTF-8 字节，包含正文转义、失败槽位和元数据；超限为查询级 `CG_BUDGET_EXCEEDED`，需要拆批或过滤 |
-| 单篇失败 | 缺失文件、无匹配 Reader、非法 UTF-8、Reader 合同错误或全文超过单次响应容量产生失败槽位；改用分页可继续读取大文档 |
+| 单篇失败 | 缺失文件、无匹配 Reader、非法 UTF-8、Reader 合同错误或全文超过单篇返回预算产生失败槽位；改用分页可继续读取大文档 |
 
 具体 Reader 选择、来源身份和错误码见[Reader 与 Adapter](./runtime-adapter#knowledgereader)。这里的默认值可以通过 `budgets.read` 调整，不能绕过所选修订和 Provider 范围。
 
@@ -117,7 +117,7 @@ do {
 } while (cursor);
 ```
 
-`DocumentBodyPage` 明确返回 UTF-8 字节范围 `startOffset/endOffset`、总字节数 `totalBytes`、本页 `byteLength`、`hasMore` 与可选 `nextCursor`。`complete` 只在本次返回整篇时为 true；末页不等于全文。全文 `contentId` 和 `pageContentId` 分别计算，保留 BOM 与原始换行。默认页大小 32768 字节，由 `read.maxBytes` 控制，单次 JSON 响应仍受 `read.maxResponseBytes` 保护。
+`DocumentBodyPage` 明确返回 UTF-8 字节范围 `startOffset/endOffset`、总字节数 `totalBytes`、本页 `byteLength`、`hasMore` 与可选 `nextCursor`。`complete` 只在本次返回整篇时为 true；末页不等于全文。全文 `contentId` 和 `pageContentId` 分别计算，保留 BOM 与原始换行。默认页大小 32768 字节，由 `read.maxPageBytes` 独立控制，单次 JSON 响应仍受 `read.maxResponseBytes` 保护。
 
 可指定 `startOffset/maxBytes` 读取范围，或传 `cursor` 续读；不能同时指定 `cursor/startOffset`。偏移必须在 UTF-8 边界。分页优先在较近的段落或围栏行结束；超长单行、代码块通过明确的连续范围读取。游标绑定 Provider、文档身份、静态修订、来源路径和全文哈希。来源正文变化，即使静态修订没变，旧游标也返回 `CG_REVISION_MISMATCH`。
 

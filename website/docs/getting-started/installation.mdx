@@ -5,11 +5,11 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 
 # 安装
 
-<span className="cg-status">待发布 1.1.0 / Registry 1.0.1</span>
+<span className="cg-status">本文对应 1.1.0</span>
 
-后续教程使用仓库待发布的 1.1.0，包含 directory 布局、知识根别名与正文分页。Registry 的 1.0.1 不支持新增接口；旧库可能忽略新布局选项后返回空目录。无版本安装仍取得 Registry 的 latest，请核对实际版本。
+后续教程使用 1.1.0，包含 directory 布局、知识根别名与正文分页。先查询这个确切版本是否已发布，再安装；Registry 的实际结果决定包是否可用。1.0.1 不支持这些新增接口，无版本安装取得的 latest 也可能与本文不同。
 
-当前请使用下方源码安装步骤。打包文件与消费项目都放在源码仓库同级；这些命令不会发布包。首次发现只需两个 JSON 和一个脚本，当前预览版的安装阶段另需取得源码。
+发布版直接安装即可；若确切版本返回 `E404`，使用下方固定源码回退。网络、认证或镜像错误需先排查，不能据此判断版本未发布。首次发现只需两个 JSON 和一个脚本。
 
 把包装在负责加载 Provider、向 Agent 提供 API/MCP 的 Node.js 接入项目中。Provider 定义目录只是数据目录，不必单独安装一份包；一个接入项目可以加载多个 Provider。
 
@@ -19,35 +19,47 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 - 使用 ESM。主包只提供根入口，不提供 CommonJS `require()` 入口或 `./mcp` 子路径。
 - 后续将创建 Provider 定义文件；安装命令本身不会生成它们。
 
-## 安装当前 1.1.0 预览版
+## 安装对应版本
 
-以下命令从一个新的工作目录开始，适用于 Bash、PowerShell 等支持这些命令的终端。需要 Git、npm 和上述 Node.js 版本。`source/` 是源码，`packages/` 保存安装包，`capability-graph-demo/` 是实际使用 Core 的独立项目。
+在你的 Node.js 接入项目运行：
+
+```sh
+npm view @devcodex/capability-graph@1.1.0 version
+npm install @devcodex/capability-graph@1.1.0
+npm ls @devcodex/capability-graph
+```
+
+查询与实际安装都应显示 `1.1.0`。如果该版本尚未发布，第一条会返回 `E404`；此时不要用旧版本继续新版教程。
+
+## 未发布时从固定源码构建
+
+以下命令从新的工作目录开始，需要 Git、npm 和上述 Node.js。先在 GitHub 的提交页面取得**与正在阅读的文档一致的完整 40 位提交 SHA**，替换下方 `DOCUMENTATION_COMMIT`；不要使用会移动的分支名。已构建站点也可在 `release.json` 的 `documentationCommit` 查看文档提交，同时核对 `packageVersion`。`source/` 是源码，`packages/` 保存安装包，`capability-graph-demo/` 是独立接入项目。
 
 ```sh
 mkdir capability-graph-preview
 cd capability-graph-preview
-git clone --branch main https://github.com/devcodex-labs/capability-graph.git source
+git init source
+git -C source remote add origin https://github.com/devcodex-labs/capability-graph.git
+git -C source fetch --depth=1 origin DOCUMENTATION_COMMIT
+git -C source checkout --detach FETCH_HEAD
 cd source
+node -e "if(require('./package.json').version !== '1.1.0') throw new Error('源码与文档版本不一致')"
 npm ci
 npm run build
 mkdir ../packages
-npm pack --ignore-scripts --pack-destination ../packages
+npm pack --ignore-scripts --pack-destination ../packages --json > ../packages/pack.json
 cd ..
 mkdir capability-graph-demo
 cd capability-graph-demo
 npm init -y
 npm pkg set type=module
-npm install ../packages/devcodex-capability-graph-1.1.0.tgz
+node -e "const {execFileSync}=require('node:child_process');const [p]=require('../packages/pack.json');execFileSync(process.platform==='win32'?'npm.cmd':'npm',['install','../packages/'+p.filename],{stdio:'inherit',shell:process.platform==='win32'})"
 npm ls @devcodex/capability-graph
 ```
 
-最后一条应显示 `@devcodex/capability-graph@1.1.0`。以后在消费项目根目录完成[第一次发现](./first-provider)，不在 `source/` 中放置你的 Provider。
+打包与消费目录都位于源码仓库外；安装文件名取自本次 `npm pack` 的结果。最后一条应显示 `@devcodex/capability-graph@1.1.0`。以后在消费项目根完成[第一次发现](./first-provider)。
 
 已有项目安装上面生成的 tgz 即可，并确认模块配置。`npm pkg set type=module` 会在 `package.json` 写入 `"type": "module"`，让 `.js` 使用 ESM；已有 CommonJS 项目可以把接入脚本命名为 `.mjs`，无需改变整个项目的模块规则。
-
-## Registry 发布版与升级
-
-目前 `npm install @devcodex/capability-graph@1.0.1` 安装的是发布版，只适用于[线上 1.0.1 文档](https://devcodex-labs.github.io/capability-graph/)，不能直接运行本页之后的新版 directory / 正文分页教程。`npm install @devcodex/capability-graph` 同样仍取得 1.0.1。待 1.1.0 实际发布后，才可改为 `npm install @devcodex/capability-graph@1.1.0`，无需取得源码。
 
 ## 验证包入口
 
@@ -57,7 +69,7 @@ npm ls @devcodex/capability-graph
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
 if (typeof CapabilityGraph.prototype.readDocumentPage !== 'function') {
-  throw new Error('本教程需要 1.1.0 的正文分页接口，请按预览版步骤安装并核对 npm ls。');
+  throw new Error('本教程需要 1.1.0 的正文分页接口，请按安装页核对 npm ls。');
 }
 console.log(typeof CapabilityGraph.open); // function
 ```
@@ -70,7 +82,7 @@ node check.mjs
 
 ## 安装内容
 
-主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及数据库 Authority、Runtime、两类 Retriever 和远程 Reader 的扩展合同。1.0.1 固定依赖 `bcp-47` 与 `language-subtag-registry`，用于独立于宿主 ICU 的语言标签校验。
+主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及数据库 Authority、Runtime、两类 Retriever 和远程 Reader 的扩展合同。固定依赖 `bcp-47` 与 `language-subtag-registry`，用于独立于宿主 ICU 的语言标签校验。
 
 它不安装 HTTP/MCP Server、数据库驱动、向量数据库、RAG 后端或 VextJS Adapter。MCP SDK 仅用于仓库的独立私有示例；要提供 MCP，由接入项目安装 SDK 并实现协议层。
 
@@ -84,6 +96,21 @@ node check.mjs
 | npm 返回版本或包不存在 | 用 `npm config get registry` 检查 registry 配置，再用 `npm view @devcodex/capability-graph version` 核对镜像是否已同步 |
 
 安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本；1.0.0 不具备后文的 Selection 与多文档 Specification 接口。
+
+## 从 1.0.1 升级到 1.1.0
+
+已有 `*.capability.json` 定义与旧相对路径可以继续使用，无需批量改名。新功能按需启用：
+
+| 变化 | 升级方案 | 验证 |
+|---|---|---|
+| directory 布局 | 文件移入 `capabilities/**/*.json`，并显式设置 `definitionLayout: 'directory'`；缺省仍是 legacy | Catalog 身份与数量一致，不留下目录外的旧定义 |
+| 外部目录 / node_modules | 在每个 Provider 配置 `knowledgeRoots`，locator 的 `root` 引用该 Provider 别名 | 实际读取原文；包中缺失章节另用目录或 URL |
+| 大文档分页 | 使用 `readDocumentPage` / `readSpecificationPage`，保留 `nextCursor` 与修订 | 连续偏移与拼接字节一致；内容变更拒绝旧游标 |
+| 全文与分页预算 | `read.maxBytes` 仍限制全文单篇返回，默认 32768；新增 `read.maxPageBytes` 独立限制分页/流块，默认也为 32768 | 原有显式全文预算继续生效；减小全文预算不缩小分页 |
+| 输入与 JSON 预算 | 默认 selected 32、每维过滤 128、文档 8、整次 JSON 4 MiB | 拆批或按业务覆盖预算；检查逐项错误与查询级错误 |
+| 外部 Retriever / 数据库 Adapter | 提供真实来源 Reader、完整证据与八类关系；更新后显式失效/重建索引 | 零命中也核验来源；过期索引明确失败 |
+
+文档总大小没有准入上限。全文超出单篇预算时不会截断返回；改用分页即可完整续读。先锁定依赖版本和来源，再用[最小 Provider](./first-provider)及你实际使用的 Adapter 重测。
 
 ## 从 1.0.0 迁移到 1.0.1
 

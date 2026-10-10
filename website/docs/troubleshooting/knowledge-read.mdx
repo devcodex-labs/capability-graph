@@ -18,6 +18,12 @@ description: 诊断知识关联、Reader、路径、Retriever、索引证据和 
 
 全文接口默认最多 32 个原始 selected、每种过滤最多 128 个值、最多读取 8 篇文档，完整 JSON 响应最多 4194304 个 UTF-8 字节。原始数量在去重前检查；缺失身份及失败槽位也占响应空间。数量或整次响应超限时拆批或过滤；大正文使用 `readDocumentPage()` 或 `readSpecificationPage()`，默认每页 32768 字节，模型决定是否继续。文档总大小不是拒绝来源的理由。旧 Reader 未实现 stream 时，其全文回退仍受单次容量保护；实现流式协议即可读取任意大小来源。`queryKnowledge()` 使用自己的预算，见[结果元数据与预算](../reference/result-meta)。
 
+## 文档太大怎么办
+
+全文读取默认每篇最多返回 32768 字节，由 `read.maxBytes` 控制，超限产生逐项 `CG_BUDGET_EXCEEDED`，不会返回截断的正文。无需人工拆文件；改用 [正文分段读取](../reference/knowledge#正文分段读取)，传回 `nextCursor` 直到没有续页。分页默认 32768 字节，由独立的 `read.maxPageBytes` 控制；模型决定范围与是否继续。URL、本地目录和 node_modules 使用同一套分页规则，远程来源需配置流式 Reader。
+
+如果是整次 JSON、文档数或过滤值超限，先拆批或缩小过滤。刚从旧版升级可查看 [1.0.1 升级清单](../getting-started/installation#从-101-升级到-110)，不要把全文预算与文档总大小混为一谈。
+
 ## 检索与 Adapter
 
 `CG_RETRIEVER_UNCONFIGURED` 表示调用了可选召回或检索，但没有配置对应 Retriever。继续使用 Flat Catalog 或配置真实后端。

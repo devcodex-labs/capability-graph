@@ -67,8 +67,26 @@ jobs:
             exit 1
           }
 
-  gates:
+  compatibility:
     needs: freeze
+    uses: ./.github/workflows/ci.yml
+    with:
+      commit: ${{ needs.freeze.outputs.release_commit }}
+
+  framework:
+    needs: freeze
+    uses: ./.github/workflows/vextjs-ci.yml
+    with:
+      commit: ${{ needs.freeze.outputs.release_commit }}
+
+  documentation:
+    needs: freeze
+    uses: ./.github/workflows/docs-ci.yml
+    with:
+      commit: ${{ needs.freeze.outputs.release_commit }}
+
+  gates:
+    needs: [freeze, compatibility, framework, documentation]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -79,22 +97,9 @@ jobs:
         with:
           node-version: "22.12.0"
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            website/package-lock.json
       - run: npm ci
-      - run: npm test
-      - run: npm run test:package:built
+      - run: npm run build && npm run build:tests
       - run: npm run evaluate:built
-      - run: npm ci --ignore-scripts
-        working-directory: examples/seed-mcp
-      - run: npm test
-        working-directory: examples/seed-mcp
-      - run: npm ci
-        working-directory: website
-      - run: npx playwright install --with-deps chromium
-      - run: npm run check:built
-        working-directory: website
 
   package:
     needs: [freeze, gates]

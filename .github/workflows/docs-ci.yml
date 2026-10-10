@@ -31,6 +31,12 @@ on:
       - ".github/workflows/docs-deploy.yml"
       - ".github/workflows/release.yml"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        description: Immutable commit supplied by the release workflow
+        required: true
+        type: string
 
 env:
   CG_ARTIFACTS_DIR: ${{ github.workspace }}/../capability-graph-artifacts
@@ -45,6 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -78,6 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -97,6 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - id: browser-artifacts
         name: Normalize the external browser report path

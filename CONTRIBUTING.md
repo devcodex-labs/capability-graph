@@ -37,7 +37,7 @@
 
 文档材料维护：最小 acme.http/route 对照为 test/fixtures/website/minimal-provider，输入来自公开页面；test/fixtures/website/advanced-provider 是独立的关系、知识、Specification 高级回归，不能暗中给最小教程补文件。两者由 check:examples 分别验证，不向读者解释内部夹具组织。
 
-VextJS 已有原生 Provider/Runtime 源码参考与默认合同回归，固定来源下另有真实 MCP、TCP Session 和文档来源矩阵验证。根 `npm test` 对该集成的证明范围仍为 `Contract-only`；需要外部源码、安装快照或服务的验证应单列前置条件、命令、来源身份及结果，不作为通用生产认证或 Agent 任务成功的证据。具体入口与兼容边界见 [examples/vextjs/README.md](examples/vextjs/README.md)。新增 `Runnable` 声明需要真实自动执行路径、公开包入口及页面同源验证，不能只补代码或状态标签。
+VextJS 是有前置条件的可运行源码示例，固定来源已有真实 MCP、TCP Session、官方文档和独立实装业务验证。根 `npm test` 只覆盖默认接入合同；需要外部源码、安装快照或服务的验证应单列前置条件、命令、来源身份及结果，不作为通用生产认证或 Agent 任务成功的证据。具体入口与兼容边界见 [examples/vextjs/README.md](examples/vextjs/README.md)。新增 `Runnable` 声明需要真实自动执行路径、公开包入口及页面同源验证，不能只补代码或状态标签。
 
 主题覆盖依赖固定的 Rspress 2.0.22 搜索 hook/SuggestItem 内部入口；保留其本地索引和排序，覆盖事件、模态与失败恢复。显式重试或失败后重开须重建失败搜索器及请求缓存，成功搜索器继续复用；不得直接修改 node_modules。侧栏覆盖布局按 ≤768px，目录展开按 ≤1279px，触发器/关闭按钮/模态语义与布局同步，跨断点必须释放滚动和 inert。升级依赖时运行 check:types 与完整浏览器回归，特别是索引 503 恢复、空/关闭搜索 Enter、IME、焦点约束、导航/搜索叠加、跨断点、目录 Escape 和折叠语义。侧栏与分区快速跳转只从同一 _meta 派生，不另建导航配置。
 

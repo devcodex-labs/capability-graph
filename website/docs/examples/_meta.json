@@ -1,5 +1,5 @@
 [
   { "type": "file", "name": "seed-provider", "label": "Seed 端到端示例" },
   { "type": "file", "name": "multi-provider", "label": "多 Provider 隔离测试" },
-  { "type": "file", "name": "vextjs-integration", "label": "VextJS 集成", "tag": "概念示例" }
+  { "type": "file", "name": "vextjs-integration", "label": "VextJS 集成", "tag": "固定来源实测" }
 ]

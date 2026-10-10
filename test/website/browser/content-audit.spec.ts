@@ -32,11 +32,18 @@ for (const width of [320, 768, 1280]) {
         }));
         expect(widths.scroll, `${route}: global horizontal overflow`).toBeLessThanOrEqual(widths.client + 1);
         const tables = await page.locator('.rp-doc table').evaluateAll((elements) => elements.map((element) => {
-          const table = element.getBoundingClientRect();
+          const scrollContainer = element.closest<HTMLElement>('.rp-table-scroll-container');
+          const table = (scrollContainer ?? element).getBoundingClientRect();
           const container = element.closest('.rp-doc')!.getBoundingClientRect();
-          return { right: table.right, containerRight: container.right };
+          return { right: table.right, containerRight: container.right,
+            accessibleOverflow: !scrollContainer || scrollContainer.scrollWidth <= scrollContainer.clientWidth + 1 ||
+              (getComputedStyle(scrollContainer).overflowX === 'auto' && scrollContainer.tabIndex === 0 &&
+                scrollContainer.getAttribute('role') === 'region' && Boolean(scrollContainer.getAttribute('aria-label'))) };
         }));
-        for (const table of tables) expect(table.right, `${route}: table extends outside its article`).toBeLessThanOrEqual(table.containerRight + 1);
+        for (const table of tables) {
+          expect(table.right, `${route}: table viewport extends outside its article`).toBeLessThanOrEqual(table.containerRight + 1);
+          expect(table.accessibleOverflow, `${route}: overflowing table needs keyboard access`).toBe(true);
+        }
         if (route === 'reference/queries-and-results') {
           await page.screenshot({ path: testInfo.outputPath(`audit-${width}-queries.png`) });
         }

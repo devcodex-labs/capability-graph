@@ -20,7 +20,7 @@ test("T-F11: all numeric defaults match the design", () => {
       defaultKnowledgePageSize: 20, maxKnowledgePageSize: 100 },
     specification: { defaultPageSize: 20, maxPageSize: 100, maxBytes: 131_072, maxItemBytes: 16_384 },
     selection: { maxSelected: 32, maxNodes: 128, maxEdges: 256 },
-    read: { maxBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
+    read: { maxBytes: 32_768, maxPageBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
       maxFilterValuesPerDimension: 128, maxResponseBytes: 4_194_304 },
     retrieveCapabilities: { maxCandidates: 20, maxCandidateBytes: 512 },
     queryKnowledge: { maxHits: 8, maxSnippetBytes: 2_048, maxSelected: 32,

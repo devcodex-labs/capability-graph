@@ -41,7 +41,8 @@ for (const entry of statuses) {
   assert((await stat(source)).isFile() || (await stat(source)).isDirectory(), `${entry.id} source is not readable`);
 }
 const vextjs = statuses.find(({ id }) => id === 'vextjs-integration');
-assert(vextjs?.status === 'Contract-only' && vextjs.source === '../examples/vextjs', 'VextJS must disclose its fixed-source opt-in verification boundary');
+assert(vextjs?.status === 'Runnable' && vextjs.source === '../examples/vextjs' &&
+  vextjs.verify.includes('scripts/validation/vextjs-documentation.mjs') && vextjs.verify.includes('ef926649926e17543562b8169982fa1786285ecf'), 'VextJS must have the fixed-source executable verification entry');
 
 const fixtureRoot = path.join(websiteFixtureRoot, 'advanced-provider');
 const fixtureFiles = ['provider.json', 'capabilities/route.json', 'capabilities/route-http.json'];

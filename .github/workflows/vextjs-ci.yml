@@ -6,6 +6,12 @@ on:
   pull_request:
     paths: ['src/**', 'examples/**', 'scripts/**', 'test/**', 'package*.json', 'tsconfig*.json', '.github/workflows/vextjs-ci.yml']
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      commit:
+        description: Immutable commit supplied by the release workflow
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -33,6 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -97,6 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -133,6 +141,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          npm run test:docs:vextjs -- "$VEXT_ROOT"
           docker pull mongo:8.0
           node scripts/validation/vextjs-consumer.mjs "$VEXT_ROOT" "$VEXT_SOURCE_COMMIT" --https
       - uses: actions/upload-artifact@v4

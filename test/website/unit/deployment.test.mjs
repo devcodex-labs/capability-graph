@@ -28,10 +28,10 @@ for (const file of ['ci', 'docs-ci', 'docs-deploy', 'release']) {
   const value = parsed.toJSON();
   assert(value.on && value.jobs && value.permissions, `${file}: missing workflow controls`);
   for (const [name, job] of Object.entries(value.jobs)) {
-    assert(job['runs-on'] && Array.isArray(job.steps), `${file}.${name}: incomplete job`);
+    assert(job.uses || (job['runs-on'] && Array.isArray(job.steps)), `${file}.${name}: incomplete job`);
     const needs = job.needs === undefined ? [] : [].concat(job.needs);
     assert(needs.every((dependency) => dependency in value.jobs), `${file}.${name}: unknown dependency`);
-    for (const step of job.steps) assert(Boolean(step.run) !== Boolean(step.uses), `${file}.${name}: ambiguous step`);
+    for (const step of job.steps ?? []) assert(Boolean(step.run) !== Boolean(step.uses), `${file}.${name}: ambiguous step`);
   }
   if (file === 'docs-deploy') {
     assert.deepEqual(Object.keys(value.on), ['workflow_dispatch']);

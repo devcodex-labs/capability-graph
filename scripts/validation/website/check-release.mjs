@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { repositoryRoot } from '../../lib/artifact-paths.mjs';
 import { websiteRoot } from '../../lib/website-paths.mjs';
+import { assertReleaseDocumentation } from './lib/release-documentation.mjs';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -31,6 +32,11 @@ for (const [name, value] of [
 await access(path.join(repositoryRoot, 'changelogs', `${manifest.version}.md`));
 const readme = await readFile(path.join(repositoryRoot, 'README.md'), 'utf8');
 assert(readme.includes(`changelogs/${manifest.version}.md`), 'README must link the release changelog');
+assertReleaseDocumentation({ version: manifest.version, readme,
+  installation: await readFile(path.join(websiteRoot, 'docs/getting-started/installation.mdx'), 'utf8'),
+  home: await readFile(path.join(websiteRoot, 'docs/index.mdx'), 'utf8'),
+  quickstart: await readFile(path.join(websiteRoot, 'docs/getting-started/index.mdx'), 'utf8'),
+  changelog: await readFile(path.join(repositoryRoot, 'changelogs', `${manifest.version}.md`), 'utf8') });
 
 const releaseId = `capability-graph-${manifest.version}`;
 const checkoutCommit = execFileSync('git', ['rev-parse', 'HEAD'], {

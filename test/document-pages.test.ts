@@ -73,10 +73,32 @@ test("UTF-8 pages reconstruct large documents and overlong fences exactly, with 
   const spec = await bound.readSpecificationPage({ knowledgeId: "SPEC", maxBytes: 500 });
   assert.equal(spec.contentId, contentId(Buffer.from(text))); assert.ok(spec.nextCursor);
   const full = await graph.readDocuments({ selected: [{ providerId: "pages", capabilityId: "a" }] });
-  assert.ok(full.results[0]?.ok); assert.equal(full.results[0].value.byteLength, Buffer.byteLength(text));
+  assert.equal(full.results[0]?.ok, false);
+  if (!full.results[0]!.ok) assert.equal(full.results[0]!.error.code, "CG_BUDGET_EXCEEDED");
   const found = await bound.queryKnowledge({ text: "paragraph", selected: [{ capabilityId: "a" }], limit: 2 });
   assert.equal(found.items.length, 2); assert.equal(found.meta.completeness, "complete");
   for (const hit of found.items) assert.equal(Buffer.from(text).subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
+}));
+
+test("LF and CRLF paragraph/fence boundaries preserve original UTF-8 byte ranges", async () => fixture(async (graph, root) => {
+  for (const newline of ["\n", "\r\n"]) {
+    for (const suffix of [newline + newline, newline + "```ts" + newline, newline + "~~~js" + newline]) {
+      const prefix = "\ufeff" + "中🙂".repeat(4) + suffix;
+      const text = prefix + "中🙂".repeat(200);
+      await writeFile(path.join(root, "doc.md"), text);
+      const first = await graph.forProvider("pages").readDocumentPage({ capabilityId: "a", knowledgeId: "DOC", maxBytes: Buffer.byteLength(prefix) + 9 });
+      assert.equal(first.text, prefix);
+      assert.equal(first.endOffset, Buffer.byteLength(prefix));
+      let cursor = first.nextCursor; let restored = first.text; let offset = first.endOffset;
+      while (cursor) {
+        const page = await graph.forProvider("pages").readDocumentPage({ capabilityId: "a", knowledgeId: "DOC", maxBytes: 41, cursor });
+        assert.equal(page.startOffset, offset);
+        restored += page.text; offset = page.endOffset; cursor = page.nextCursor;
+      }
+      assert.equal(restored, text);
+      assert.equal(offset, Buffer.byteLength(text));
+    }
+  }
 }));
 
 test("cursors reject body changes, identity changes and metadata drift; invalid UTF-8 offsets fail", async () => fixture(async (graph, root, text) => {
@@ -125,7 +147,7 @@ test("HTTP pages work without Range and abort closes real I/O before returning",
     await writeFile(path.join(root, "provider.json"), JSON.stringify({ providerId: "http", name: "HTTP", version: "1" }));
     await writeFile(path.join(root, "a.capability.json"), JSON.stringify({ capabilityId: "a", name: "a", description: "HTTP", whenToUse: "read",
       knowledge: ["doc", "slow"].map((knowledgeId) => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "http", url: `${origin}/${knowledgeId}` } })) }));
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ["http"], integrationEnabledProviders: ["http"], providers: [{ providerId: "http", authority: { kind: "file", rootDir: root } }], readers: [reader], knowledgeRetriever: new TextKnowledgeRetriever(), budgets: { read: { maxBytes: 1024 } } });
+    graph = await CapabilityGraph.open({ hostAllowedProviders: ["http"], integrationEnabledProviders: ["http"], providers: [{ providerId: "http", authority: { kind: "file", rootDir: root } }], readers: [reader], knowledgeRetriever: new TextKnowledgeRetriever(), budgets: { read: { maxPageBytes: 1024 } } });
     const bound = graph.forProvider("http"); const first = await bound.readDocumentPage({ capabilityId: "a", knowledgeId: "doc", maxBytes: 1024 });
     assert.equal(first.totalBytes, Buffer.byteLength(text)); assert.equal(first.contentId, contentId(Buffer.from(text)));
     const before = requests;

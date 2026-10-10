@@ -13,7 +13,9 @@ test('manual release resume rejects a later branch checkout even when its versio
     const version = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8')).version;
     const tag = `v${version}`;
     const files = ['package.json', 'package-lock.json', 'website/package.json', 'website/package-lock.json',
-      'README.md', `changelogs/${version}.md`, 'scripts/lib/artifact-paths.mjs', 'scripts/lib/website-paths.mjs', 'scripts/validation/website/check-release.mjs'];
+      'README.md', `changelogs/${version}.md`, 'scripts/lib/artifact-paths.mjs', 'scripts/lib/website-paths.mjs', 'scripts/validation/website/check-release.mjs',
+      'scripts/validation/website/lib/release-documentation.mjs', 'website/docs/getting-started/installation.mdx',
+      'website/docs/getting-started/index.mdx', 'website/docs/index.mdx'];
     for (const file of files) {
       await mkdir(path.dirname(path.join(root, file)), { recursive: true });
       await cp(path.join(repositoryRoot, file), path.join(root, file));
@@ -53,6 +55,30 @@ test('manual release resume rejects a later branch checkout even when its versio
       assert(result.stdout.includes(frozen));
     }
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('publication depends on all frozen-commit compatibility, framework and documentation workflows', async () => {
+  const readWorkflow = async (name) => parseDocument(await readFile(path.join(repositoryRoot, `.github/workflows/${name}.yml`), 'utf8')).toJSON();
+  const release = await readWorkflow('release');
+  assert.deepEqual(release.jobs.gates.needs, ['freeze', 'compatibility', 'framework', 'documentation']);
+  assert.deepEqual(release.jobs.package.needs, ['freeze', 'gates']);
+  for (const [name, file] of [['compatibility', 'ci'], ['framework', 'vextjs-ci'], ['documentation', 'docs-ci']]) {
+    const call = release.jobs[name];
+    assert.equal(call.uses, `./.github/workflows/${file}.yml`);
+    assert.equal(call.with.commit, '${{ needs.freeze.outputs.release_commit }}');
+    assert.equal(call.needs, 'freeze');
+    assert.equal(call.if, undefined, 'failed or pending prerequisites cannot be bypassed with always()');
+    assert.equal(call['continue-on-error'], undefined);
+    const workflow = await readWorkflow(file);
+    assert.equal(workflow.on.workflow_call.inputs.commit.required, true);
+    for (const job of Object.values(workflow.jobs)) {
+      assert.equal(job['continue-on-error'], undefined);
+      const checkouts = job.steps.filter((step) => step.uses?.startsWith('actions/checkout@'));
+      for (const checkout of checkouts) assert.equal(checkout.with.ref, '${{ inputs.commit || github.sha }}');
+    }
+  }
+  assert.equal(release.jobs.gates.if, undefined);
+  assert.equal(release.jobs.package.if, undefined);
 });
 
 test('all release product jobs use the frozen commit and the initial resume checkout uses the tag', async () => {
