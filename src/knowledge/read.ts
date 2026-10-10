@@ -1,6 +1,6 @@
 import type { BudgetConfig, ResolvedBudgetConfig } from "../budgets.js";
 import { errorShape, type QueryContext } from "../core-host.js";
-import { CapabilityGraphError, type ErrorShape } from "../errors.js";
+import { CapabilityGraphError, projectAdapterError, type ErrorShape } from "../errors.js";
 import { formatQualifiedId, isKnowledgeId } from "../identity.js";
 import { normalizeLocale } from "../locale.js";
 import { bytes, capability, inputInvalid } from "../query/common.js";
@@ -46,7 +46,7 @@ export async function readDocument(ref: KnowledgeDocumentRef, context: Knowledge
   try { raw = await reader.read(ref, context, { maxBytes }); }
   catch (error) {
     if (reader === local && error instanceof CapabilityGraphError) throw error;
-    throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" });
+    throw projectAdapterError(error, { CG_BUDGET_EXCEEDED: "page_or_filter" }, "CG_READER_UNAVAILABLE", "repair_source");
   }
   if (!raw || !(raw.bytes instanceof Uint8Array) || typeof raw.contentType !== "string" || !raw.contentType.trim() || raw.source !== locatorSource(ref)) {
     throw new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source", details: { reason: "reader_result_invalid" } });

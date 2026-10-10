@@ -7,6 +7,11 @@ import type { CapabilityRef, CatalogRecord } from "./types.js";
 export const KINDS: readonly NeighborKind[] = ["parents", "children", "specializes", "specializedBy", "related", "relatedBy", "requires", "requiredBy"];
 export const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value), "utf8");
 export function inputInvalid(): never { throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" }); }
+/** Check raw counts before mapping identities, inspecting elements or probing an authority. */
+export function arrayBudget(value: unknown, maximum: number): asserts value is readonly unknown[] {
+  if (!Array.isArray(value)) inputInvalid();
+  if (value.length > maximum) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+}
 export function limit(value: number | undefined, fallback: number, maximum: number, zero = false): number {
   const result = value === undefined ? fallback : value;
   if (!Number.isSafeInteger(result) || result < (zero ? 0 : 1)) inputInvalid();

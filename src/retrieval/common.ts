@@ -1,4 +1,4 @@
-import { CapabilityGraphError, type ErrorCode } from "../errors.js";
+import { CapabilityGraphError, projectAdapterError, type ErrorCode } from "../errors.js";
 import type { QueryContext } from "../core-host.js";
 import type { ResultMeta } from "../types.js";
 import { inputInvalid } from "../query/common.js";
@@ -19,9 +19,10 @@ export async function invoke<T>(call: () => Promise<T>, accessErrors?: WeakMap<o
   catch (error) {
     const captured = error !== null && typeof error === "object" ? accessErrors?.get(error) : undefined;
     if (captured) throw captured;
-    if (error instanceof CapabilityGraphError && ["CG_REVISION_MISMATCH", "CG_INDEX_STALE", "CG_READER_UNCONFIGURED", "CG_READER_UNAVAILABLE", "CG_SOURCE_UNREADABLE", "CG_PATH_TRAVERSAL", "CG_BUDGET_EXCEEDED", "CG_ADAPTER_CONTRACT_INVALID", "CG_SCOPE_DENIED"].includes(error.code)) {
-      throw new CapabilityGraphError(error.code, { nextAction: error.nextAction });
-    }
-    throw new CapabilityGraphError("CG_RETRIEVER_UNAVAILABLE", { nextAction: "repair_source" });
+    throw projectAdapterError(error, {
+      CG_REVISION_MISMATCH: "refresh", CG_INDEX_STALE: "refresh", CG_READER_UNCONFIGURED: "configure_backend",
+      CG_READER_UNAVAILABLE: "repair_source", CG_SOURCE_UNREADABLE: "repair_source", CG_PATH_TRAVERSAL: "repair_source",
+      CG_BUDGET_EXCEEDED: "page_or_filter", CG_ADAPTER_CONTRACT_INVALID: "repair_source", CG_SCOPE_DENIED: "narrow_scope",
+    }, "CG_RETRIEVER_UNAVAILABLE", "repair_source");
   }
 }

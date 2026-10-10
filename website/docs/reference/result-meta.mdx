@@ -74,7 +74,7 @@ Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticR
 
 ## 分页与游标
 
-游标绑定原请求的范围、过滤、limit 和修订。续页必须保留这些条件。最终公开游标编码后最多 32,768 个 base64url 字符；输入超限为 `CG_INPUT_INVALID`，输出超限为 `CG_BUDGET_EXCEEDED`。
+条目分页游标按各接口绑定原请求范围、过滤、有效 limit 和修订，续页保留相应条件。正文 `readDocumentPage/readSpecificationPage` 的游标绑定文档、来源、静态修订及全文内容身份；允许在有效预算内更改下一页 `maxBytes`，但不能同时传 `cursor` 和 `startOffset`。最终公开游标编码后最多 32,768 个 base64url 字符；输入超限为 `CG_INPUT_INVALID`，输出超限为 `CG_BUDGET_EXCEEDED`。
 
 邻居八个关系组各自分页。续页只提交仍有 `nextCursor` 的 `kinds` 和对应 `cursors`。页大小和总字节预算同时生效，提高响应字节预算不会放宽游标长度上限。
 
@@ -92,7 +92,7 @@ Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticR
 | Knowledge query | 32 个原始 selected、每维 128 个过滤值、128 个最终 targets、8 命中、2,048 单个 snippet 字节 |
 | Runtime | 50 默认页、100 最大页、5,000 ms 等待、4,096 facts 字节 |
 
-字节预算使用 UTF-8 或原始 bytes，不是 JavaScript 字符数。`truncated` 表示继续分页，`partial` 表示检查 warning 或逐项失败。单项过大不会被截断成看似合法的数据；无法取得进展时返回 `CG_BUDGET_EXCEEDED`。
+字节预算使用 UTF-8 或原始 bytes，不是 JavaScript 字符数。条目查询的 `truncated` 表示有续页，`partial` 表示检查 warning 或逐项失败。正文页的 `partial` 表示本页未包含整个文档，即使读取成功且没有 warning/error；续读看 `hasMore/nextCursor`。仅从偏移 0 返回完整正文时，completeness 为 `complete`。单项过大不会被截断成看似合法的数据；无法取得进展时返回 `CG_BUDGET_EXCEEDED`。
 
 Selection 按选择、节点和依赖边数量限制工作量，当前没有独立的响应总字节预算。可通过 `OpenConfig.budgets.selection` 覆盖 `maxSelected/maxNodes/maxEdges`；原始选择在去重前计数。
 

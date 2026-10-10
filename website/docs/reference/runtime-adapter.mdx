@@ -73,12 +73,14 @@ Core 拥有 `close()` 调用并在验证失败或视图退休时执行；仍有�
 |---|---|---|
 | retrieveCapabilities | 非空 text，允许 scope 与当前静态修订 → 候选身份/score/sourceStaticRevision，再投影 CapabilityCandidate | limit 默认/最大 20，单候选 512 字节；未配置 CG_RETRIEVER_UNCONFIGURED，后端异常 CG_RETRIEVER_UNAVAILABLE；不合法候选剔除并 warning/partial |
 | queryKnowledge | 非空 text、非空 selected，knowledgeIds/roles/locales 可选 → QueryKnowledgePage | limit 默认/最大 8，snippet 2,048 UTF-8 字节；原始 selected 32、每维过滤 128、最终 targets 128/131,072 字节，检索前校验 |
-| KnowledgeReader.read | 必填 Document、只在 Reader 内可用的 context、maxBytes → bytes/contentType/contentId/source | 返回完整有界字节；全文调用默认受 4 MiB 响应容量保护；contentId 为原始完整 bytes 的 SHA-256 前 16 位，source 精确等于 locator |
+| KnowledgeReader.read | 必填 Document、只在 Reader 内可用的 context、maxBytes → bytes/contentType/contentId/source | 全文单篇默认 `read.maxBytes = 32 KiB`；超限使用 `CG_BUDGET_EXCEEDED / page_or_filter`；contentId 为原始完整 bytes 的 SHA-256 前 16 位，source 精确等于 locator |
 | KnowledgeReader.stream | 可选 Document/context/chunkBytes/signal → AsyncIterable 字节块 | 单块不超过 chunkBytes，总文档大小不设门槛；Core 计算完整哈希；取消和迭代器退出必须关闭实际 I/O |
 | RuntimeAdapter.query | 必填 project/environment/currentStaticRevision/limit，可选 instanceOf/instanceId/cursor → RuntimeAdapterResult | 输入 limit 来自 runtime 有效预算；Core 默认等 5,000ms，不发送 AbortSignal；完整校验见[Runtime](./runtime) |
 | DatabaseReadView 扫描/邻居 | StorePageRequest 必填 limit/maxBytes，cursor 可选 → StorePage&lt;T&gt; | 按收到的数量/字节预算返回严格有序且有进展的页；坏页/漂移使验证或查询失败，不以空页绕过合同 |
 
 查询输入的所有字段/输出形状与 Adapter 方法参数在下方展开。limit 必须是正的安全整数，超过有效最大值时收敛到最大值；检索没有默认目录替代。queryKnowledge 的 selected 仍为 CapabilityRef 对象数组（包括绑定对象调用），不能照搬 readDocuments 的绑定字符串数组。
+
+`read.maxPageBytes` 默认也是 32 KiB，独立控制正文页/流块。`read.maxResponseBytes` 默认 4 MiB，约束完整 JSON 响应，也用于只有 `read` 的旧 Reader 正文分页及检索 access 的有界全文回退；Core 私有快照缓存另有每实例 4 MiB 容量。流式 Reader 的完整文档总大小不设门槛，缓存不足时继续完整核验。全文、分页和缓存预算的含义见[结果与预算](./result-meta#预算字段与默认值)。
 
 Reader 的精确表达式是 `contentId = 'k:' + createHash('sha256').update(bytes).digest('hex').slice(0, 16)`。对正文原始字节计算，不先解码、规范化换行或截取正文；完整 64 位哈希也会被 Core 判为内容身份不匹配。最小实现见 [KnowledgeReader 接入](../integrations/knowledge-reader#http-reader-骨架)。
 

@@ -15,6 +15,15 @@ const command = (args, cwd = repository) => execFileSync(process.execPath, args,
   cwd, encoding: "utf8", timeout: 120_000, maxBuffer: 2 * 1024 * 1024,
 });
 
+function checkReadmeLinks(markdown, files) {
+  for (const [, target] of markdown.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+    if (target.startsWith('#')) continue;
+    if (/^https?:\/\//.test(target)) { new URL(target); continue; }
+    const file = path.posix.normalize(decodeURIComponent(target.split('#')[0]));
+    assert.ok(files.has(file), `README package link has no shipped target: ${target}`);
+  }
+}
+
 try {
   const snapshot = path.join(temporary, "source"); await mkdir(snapshot);
   for (const entry of ["package.json", "package-lock.json", "README.md", "LICENSE", "tsconfig.json", "src", "scripts", "node_modules"]) {
@@ -45,6 +54,12 @@ try {
   command([npm, "install", "--prefer-offline", "--ignore-scripts", "--no-audit", "--no-fund", "--package-lock=false",
     path.join(temporary, packed.filename)], temporary);
   const installed = path.join(temporary, "node_modules", "@devcodex", "capability-graph");
+  const readme = await readFile(path.join(installed, "README.md"), "utf8");
+  const shipped = new Set(packed.files.map((file) => file.path));
+  checkReadmeLinks(readme, shipped);
+  assert.throws(() => checkReadmeLinks(readme + '\n[Source-only guide](website/docs/getting-started/first-provider.mdx)', shipped),
+    /README package link has no shipped target/);
+  console.log("Installed README links and source-only link negative control passed");
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
   assert.deepEqual(Object.keys(metadata.exports), ["."]);
   assert.deepEqual(metadata.dependencies, { "bcp-47": "2.1.1", "language-subtag-registry": "0.4.2" });

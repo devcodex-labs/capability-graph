@@ -156,3 +156,33 @@ test("read budgets do not replace queryKnowledge selection/filter budgets", asyn
     assert.throws(() => f.graph.readDocuments({ selected: [id("a"), id("b")] }), { code: "CG_BUDGET_EXCEEDED" });
   } finally { await f.graph.close(); }
 });
+
+test("detail and knowledge raw budgets reject before conversion, revision probes and backend calls", async () => {
+  const f = await open(); const bound = f.graph.forProvider("seed");
+  try {
+    const revision = (await bound.getProvider()).staticRevision;
+    f.db.reads = 0;
+    for (const requiredStaticRevision of [undefined, revision]) {
+      await assert.rejects(f.graph.getCapabilities(Array(21).fill(id("a")), { requiredStaticRevision }), { code: "CG_BUDGET_EXCEEDED" });
+      await assert.rejects(bound.getCapabilities(Array(21).fill("a"), { requiredStaticRevision }), { code: "CG_BUDGET_EXCEEDED" });
+      for (const api of [f.graph, bound]) {
+        await assert.rejects(api.queryKnowledge({ text: "guide", selected: Array(33).fill(id("a")), requiredStaticRevision }), { code: "CG_BUDGET_EXCEEDED" });
+        for (const field of ["knowledgeIds", "roles", "locales"] as const) {
+          await assert.rejects(api.queryKnowledge({ text: "guide", selected: [id("a")], [field]: Array(129).fill("invalid"), requiredStaticRevision }),
+            { code: "CG_BUDGET_EXCEEDED" });
+        }
+      }
+    }
+    let indices = 0;
+    const ids = new Proxy(Array<string>(4096).fill("a"), { get(target, property, receiver) {
+      if (typeof property === "string" && /^[0-9]+$/.test(property)) indices++;
+      return Reflect.get(target, property, receiver);
+    } });
+    await assert.rejects(bound.getCapabilities(ids), { code: "CG_BUDGET_EXCEEDED" });
+    assert.equal(indices, 0); assert.equal(f.db.reads, 0); assert.equal(f.calls(), 0);
+    const detail = await bound.getCapabilities(Array(20).fill("a"), { requiredStaticRevision: revision });
+    assert.equal(detail.results.length, 20); assert.ok(detail.results.every((slot) => slot.ok));
+    const page = await bound.queryKnowledge({ text: "guide", selected: Array(32).fill(id("a")), roles: Array(128).fill("unused"), requiredStaticRevision: revision });
+    assert.equal(page.knowledgeState, "filtered_empty");
+  } finally { await f.graph.close(); }
+});

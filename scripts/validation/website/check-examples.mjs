@@ -44,6 +44,17 @@ const vextjs = statuses.find(({ id }) => id === 'vextjs-integration');
 assert(vextjs?.status === 'Runnable' && vextjs.source === '../examples/vextjs' &&
   vextjs.verify.includes('scripts/validation/vextjs-documentation.mjs') && vextjs.verify.includes('ef926649926e17543562b8169982fa1786285ecf'), 'VextJS must have the fixed-source executable verification entry');
 
+// Keep the original Seed's documented count tied to the actual registrations.
+const mcpSource = await readFile(path.join(repositoryRoot, 'examples/seed-mcp/src/server.ts'), 'utf8');
+const mcpTools = [...mcpSource.matchAll(/server\.registerTool\("([^"]+)"/g)].map((match) => match[1]);
+assert(mcpTools.length > 0 && new Set(mcpTools).size === mcpTools.length, 'Seed MCP tool registrations must be unique');
+for (const file of ['CONTRIBUTING.md', 'examples/seed-mcp/README.md',
+  'website/docs/integrations/provider-owned-mcp.mdx', 'website/docs/examples/index.mdx', 'website/docs/examples/seed-provider.mdx']) {
+  const prose = await readFile(path.join(repositoryRoot, file), 'utf8');
+  const counts = [...prose.matchAll(/(\d+) 个查询工具/g)].map((match) => Number(match[1]));
+  assert(counts.length > 0 && counts.every((count) => count === mcpTools.length), `${file}: Seed MCP tool count drifted from registrations`);
+}
+
 const fixtureRoot = path.join(websiteFixtureRoot, 'advanced-provider');
 const fixtureFiles = ['provider.json', 'capabilities/route.json', 'capabilities/route-http.json'];
 const fixtureDocuments = ['PROVIDER.md', 'knowledge/routing.md', 'discover.mjs'];

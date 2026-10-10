@@ -70,9 +70,15 @@ try {
   for (const [page, source] of originals) await writeFile(path.join(scratch, page), source.replace(
     '| Static Revision 证据不匹配 | `CG_REVISION_MISMATCH`', '| Static Revision 证据不匹配 | `CG_INDEX_STALE`'), 'utf8');
   await assert.rejects(verifyAdapterContracts(scratch), /documented knowledge error differs from Core/);
+  for (const [page, source] of originals) await writeFile(path.join(scratch, page), source, 'utf8');
+  const readerPage = originals.get('integrations/knowledge-reader.mdx');
+  const missingEmptyChunk = readerPage.replace(/      if \(!emitted\) yield \{[^\n]+\};\n/, '');
+  assert.notEqual(missingEmptyChunk, readerPage, 'negative control must remove the empty-stream metadata chunk');
+  await writeFile(path.join(scratch, 'integrations/knowledge-reader.mdx'), missingEmptyChunk);
+  await assert.rejects(verifyAdapterContracts(scratch), /documented Reader factory failed to page 0 bytes/);
 } finally {
   assert.equal(path.dirname(scratch), artifactsRoot);
   assert(path.basename(scratch).startsWith('cg-contract-negatives-'));
   await rm(scratch, { recursive: true, force: true });
 }
-console.log(`contract negative controls passed: removed fields/signatures/enums, wrong type/optionality/default, ${signatureMutations.length} shared signature mutations, wrong Reader hash and knowledge error`);
+console.log(`contract negative controls passed: removed fields/signatures/enums, wrong type/optionality/default, ${signatureMutations.length} shared signature mutations, wrong Reader hash, missing empty-stream metadata and knowledge error`);

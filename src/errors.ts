@@ -98,3 +98,15 @@ export class CapabilityGraphError extends Error implements ErrorShape {
     if (init.details !== undefined) this.details = Object.freeze({ ...init.details });
   }
 }
+
+/** Rebuild backend failures from an operation-specific whitelist; backend diagnostics stay private. */
+export function projectAdapterError(error: unknown, actions: Readonly<Partial<Record<ErrorCode, NextAction>>>,
+  fallback: ErrorCode, nextAction: NextAction): CapabilityGraphError {
+  try {
+    if (error instanceof CapabilityGraphError) {
+      const code = error.code;
+      if (Object.hasOwn(actions, code)) return new CapabilityGraphError(code, { nextAction: actions[code]! });
+    }
+  } catch { /* An adapter may also supply throwing property accessors. */ }
+  return new CapabilityGraphError(fallback, { nextAction });
+}

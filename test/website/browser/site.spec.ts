@@ -61,7 +61,8 @@ test('first Provider starts with a complete runnable path', async ({ page }) => 
   await expect(page.locator('h2').first()).toContainText('最快跑通');
   await expect(page.locator('pre').getByText('node discover.mjs', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '完整受检示例目录' })).toHaveCount(0);
-  await expect(page.getByRole('main')).toContainText('取得 1.1.0 预览包后');
+  await expect(page.getByRole('main')).toContainText('查询并取得 1.1.0 后');
+  await expect(page.getByRole('main')).not.toContainText('预览包');
   await expect(page.getByText('npm run check:examples', { exact: true })).toHaveCount(0);
 });
 
@@ -74,7 +75,8 @@ test('tutorial checkpoints and MCP entry remain directly reachable', async ({ pa
   await expect(page.getByRole('main')).toContainText('本节只需要 G0，不需要 G1-G3');
   await page.goto('integrations/provider-owned-mcp#seed-调用示例');
   await expect(page.getByRole('main')).toContainText('node examples/seed-mcp/docs-main-entry/client.mjs');
-  await expect(page.getByRole('main')).toContainText('十二工具');
+  await expect(page.getByRole('main')).toContainText('原 examples/seed-mcp Server 保持 14 个查询工具');
+  await expect(page.getByRole('main')).toContainText('只注册五个查询工具');
 });
 
 test('task navigation keeps API design in integrations and derives section jumps', async ({ page }) => {

@@ -17,6 +17,34 @@ const context: KnowledgeReadContext = { providerId: 'seed.http', staticRevision:
 const ref = (url: string): KnowledgeDocumentRef => ({ kind: 'document', knowledgeId: 'HTTP', role: 'guide', locator: { type: 'http', url } });
 const contentId = (bytes: Uint8Array) => `k:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}`;
 
+test('HTTP full-read budgets preserve actionable errors and leave oversized sources pageable', async () => {
+  let body = Buffer.alloc(32768, 120);
+  const source = await httpSource((_url, response) => { response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); response.end(body); });
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin] });
+  const document = ref(source.origin + '/guide');
+  const db = new FakeDatabase([record('a', { knowledge: [document] })]);
+  Object.assign(db.provider, { specification: { specificationId: 'spec', version: '1', documents: [{ ...document, knowledgeId: 'SPEC', role: 'specification' }] } });
+  const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'], readers: [reader],
+    providers: [{ providerId: 'seed', authority: { kind: 'database', adapter: { id: 'metadata', openView: async () => db } } }] });
+  try {
+    for (const size of [32768, 32769]) {
+      body = Buffer.alloc(size, 120);
+      for (const result of [await graph.forProvider('seed').readDocuments({ selected: ['a'] }), await graph.forProvider('seed').readSpecification()]) {
+        const slot = result.results[0]!; assert.equal(slot.ok, size === 32768);
+        if (slot.ok) assert.equal(slot.value.byteLength, size);
+        else { assert.equal(slot.error.code, 'CG_BUDGET_EXCEEDED'); assert.equal(slot.error.nextAction, 'page_or_filter'); }
+      }
+      assert.equal(reader.activeRequests, 0);
+    }
+    let cursor: string | undefined; let text = '';
+    do {
+      const page = await graph.forProvider('seed').readDocumentPage({ capabilityId: 'a', knowledgeId: 'HTTP', ...(cursor ? { cursor } : {}) });
+      assert.equal(page.totalBytes, body.length); text += page.text; cursor = page.nextCursor;
+    } while (cursor);
+    assert.deepEqual(Buffer.from(text), body);
+  } finally { await graph.close(); await reader.close(); await source.close(); }
+});
+
 test('strong ETag snapshot downloads a long source once, revalidates each page and rejects changed cursors', async () => {
   const directory = await createTestDirectory('http-snapshot-');
   let body = Buffer.from('source 中文🙂\n'.repeat(10000)); let version = '"1"'; let downloads = 0; let conditional = 0;

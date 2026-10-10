@@ -1,6 +1,6 @@
 ---
 title: 添加本地知识
-description: 为已选能力关联并安全读取 Provider 根目录内的本地 Document。
+description: 关联 Provider 内或外部目录、安装包和 URL 文档，并使用同一正文分页接口读取。
 ---
 
 # 添加本地知识
@@ -66,3 +66,106 @@ Core 会校验相对路径仍位于 Provider 根的真实路径中，并按条�
 - Collection 不能整读；可以先列成员再按成员 ID 精确读取，全文检索需要 `KnowledgeRetriever`。
 - HTTP/HTTPS 引用需要 `KnowledgeReader`；没有 Reader 会返回明确未配置错误。
 - 知识只从非空已选能力集合展开；需要依赖闭包时先调用 `resolveSelection()`，仅 `requires` 被展开。
+
+## 三类来源与同一分页调用
+
+正文不必都复制进 `knowledge/`。下面是一个独立消费项目的完整配置，覆盖本地目录（含 Provider 外目录）、已安装包和 URL；选择文档后使用相同的 `readDocumentPage()`。先按[安装页](../getting-started/installation)取得 1.1.0，并安装示例包 `npm install bcp-47@2.1.1`。
+
+| 来源 | locator | 宿主配置及正文来源 |
+|---|---|---|
+| Provider 内文件 | `relative-file`，省略 root | path 相对 authority.rootDir；示例 routing.md 由接入者编写 |
+| 其他本地目录 | `relative-file`，root 为 docs | knowledgeRoots.docs 绑定获准目录；直接读取该目录原文件 |
+| node_modules 安装包 | `relative-file`，root 为 installed | packageName 与 resolveFrom 定位实际安装包；直接读取包内 README，不执行包入口 |
+| URL | `http`，url 为原始正文地址 | readers 配置宿主 HTTP Reader；示例地址指向固定 VextJS 提交的原始 README |
+
+创建如下文件。JSON 定义及关联由接入者编写，包内 README 和 URL 正文保持其原始来源；这些关联不表示 VextJS 原生提供了该 Provider。
+
+```text
+consumer/
+  providers/acme.http/provider.json
+  providers/acme.http/capabilities/route-http.json
+  providers/acme.http/knowledge/routing.md
+  docs/routing.md
+  knowledge-sources.mjs
+  read-source.mjs
+```
+
+```json title="providers/acme.http/provider.json"
+{ "providerId": "acme.http", "name": "HTTP application", "version": "1" }
+```
+
+```json title="providers/acme.http/capabilities/route-http.json"
+{
+  "capabilityId": "route.http",
+  "name": "HTTP route",
+  "description": "Discover documentation for the application's route integration.",
+  "whenToUse": "Read the source chosen for this route task.",
+  "knowledge": [
+    { "kind": "document", "knowledgeId": "local-guide", "role": "guide",
+      "locator": { "type": "relative-file", "path": "knowledge/routing.md" } },
+    { "kind": "document", "knowledgeId": "external-guide", "role": "guide",
+      "locator": { "type": "relative-file", "root": "docs", "path": "routing.md" } },
+    { "kind": "document", "knowledgeId": "package-readme", "role": "reference",
+      "locator": { "type": "relative-file", "root": "installed", "path": "readme.md" } },
+    { "kind": "document", "knowledgeId": "url-guide", "role": "reference",
+      "locator": { "type": "http", "url": "https://raw.githubusercontent.com/devcodex-labs/vextjs/ef926649926e17543562b8169982fa1786285ecf/README.md" } }
+  ]
+}
+```
+
+在两个 routing.md 中分别写入自己的指南；包内文件名须与真实安装包一致，示例 bcp-47 使用小写 `readme.md`。它用于演示安装包来源，实际接入可改为 vextjs、monsqlize 或其他包及其真实文档路径。包没有发布的 website 文档须另绑定官方目录或原始 URL。
+
+```js title="knowledge-sources.mjs"
+import path from 'node:path';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+export function openKnowledgeSources({
+  providerRoot = './providers/acme.http',
+  directoryRoot = './docs',
+  packageName = 'bcp-47',
+  resolveFrom = '.',
+  readers = []
+} = {}) {
+  return CapabilityGraph.open({
+    hostAllowedProviders: ['acme.http'],
+    integrationEnabledProviders: ['acme.http'],
+    providers: [{
+      providerId: 'acme.http',
+      authority: { kind: 'file', definitionLayout: 'directory', rootDir: path.resolve(providerRoot) },
+      knowledgeRoots: {
+        docs: { kind: 'directory', rootDir: path.resolve(directoryRoot) },
+        installed: { kind: 'package', packageName, resolveFrom: path.resolve(resolveFrom) }
+      }
+    }],
+    readers
+  });
+}
+```
+
+下面默认读取 Provider 内的指南；把 knowledgeId 换成 `external-guide` 或 `package-readme` 后直接运行同一脚本：
+
+```js title="read-source.mjs"
+import { openKnowledgeSources } from './knowledge-sources.mjs';
+
+const graph = await openKnowledgeSources();
+try {
+  const provider = graph.forProvider('acme.http');
+  const requiredStaticRevision = (await provider.getProvider()).staticRevision;
+  const query = { capabilityId: 'route.http', knowledgeId: 'local-guide', requiredStaticRevision };
+  const page = await provider.readDocumentPage({ ...query, maxBytes: 1024 });
+  console.log(page.source, page.contentId, page.text, page.hasMore);
+  if (page.hasMore) {
+    // 示例再读一页；实际任务由模型决定是否续读及下一页范围预算。
+    const next = await provider.readDocumentPage({ ...query, cursor: page.nextCursor, maxBytes: 2048 });
+    console.log(next.text, next.hasMore, next.nextCursor);
+  }
+} finally {
+  await graph.close();
+}
+```
+
+在 consumer 目录运行 `node read-source.mjs`。读取 `url-guide` 前，按 [HTTP Reader 接入](../integrations/knowledge-reader#http-reader-骨架)创建宿主的 httpReader，并将打开图的一行改为 `openKnowledgeSources({ readers: [httpReader] })`；分页查询保持相同。httpReader 的传输实现、访问策略和关闭由宿主提供，没有 Reader 时该 URL 返回 `CG_READER_UNCONFIGURED`。
+
+各来源都返回实际 source、全文 contentId、当前范围偏移及 hasMore/nextCursor；source 会显示 `knowledge/routing.md`、`root:docs/routing.md`、`root:installed/readme.md` 或原始 URL。空正文可成功返回完整空页。完整文档不受总大小门槛限制，默认全文单篇和正文页各为 32 KiB；超出全文预算时使用分页。续页可调整 maxBytes，正文变化会拒绝旧游标。
+
+知识根别名按[知识接口](../reference/knowledge#locator-字段)的 ASCII 命名规则设置。目录真实根、安装包版本和 manifest 在打开视图时固定；替换包或迁移根目录后重新加载并取得新修订。关闭图后，仍需由宿主关闭其创建的 HTTP Reader。

@@ -4,7 +4,7 @@ import { resolveBudgets, type ResolvedBudgetConfig, type BudgetOverrides } from 
 import { CapabilityGraphError, type ErrorShape } from "./errors.js";
 import { isId } from "./identity.js";
 import { computeEffectiveScope } from "./scope.js";
-import { databaseAuthorityStore } from "./store/database-authority-store.js";
+import { authorityError, databaseAuthorityStore } from "./store/database-authority-store.js";
 import { FileAuthorityStore } from "./store/file-authority-store.js";
 import { memoryGraphStore } from "./store/memory-graph-store.js";
 import { ProviderViewStore, FrozenGraph, type PinnedStore } from "./store/provider-view-store.js";
@@ -93,7 +93,12 @@ export class CoreHost {
   private async load(spec: ProviderLoadSpec): Promise<ValidatedProviderView> {
     try {
       const roots = await bindKnowledgeRoots(spec.knowledgeRoots);
-      if (spec.authority.kind === "database") return await databaseAuthorityStore(await spec.authority.adapter.openView(spec.providerId), spec.providerId, roots);
+      if (spec.authority.kind === "database") {
+        let view;
+        try { view = await spec.authority.adapter.openView(spec.providerId); }
+        catch (error) { throw authorityError(error); }
+        return await databaseAuthorityStore(view, spec.providerId, roots);
+      }
       const source = await new FileAuthorityStore().load(spec.authority.rootDir, spec.authority.definitionLayout);
       const snapshot = await validateSnapshot({ ...source, knowledgeRoots: roots });
       if (snapshot.provider.providerId !== spec.providerId) throw new CapabilityGraphError("CG_VALIDATION_FAILED", { nextAction: "repair_source" });

@@ -1,6 +1,6 @@
 # Provider 自有 MCP 示例
 
-本例是独立私有包，不属于 Core 的发布入口。12 个查询工具复用同一 `CapabilityGraph`，不为每项能力单独注册工具。Provider 自己通过 `seed://provider/specification` 资源提供规范正文；Core 关联 Specification Document 元数据并支持显式读取，但不负责 MCP Resource 投递。
+本例是独立私有包，不属于 Core 的发布入口。14 个查询工具复用同一 `CapabilityGraph`，不为每项能力单独注册工具。Provider 自己通过 `seed://provider/specification` 资源提供规范正文；Core 关联 Specification Document 元数据并支持显式读取，但不负责 MCP Resource 投递。
 
 ## 运行
 

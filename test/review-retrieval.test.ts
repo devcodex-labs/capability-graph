@@ -140,6 +140,25 @@ test("S1: forged adapter diagnostics stay stripped in both retrieval entry point
   } finally { await graph.close(); }
 });
 
+test("retrieval backend nextAction is derived from the allowed error code", async () => {
+  const fail = async (): Promise<never> => {
+    const error = new CapabilityGraphError("CG_INDEX_STALE", { nextAction: "repair_source", message: "/private/index", details: { secret: "private" } });
+    Object.assign(error, { nextAction: "private-action" }); throw error;
+  };
+  const graph = await CapabilityGraph.open(config(new FakeDatabase([record("a", { knowledge: [remoteDocument] })]), {
+    knowledgeRetriever: { id: "invalid-action", retrieve: fail }, capabilityRetriever: { id: "invalid-action", retrieve: fail },
+  }));
+  try {
+    for (const call of [() => graph.queryKnowledge({ text: "find", selected: [id] }), () => graph.retrieveCapabilities({ text: "find" })]) {
+      await assert.rejects(call(), (error: unknown) => {
+        assert.ok(error instanceof CapabilityGraphError); assert.equal(error.code, "CG_INDEX_STALE");
+        assert.equal(error.nextAction, "refresh"); assert.equal(error.details, undefined);
+        assert.doesNotMatch(error.message, /private/); return true;
+      });
+    }
+  } finally { await graph.close(); }
+});
+
 test("R10: late Runtime rejection after timeout is handled under strict unhandled-rejection mode", () => {
   const script = `
     import assert from 'node:assert/strict';

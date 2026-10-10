@@ -48,11 +48,11 @@ interface KnowledgeReader {
 
 ## HTTP Reader 骨架
 
-下面的类型可编译，但 `readBounded` 是接入方必须提供的传输实现，不代表主包已有 HTTP 后端。它应在接收数据时累计字节、超限立即终止，并负责访问策略、认证、重定向和超时；不能先下载任意大小的正文再检查长度。
+下面的类型可编译，但 `readBounded` 是接入方必须提供的传输实现。它应在接收数据时累计字节，超限立即终止并抛出 `CapabilityGraphError('CG_BUDGET_EXCEEDED', { nextAction: 'page_or_filter' })`；访问策略、认证、重定向和超时由传输实现负责。流式实现按块读取完整来源，文档总大小不设门槛。
 
 ```ts title="reader-skeleton.ts"
 import { createHash } from 'node:crypto';
-import type { KnowledgeReader, KnowledgeDocumentRef, KnowledgeReadContext } from '@devcodex/capability-graph';
+import { CapabilityGraphError, type KnowledgeReader, type KnowledgeDocumentRef, type KnowledgeReadContext } from '@devcodex/capability-graph';
 
 export function createHttpReader(
   readBounded: (url: string, maxBytes: number) => Promise<Uint8Array>,
@@ -65,15 +65,18 @@ export function createHttpReader(
     },
     ...(streamBounded ? { async *stream(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, options: { chunkBytes: number; signal?: AbortSignal }) {
       if (ref.locator.type !== 'http') throw new Error('Unsupported locator');
+      let emitted = false;
       for await (const bytes of streamBounded(ref.locator.url, options)) {
         if (bytes.length > options.chunkBytes) throw new Error('Chunk budget exceeded');
+        emitted = true;
         yield { bytes, contentType: 'text/plain; charset=utf-8', source: ref.locator.url };
       }
+      if (!emitted) yield { bytes: new Uint8Array(), contentType: 'text/plain; charset=utf-8', source: ref.locator.url };
     } } : {}),
     async read(ref, _context, { maxBytes }) {
       if (ref.locator.type !== 'http') throw new Error('Unsupported locator');
       const bytes = await readBounded(ref.locator.url, maxBytes);
-      if (bytes.byteLength > maxBytes) throw new Error('Document exceeds byte budget');
+      if (bytes.byteLength > maxBytes) throw new CapabilityGraphError('CG_BUDGET_EXCEEDED', { nextAction: 'page_or_filter' });
       return {
         bytes,
         contentType: 'text/plain; charset=utf-8',
@@ -89,7 +92,7 @@ export function createHttpReader(
 
 `bytes` 是正文原始字节，V1 的 `contentId` 为 `k:` 加 SHA-256 十六进制值的前 16 位；Core 会重新计算核验。`source` 必须等于声明的 URL，不能随意换成缓存路径或重定向地址。`maxBytes` 单位为字节，不能用字符串长度替代。
 
-成功时 `readDocuments()` 的成功槽位返回 `text`、`byteLength`、`contentId` 和原 `source`。伪造哈希/source 会得到 `CG_ADAPTER_CONTRACT_INVALID`，Reader 抛错投影为 `CG_READER_UNAVAILABLE`；批量读取中检查每项 `ok`。Reader 拥有网络资源，Core 不负责关掉它的连接池。
+成功时 `readDocuments()` 的成功槽位返回 `text`、`byteLength`、`contentId` 和原 `source`。伪造哈希/source 会得到 `CG_ADAPTER_CONTRACT_INVALID`；受控的超预算异常投影为 `CG_BUDGET_EXCEEDED / page_or_filter`，其他自定义 Reader 执行异常为 `CG_READER_UNAVAILABLE`。Core 使用稳定消息并移除 Reader 私有详情。批量读取中检查每项 `ok`。Reader 拥有网络资源，Core 不负责关掉它的连接池。
 
 
 ## 分页、代理与宿主快照

@@ -3,6 +3,9 @@
 - `readDocuments()` / `readSpecification()` 新增独立的原始输入与完整 JSON 响应预算：`read.maxSelected=32`、`read.maxFilterValuesPerDimension=128`、`read.maxResponseBytes=4194304`。原始数量在去重、查询 pin 和 Authority 点读前检查；计划文档数超限在 Reader 调用前检查；完整响应包含正文转义、错误、meta 与 view。
 - 超出这些默认值的旧请求现在报查询级 `CG_BUDGET_EXCEEDED`，`nextAction=page_or_filter`。请拆分选择和过滤值，或在 `CapabilityGraph.open({ budgets: { read: { ... } } })` 中显式覆盖上限。总响应检查可能发生在有界 I/O 之后；单篇超限仍为逐项失败。原有每篇 32768 字节、每次 8 篇的默认值不变，`queryKnowledge()` 使用自己的预算。新增字段在公开完整 `BudgetConfig` 中可省略，旧类型配置继续可编译。
 - 文件视图的反向关系索引改为追加自有数组，消除高扇入节点构建时反复复制邻接表的成本；关系去重、排序及作者数组保持原有语义。
+- 数据库 Authority 的环校验改为有界关系分页，避免按边重复点读完整记录；仍校验三类 DAG 及全部八类关系流。批量详情与 queryKnowledge 的原始数组预算在来源点读前检查。
+- 数据库、Reader 和 Retriever 外部异常去除私有诊断及不可信动作；HTTP 全文超限返回 CG_BUDGET_EXCEEDED / page_or_filter，空流输出必要 MIME/source 元数据。全文单篇默认预算和无限总长度的正文分页保持原有语义。
+- 安装包 README 使用可访问的站点/源码链接；补齐本地目录、node_modules 安装包与 URL 来源指南，并从页面还原 Reader 和独立消费项目。站点门禁核验空正文流、Seed MCP 工具数量和 First Provider 版本文案。
 - 私有 Node.js HTTP 示例增加真实文档 Reader 与有限文本索引，覆盖原始字节、BOM/中文/补充字符偏移、来源限制、截止与连接终止，以及正文/映射/配置失效与显式恢复；不作为主包后端导出，也不声明模型任务效果。
 - MCP 增加 Collection 与检索协议回归；新增 `npm run evaluate:capacity`，从仓库外的真实文件来源执行多 Provider 混合查询、reload、close 验证，报告同样保存在仓库同级目录。
 - 文档测试移到根 `test/website`，固定材料移到 `test/fixtures/website`，验证工具移到 `scripts/validation/website`。站点生成片段、制品、临时消费者、截图与报告位于仓库同级 `capability-graph-artifacts`；Docs CI 同步输入路径并增加 Firefox/WebKit 代表性冒烟。

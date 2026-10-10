@@ -9,7 +9,7 @@ import { scanDocument, documentRanges } from "../knowledge/stream.js";
 import { knowledgeRoot } from "../knowledge/roots.js";
 import type { KnowledgeScanResult } from "../knowledge/types.js";
 import type { KnowledgeIndexEvidence, KnowledgeReader, KnowledgeReadContext, KnowledgeResultHit, KnowledgeRetriever, KnowledgeRetrievalAccess, KnowledgeSearchTarget } from "../knowledge/types.js";
-import { bytes, capability, identity, inputInvalid, limit } from "../query/common.js";
+import { arrayBudget, bytes, capability, identity, inputInvalid, limit } from "../query/common.js";
 import type { KnowledgeDocumentRef, ResultMeta, StaticCapability } from "../types.js";
 import { freeze } from "../validate/values.js";
 import { contract, invoke, queryText, warning } from "./common.js";
@@ -30,14 +30,14 @@ export function projectKnowledgeTarget(target: KnowledgeSearchTarget): Knowledge
     ...(target.canonicalUrl === undefined ? {} : { canonicalUrl: target.canonicalUrl }) };
 }
 
+export function validateKnowledgeBudgetInput(query: QueryKnowledgeQuery, budgets: BudgetConfig): void {
+  arrayBudget(query.selected, budgets.queryKnowledge.maxSelected);
+  for (const value of [query.knowledgeIds, query.roles, query.locales]) if (value !== undefined) arrayBudget(value, budgets.queryKnowledge.maxFilterValuesPerDimension);
+}
+
 /** Expand only selected knowledge, then verify index evidence and bounded hits against that boundary. */
 export async function queryKnowledge(context: QueryContext, query: QueryKnowledgeQuery, budgets: BudgetConfig, readers: readonly KnowledgeReader[], retriever?: KnowledgeRetriever, bound?: string): Promise<QueryKnowledgePage> {
-  const rawLimit = (value: unknown, maximum: number) => {
-    if (!Array.isArray(value)) inputInvalid();
-    if (value.length > maximum) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
-  };
-  rawLimit(query.selected, budgets.queryKnowledge.maxSelected);
-  for (const value of [query.knowledgeIds, query.roles, query.locales]) if (value !== undefined) rawLimit(value, budgets.queryKnowledge.maxFilterValuesPerDimension);
+  validateKnowledgeBudgetInput(query, budgets);
   queryText(query.text); validateSelection(query);
   const filters = validateDocumentFilters(query);
   if (query.knowledgeIds?.length === 0) inputInvalid();

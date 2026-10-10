@@ -32,14 +32,38 @@ test("DB A completes all pages before endpoint checks; hash equals file independ
   }
 });
 
-test("DB independently rejects disconnected parents and specializes cycles after complete scan", async () => {
-  for (const relation of ["parents", "specializes"] as const) {
+test("DB independently rejects disconnected parents, specializes and requires cycles after complete scan", async () => {
+  for (const relation of ["parents", "specializes", "requires"] as const) {
     const db = new FakeDatabase([record("a"), record("y", { [relation]: ["z"] }), record("z", { [relation]: ["y"] })]);
     await assert.rejects(databaseAuthorityStore(db, "seed"), code("CG_RELATION_CYCLE"));
     assert.equal(db.scans, 3); assert.equal(db.closed, 1);
   }
   const db = new FakeDatabase([record("a", { parents: ["z"], related: ["z"] }), record("z", { specializes: ["a"], related: ["a"] })]);
   await (await databaseAuthorityStore(db, "seed")).close();
+});
+
+test("DB high-fanout DAG validation pages relations without repeated whole-record reads", async () => {
+  for (const degree of [250, 1000, 2000]) {
+    const targets = Array.from({ length: degree }, (_, i) => `b${String(i).padStart(5, "0")}`);
+    const db = new FakeDatabase([record("a", { parents: targets }), ...targets.map((id) => record(id))]); db.pageSize = 100;
+    const records = new Map(db.records.map((item) => [item.capabilityId, item]));
+    let rootReads = 0; let pointReads = 0; let rootPages = 0;
+    db.getCapability = async (id) => { pointReads++; if (id === "a") rootReads++; return records.get(id); };
+    db.neighbors = async (id, kind, request) => {
+      assert.ok(request.limit <= 100); assert.ok(request.maxBytes <= 262144);
+      if (id === "a" && kind === "parents") rootPages++;
+      const ids = kind === "parents" && id === "a" ? targets : kind === "children" && id !== "a" ? ["a"] : [];
+      return db.page(ids.map((capabilityId) => ({ providerId: "seed", capabilityId })), request);
+    };
+    const view = await databaseAuthorityStore(db, "seed");
+    try {
+      assert.ok(rootReads <= 10, `degree ${degree}: root record read ${rootReads} times`);
+      assert.ok(pointReads <= 4 * records.size, `degree ${degree}: excessive complete-record validation`);
+      assert.ok(rootPages >= 2 * Math.ceil(degree / 100), "cycle and publication checks must consume complete source pages");
+      assert.equal(view.staticRevision, (await file(db)).staticRevision);
+    } finally { await view.close(); }
+    assert.equal(db.closed, 1);
+  }
 });
 
 test("DB rejects dangling, unordered, duplicate and changed records and closes each candidate", async () => {

@@ -3,7 +3,7 @@ import { request as httpRequest, type Agent, type ClientRequest, type IncomingMe
 import { request as httpsRequest } from "node:https";
 import { mkdir, mkdtemp, open, rm, type FileHandle } from "node:fs/promises";
 import path from "node:path";
-import type { KnowledgeReader, KnowledgeDocumentRef, KnowledgeReadContext } from "@devcodex/capability-graph";
+import { CapabilityGraphError, type KnowledgeReader, type KnowledgeDocumentRef, type KnowledgeReadContext } from "@devcodex/capability-graph";
 
 type ReadResult = Awaited<ReturnType<KnowledgeReader["read"]>>;
 type FileIdentity = { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint; ctimeNs: bigint };
@@ -234,7 +234,8 @@ export class HttpKnowledgeReader implements KnowledgeReader {
     if (!Number.isSafeInteger(budget.maxBytes) || budget.maxBytes < 1) throw new Error("Invalid read budget");
     const chunks: Buffer[] = []; let length = 0; let contentType = "";
     for await (const chunk of this.stream(ref, context, { chunkBytes: Math.min(32768, budget.maxBytes) })) {
-      length += chunk.bytes.length; if (length > budget.maxBytes) throw new Error("Read budget exceeded");
+      length += chunk.bytes.length;
+      if (length > budget.maxBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
       chunks.push(Buffer.from(chunk.bytes)); contentType = chunk.contentType;
     }
     const bytes = Buffer.concat(chunks, length);

@@ -1,6 +1,6 @@
 import { createHash, type Hash } from "node:crypto";
 import path from "node:path";
-import { CapabilityGraphError } from "../errors.js";
+import { CapabilityGraphError, projectAdapterError } from "../errors.js";
 import { canonicalJson, computeStaticRevision } from "../hash.js";
 import { isId } from "../identity.js";
 import { createKnowledgeMappingValidator } from "../validate/knowledge-ref.js";
@@ -13,6 +13,12 @@ import type { DatabaseReadView, StorePage, StorePageRequest, ValidatedProviderVi
 
 const PAGE: StorePageRequest = { limit: 100, maxBytes: RECORD_MAX_BYTES };
 const digest = (value: unknown) => createHash("sha256").update(canonicalJson(value)).digest("hex");
+export function authorityError(error: unknown, published = false): CapabilityGraphError {
+  return projectAdapterError(error, {
+    CG_LOAD_FAILED: "repair_source", CG_NO_ACTIVE_VIEW: "refresh", CG_REVISION_MISMATCH: "refresh",
+    CG_ADAPTER_CONTRACT_INVALID: "repair_source", CG_BUDGET_EXCEEDED: "repair_source", CG_SOURCE_UNREADABLE: "repair_source",
+  }, published ? "CG_NO_ACTIVE_VIEW" : "CG_LOAD_FAILED", published ? "refresh" : "repair_source");
+}
 function edgeHash(hash: Hash, sourceId: string): void {
   const bytes = Buffer.from(sourceId, "utf8");
   const length = Buffer.allocUnsafe(4);
@@ -72,28 +78,40 @@ function pageShape<T>(page: StorePage<T>, request: StorePageRequest): StorePage<
  */
 export async function databaseAuthorityStore(view: DatabaseReadView, expectedProviderId: string, knowledgeRoots: import("../knowledge/roots.js").BoundKnowledgeRoots = {}): Promise<ValidatedProviderView> {
   let closed = false;
+  let published = false;
   const close = async () => { if (!closed) { closed = true; await view.close(); } };
+  const metadata = () => {
+    try { return { sourceRevision: view.sourceRevision, declaredRoot: view.knowledgeRootDir, provider: view.provider }; }
+    catch (error) { throw authorityError(error, published); }
+  };
   try {
-    const sourceRevision = view.sourceRevision;
-    const declaredRoot = view.knowledgeRootDir;
+    const initial = metadata();
+    const { sourceRevision, declaredRoot } = initial;
     if (typeof sourceRevision !== "string" || !sourceRevision.trim() || (declaredRoot !== undefined && (typeof declaredRoot !== "string" || !declaredRoot))) contract("source_context_invalid");
     // Capture the effective root before validation awaits; keep checking the adapter's original declaration.
     const root = declaredRoot === undefined ? undefined : path.resolve(declaredRoot);
     const roots = { ...(root === undefined ? {} : { defaultRoot: root }), aliases: knowledgeRoots };
-    const provider = await validateProvider(view.provider, roots);
+    const providerDigest = digest(initial.provider);
+    const provider = await validateProvider(initial.provider, roots);
     if (provider.providerId !== expectedProviderId) contract("provider_identity_mismatch");
-    const providerDigest = digest(view.provider);
     const ids = new Set<string>();
     const hashes = new Map<string, string>();
     const acceptMappings = createKnowledgeMappingValidator();
     if (provider.specification) acceptMappings(provider.specification.documents);
     const stable = () => {
-      if (closed || view.sourceRevision !== sourceRevision) {
+      if (closed) throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh" });
+      const current = metadata();
+      if (current.sourceRevision !== sourceRevision) {
         throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh" });
       }
-      if (view.knowledgeRootDir !== declaredRoot || digest(view.provider) !== providerDigest) contract("source_context_changed");
+      if (current.declaredRoot !== declaredRoot || digest(current.provider) !== providerDigest) contract("source_context_changed");
     };
-    const call = async <T>(read: () => Promise<T>): Promise<T> => { stable(); const value = await read(); stable(); return value; };
+    const call = async <T>(read: () => Promise<T>): Promise<T> => {
+      stable();
+      let value: T;
+      try { value = await read(); } catch (error) { throw authorityError(error, published); }
+      stable(); return value;
+    };
     async function* scan() {
       let cursor: string | undefined;
       let previous: string | undefined;
@@ -128,26 +146,28 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
     const inverse = { children: "parents", specializedBy: "specializes", requiredBy: "requires", relatedBy: "related" } as const;
     const incoming = new Map(forwardKinds.map((kind) => [kind,
       new Map<string, { count: number; hash: Hash }>([...ids].map((id) => [id, { count: 0, hash: createHash("sha256") }]))]));
+    const expectedOutgoing = new Map(forwardKinds.map((kind) => [kind, new Map<string, { count: number; digest: string }>()]));
     for (const id of ids) {
       const record = await checked(id);
       validateEndpoints(record, ids);
-      for (const kind of forwardKinds) for (const target of record[kind]) {
-        const state = incoming.get(kind)!.get(target)!;
-        state.count++;
-        edgeHash(state.hash, id);
+      for (const kind of forwardKinds) {
+        const outgoing = createHash("sha256");
+        for (const target of record[kind]) {
+          edgeHash(outgoing, target);
+          const state = incoming.get(kind)!.get(target)!;
+          state.count++;
+          edgeHash(state.hash, id);
+        }
+        expectedOutgoing.get(kind)!.set(id, { count: record[kind].length, digest: outgoing.digest("hex") });
       }
     }
     const expectedIncoming = new Map([...incoming].map(([kind, states]) => [kind,
       new Map([...states].map(([id, state]) => [id, { count: state.count, digest: state.hash.digest("hex") }]))]));
-    await validateCycles(ids, checked); // C: independent parents/specializes/requires traversals.
-    async function drain(id: string, kind: NeighborKind, options: {
-      expected?: readonly string[]; start?: number; limit?: number; maxBytes?: number;
-    } = {}): Promise<{ items: CanonicalCapabilityId[]; count: number; digest: string }> {
-      const seenCursors = new Set<string>();
+    async function* relationStream(id: string, kind: NeighborKind, checkCursors = true): AsyncGenerator<CanonicalCapabilityId> {
+      // C retains a bounded page/hash per active frame. D and queries also check complete cursor history.
+      const seenCursors = checkCursors ? new Set<string>() : undefined;
       const sourceHash = createHash("sha256");
-      const items: CanonicalCapabilityId[] = [];
       let count = 0;
-      let capped = false;
       let cursor: string | undefined;
       let previous: string | undefined;
       let pages = 0;
@@ -159,32 +179,43 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
           if (!endpoint || endpoint.providerId !== provider.providerId || !isId(endpoint.capabilityId) || !ids.has(endpoint.capabilityId) ||
               (previous !== undefined && endpoint.capabilityId <= previous)) contract("neighbor_identity_invalid");
           previous = endpoint.capabilityId;
-          if (options.expected && options.expected[count] !== previous) contract(`${kind}_stream_mismatch`);
-          if (!capped && count >= (options.start ?? 0) && items.length < (options.limit ?? 0)) {
-            const candidate = [...items, { providerId: provider.providerId, capabilityId: previous }];
-            if (Buffer.byteLength(canonicalJson({ items: candidate, nextCursor: String(count + 1) }), "utf8") <= (options.maxBytes ?? 0)) {
-              items.push(candidate.at(-1)!);
-            } else capped = true;
-          }
           count++;
           if (count > ids.size) contract("neighbor_stream_unbounded");
           edgeHash(sourceHash, previous);
+          yield { providerId: provider.providerId, capabilityId: previous };
         }
         cursor = page.nextCursor;
-        if (cursor !== undefined) { if (seenCursors.has(cursor)) contract("repeated_store_cursor"); seenCursors.add(cursor); }
+        if (cursor !== undefined && seenCursors) { if (seenCursors.has(cursor)) contract("repeated_store_cursor"); seenCursors.add(cursor); }
       } while (cursor !== undefined);
-      if (options.expected && count !== options.expected.length) contract(`${kind}_stream_mismatch`);
-      return { items, count, digest: sourceHash.digest("hex") };
+      const expected = kind in inverse ? expectedIncoming.get(inverse[kind as keyof typeof inverse])!.get(id)! :
+        expectedOutgoing.get(kind as typeof forwardKinds[number])!.get(id)!;
+      if (count !== expected.count || sourceHash.digest("hex") !== expected.digest) {
+        contract(kind === "requiredBy" ? "required_by_stream_mismatch" : `${kind}_stream_mismatch`);
+      }
+    }
+    await validateCycles(ids, checked, (id, relation) => (async function* () {
+      for await (const endpoint of relationStream(id, relation, false)) yield endpoint.capabilityId;
+    })()); // C: independent DAG traversals, verified against B without rereading a whole record per edge.
+    async function drain(id: string, kind: NeighborKind, options: {
+      start?: number; limit?: number; maxBytes?: number;
+    } = {}): Promise<{ items: CanonicalCapabilityId[]; count: number }> {
+      const items: CanonicalCapabilityId[] = []; let count = 0; let capped = false;
+      for await (const endpoint of relationStream(id, kind)) {
+        if (!capped && count >= (options.start ?? 0) && items.length < (options.limit ?? 0)) {
+          const candidate = [...items, endpoint];
+          if (Buffer.byteLength(canonicalJson({ items: candidate, nextCursor: String(count + 1) }), "utf8") <= (options.maxBytes ?? 0)) {
+            items.push(endpoint);
+          } else capped = true;
+        }
+        count++;
+      }
+      return { items, count };
     }
     // D compares complete streams, including the empty reverse stream, before publication.
     for (const id of ids) {
-      const source = await checked(id);
-      for (const kind of forwardKinds) await drain(id, kind, { expected: source[kind] });
-      for (const kind of Object.keys(inverse) as (keyof typeof inverse)[]) {
-        const reverse = await drain(id, kind);
-        const expected = expectedIncoming.get(inverse[kind])!.get(id)!;
-        if (reverse.count !== expected.count || reverse.digest !== expected.digest) contract(kind === "requiredBy" ? "required_by_stream_mismatch" : `${kind}_stream_mismatch`);
-      }
+      await checked(id);
+      for (const kind of forwardKinds) await drain(id, kind);
+      for (const kind of Object.keys(inverse) as (keyof typeof inverse)[]) await drain(id, kind);
     }
     stable();
     // E rechecks a real source operation; an empty graph must also prove its handle is still readable.
@@ -196,6 +227,7 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
       const empty = pageShape(await call(() => view.scanCapabilities(PAGE)), PAGE);
       if (empty.items.length || empty.nextCursor !== undefined) contract("empty_view_changed");
     }
+    published = true;
     return { provider: freeze({ ...provider, authorityKind: "database" }), staticRevision: revision,
       sourceContext: freeze({ providerId: provider.providerId, authorityKind: "database", sourceRevision,
         ...(root === undefined ? {} : { knowledgeRootDir: root }), knowledgeRoots }),
@@ -243,15 +275,13 @@ export async function databaseAuthorityStore(view: DatabaseReadView, expectedPro
             const start = bounded.cursor === undefined ? 0 : Number(bounded.cursor);
             if (!Number.isSafeInteger(start) || start < 0) throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
             const reverse = await drain(id, kind, { start, limit: bounded.limit, maxBytes: bounded.maxBytes });
-            const expected = expectedIncoming.get(inverse[kind as keyof typeof inverse])!.get(id)!;
-            if (reverse.count !== expected.count || reverse.digest !== expected.digest) contract(kind === "requiredBy" ? "required_by_stream_mismatch" : `${kind}_stream_mismatch`);
             if (start > reverse.count) throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
             if (start < reverse.count && !reverse.items.length) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
             const next = start + reverse.items.length;
             return { items: reverse.items, ...(next < reverse.count ? { nextCursor: String(next) } : {}) };
           }
           const all = source[kind as typeof forwardKinds[number]];
-          await drain(id, kind, { expected: all });
+          await drain(id, kind);
           const start = bounded.cursor === undefined ? 0 : Number(bounded.cursor);
           if (!Number.isSafeInteger(start) || start < 0 || start > all.length) {
             throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });

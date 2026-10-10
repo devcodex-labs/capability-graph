@@ -15,7 +15,7 @@ test('manual release resume rejects a later branch checkout even when its versio
     const files = ['package.json', 'package-lock.json', 'website/package.json', 'website/package-lock.json',
       'README.md', `changelogs/${version}.md`, 'scripts/lib/artifact-paths.mjs', 'scripts/lib/website-paths.mjs', 'scripts/validation/website/check-release.mjs',
       'scripts/validation/website/lib/release-documentation.mjs', 'website/docs/getting-started/installation.mdx',
-      'website/docs/getting-started/index.mdx', 'website/docs/index.mdx'];
+      'website/docs/getting-started/index.mdx', 'website/docs/getting-started/first-provider.mdx', 'website/docs/index.mdx'];
     for (const file of files) {
       await mkdir(path.dirname(path.join(root, file)), { recursive: true });
       await cp(path.join(repositoryRoot, file), path.join(root, file));

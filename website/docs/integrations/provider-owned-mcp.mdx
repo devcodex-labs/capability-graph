@@ -20,7 +20,7 @@ Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程�
 
 ## Seed 调用示例
 
-本节是**独立的主入口示例**，使用真实 seed.http 定义，只注册五个查询工具。原 examples/seed-mcp Server 保持十二工具，example_list_catalog 仍返回五个能力的平坦目录。Core 不自动选择主入口，也不把每个能力注册成一个 MCP 工具。
+本节是**独立的主入口示例**，使用真实 seed.http 定义，只注册五个查询工具。原 examples/seed-mcp Server 保持 14 个查询工具，example_list_catalog 仍返回五个能力的平坦目录。Core 不自动选择主入口，也不把每个能力注册成一个 MCP 工具。
 
 ### 运行前提与文件
 
@@ -216,7 +216,7 @@ node examples/seed-mcp/docs-main-entry/client.mjs
 
 Server stdout 只用于 JSON-RPC，日志写 stderr。Client finally 关闭 transport；Server 停机关闭自己的 graph。示例不实现生产认证、租户策略、部署或 Agent 自动意图判断。Runtime/检索不是本链前置。
 
-原 Seed 的 Specification Resource 与十二工具仍见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。五工具 Server 没有宣称提供该 Resource。
+原 Seed 的 Specification Resource 与 14 个查询工具仍见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。五工具 Server 没有宣称提供该 Resource。
 
 ## 错误映射
 

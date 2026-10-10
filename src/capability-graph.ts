@@ -6,11 +6,11 @@ import type { KnowledgeReader, KnowledgeRetriever, CapabilityRetriever } from ".
 import { documentBody, specificationBody, validateBodyQuery, type DocumentBodyQuery, type SpecificationBodyQuery } from "./knowledge/pages.js";
 import { clearDocumentSnapshots } from "./knowledge/stream.js";
 import { retrieveCapabilities } from "./retrieval/capabilities.js";
-import { queryKnowledge } from "./retrieval/knowledge.js";
+import { queryKnowledge, validateKnowledgeBudgetInput } from "./retrieval/knowledge.js";
 import type { QueryKnowledgeQuery, RetrieveCapabilitiesQuery } from "./retrieval/types.js";
 import type { RuntimeAdapter, QueryRuntimeQuery } from "./runtime/types.js";
 import { queryRuntime, validateRuntimeQuery } from "./runtime/query.js";
-import { inputInvalid, identity } from "./query/common.js";
+import { arrayBudget, inputInvalid, identity } from "./query/common.js";
 import { isId } from "./identity.js";
 import { catalog, details, knowledgeMembers, neighbors, provider, providerResult, refScope, specificationDocuments } from "./query/static.js";
 import { resolveSelection, selectionInput } from "./query/selection.js";
@@ -108,6 +108,8 @@ export class CapabilityGraph {
   /** Preserve input order and failures per slot; an unreadable explicitly requested revision fails the whole query. */
   getCapabilities(ids: readonly CapabilityRef[], query: CapabilityDetailQuery = {}) {
     queryObject(query);
+    try { arrayBudget(ids, this.host.budgets.detail.maxCapabilities); }
+    catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
     const scope = query.requiredStaticRevision === undefined ? undefined : refScope(ids);
     return this.host.query(scope, query.requiredStaticRevision, (ctx) => details(ctx, ids, query, this.host.budgets));
   }
@@ -168,6 +170,8 @@ export class CapabilityGraph {
   /** Search only selected knowledge and return traceable evidence snippets, not a generated answer. */
   queryKnowledge(query: QueryKnowledgeQuery) {
     queryObject(query);
+    try { validateKnowledgeBudgetInput(query, this.host.budgets); }
+    catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
       (ctx) => queryKnowledge(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
@@ -212,7 +216,9 @@ export class BoundProviderGraph {
   }
   /** Resolve provider-local string IDs, retaining the original input slots. */
   getCapabilities(ids: readonly string[], query: CapabilityDetailQuery = {}) {
-    boundQuery(query); if (!Array.isArray(ids)) inputInvalid();
+    boundQuery(query);
+    try { arrayBudget(ids, this.host.budgets.detail.maxCapabilities); }
+    catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => details(ctx, ids.map((capabilityId) => ({ capabilityId })), query, this.host.budgets, this.providerId));
   }
@@ -273,7 +279,10 @@ export class BoundProviderGraph {
   }
   /** Search selected CapabilityRef objects; omitted providerId is filled from this binding. */
   queryKnowledge(query: Omit<QueryKnowledgeQuery, "requestProviderScope">) {
-    boundQuery(query); validateSelection(query);
+    boundQuery(query);
+    try { validateKnowledgeBudgetInput(query, this.host.budgets); }
+    catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
+    validateSelection(query);
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => queryKnowledge(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever, this.providerId));
   }

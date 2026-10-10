@@ -50,7 +50,7 @@ Runtime 观察会记录依据的静态修订。仅身份相同但修订变化，
 |---|---|---|
 | `complete` | 当前请求范围内完整 | 可继续业务选择 |
 | `truncated` | 命中数量或页预算上限 | 使用 `nextCursor` 续页或收窄过滤 |
-| `partial` | 某些来源、分组或条目失败 | 保留正常项，检查 warning 和逐项错误 |
+| `partial` | 条目查询有来源/分组/条目失败；正文页只返回文档的一部分 | 条目查询检查 warning/逐项错误；正文页用 hasMore/nextCursor 续读 |
 
 `getCapabilities(ids)` 保留原始输入槽位，包括重复 ID 和失败项；每个 `BatchItem` 都要检查 `ok`。`readDocuments` 会展开、过滤和去重文档，`readSpecification` 也不保证与 `knowledgeIds` 输入顺序对应；两者的 `inputIndex` 是生成结果槽位，不能用它回查原选择数组。成功项按 `id`/`knowledgeId` 关联，详见[批量结果](../reference/result-meta#批量结果)。
 

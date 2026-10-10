@@ -9,25 +9,25 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [查询与更新](#queries)
 - [支持边界](#boundaries)
 - [本地开发](#development)
-- [贡献与维护](CONTRIBUTING.md)
-- [未发布改动](changelogs/unreleased.md)
-- [1.0.1 迁移与变更](changelogs/1.0.1.md)
-- [1.1.0 变更](changelogs/1.1.0.md)
-- [1.0.0 变更](changelogs/1.0.0.md)
+- [贡献与维护](https://github.com/devcodex-labs/capability-graph/blob/main/CONTRIBUTING.md)
+- [未发布改动](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/unreleased.md)
+- [1.0.1 迁移与变更](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/1.0.1.md)
+- [1.1.0 变更](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/1.1.0.md)
+- [1.0.0 变更](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/1.0.0.md)
 - [许可证](#license)
 
 <a id="status"></a>
 
 ## 当前状态
 
-本文与仓库教程对应 `1.1.0`。先查询确切版本，确认 Registry 可用后安装；未发布时按[安装页的固定源码步骤](website/docs/getting-started/installation.mdx)构建。网络或镜像失败不代表版本不存在。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。
+本文与仓库教程对应 `1.1.0`。先查询确切版本，确认 Registry 可用后安装；未发布时按[安装页的固定源码步骤](https://devcodex-labs.github.io/capability-graph/getting-started/installation)构建。网络或镜像失败不代表版本不存在。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。
 
 ```sh
 npm view @devcodex/capability-graph@1.1.0 version
 npm install @devcodex/capability-graph@1.1.0
 ```
 
-首次接入按[最小 Provider](website/docs/getting-started/first-provider.mdx)开始，再按[进阶教程](website/docs/guides/progressive-discovery.mdx)增强。已有 1.0.1 用户参照[升级清单](website/docs/getting-started/installation.mdx#从-101-升级到-110)。[站点](https://devcodex-labs.github.io/capability-graph/)的 `release.json` 记录实际包版本和文档提交；源码提交本身不会发布包或部署站点。
+首次接入按[最小 Provider](https://devcodex-labs.github.io/capability-graph/getting-started/first-provider)开始，再按[进阶教程](https://devcodex-labs.github.io/capability-graph/guides/progressive-discovery)增强。已有 1.0.1 用户参照[升级清单](https://devcodex-labs.github.io/capability-graph/getting-started/installation#从-101-升级到-110)。[站点](https://devcodex-labs.github.io/capability-graph/)的 `release.json` 记录实际包版本和文档提交；源码提交本身不会发布包或部署站点。
 
 已实现文件权威加载、校验、单 Provider 正式图、跨 Provider 联合目录、范围控制、修订快照、按需知识读取，以及可插拔的数据库、检索和 Runtime 合同。真实 Seed 同时提供普通 API 与 MCP 接入。
 
@@ -35,7 +35,7 @@ npm install @devcodex/capability-graph@1.1.0
 
 ## 定义与接入
 
-Provider 在独立目录提供 `provider.json`、`capabilities/**/*.json` 和可选知识文件，显式启用 `definitionLayout: "directory"`。旧配置默认 `legacy`，继续递归收集 `*.capability.json`。Core 不导入业务源码，不执行能力，不自动推断图关系。可运行样本见 [Seed Provider](examples/seed-provider/PROVIDER.md)。
+Provider 在独立目录提供 `provider.json`、`capabilities/**/*.json` 和可选知识文件，显式启用 `definitionLayout: "directory"`。旧配置默认 `legacy`，继续递归收集 `*.capability.json`。Core 不导入业务源码，不执行能力，不自动推断图关系。可运行样本见 [Seed Provider](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-provider/PROVIDER.md)。
 
 ```json
 {
@@ -135,17 +135,17 @@ directory 只收集 capabilities/**/*.json，缺少目录、目录外遗留定�
 
 - 文件定义、本地 Document、普通 API 和私有 MCP 示例可直接运行。
 - 数据库、两类检索与远程 Reader 提供公开合同和正负测试；仓库示例另含真实本机 HTTP Reader 与有限词项索引，主包不附数据库、向量或模型后端。
-- Runtime Core 已实现调度、观察状态与返回校验；[独立 HTTP 参考](examples/seed-runtime/README.md)实际采集应用注册路由，并验证项目环境隔离、实时变化和失败恢复。它不是通用框架扫描器或远程集群监控服务。
+- Runtime Core 已实现调度、观察状态与返回校验；[独立 HTTP 参考](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/README.md)实际采集应用注册路由，并验证项目环境隔离、实时变化和失败恢复。它不是通用框架扫描器或远程集群监控服务。
 - Adapter 在调用进程内运行，属于显式信任代码；scope 不是进程沙箱。相对知识路径受根目录及真实路径约束，远程读取策略归已配置 Reader。
-- [API 示例](examples/seed-api/README.md)与 [MCP 示例](examples/seed-mcp/README.md)共享 Core。工具命名、认证、宿主意图判断及规范采用归接入方，不属于主包。
+- [API 示例](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-api/README.md)与 [MCP 示例](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-mcp/README.md)共享 Core。工具命名、认证、宿主意图判断及规范采用归接入方，不属于主包。
 
-官方文档导出、原生 MCP 审计与真实验证入口见 [VextJS 示例](examples/vextjs/README.md)。文档 Provider 的默认入口按官方主题发现；原生目录与运行快照另行审计。
+官方文档导出、原生 MCP 审计与真实验证入口见 [VextJS 示例](https://github.com/devcodex-labs/capability-graph/blob/main/examples/vextjs/README.md)。文档 Provider 的默认入口按官方主题发现；原生目录与运行快照另行审计。
 
 <a id="development"></a>
 
 ## 本地开发
 
-目录、代码约定、文档验证及发布规则统一见[贡献指南](CONTRIBUTING.md)；场景与测试入口见 [test/README.md](test/README.md)。
+目录、代码约定、文档验证及发布规则统一见[贡献指南](https://github.com/devcodex-labs/capability-graph/blob/main/CONTRIBUTING.md)；场景与测试入口见 [test/README.md](https://github.com/devcodex-labs/capability-graph/blob/main/test/README.md)。
 
 Node.js 范围：`^20.19.0 || >=22.12.0`。在仓库目录运行：
 
@@ -168,7 +168,7 @@ npm run evaluate
 
 容量工具每类延迟最多保留 4096 个样本，报告标明分位数来自全量还是抽样；计数和最大值持续累计，内存统计也使用固定大小，避免验证工具自身随运行时长持续增长。
 
-文档站点的正式测试位于根 `test/website`，固定样例位于 `test/fixtures/website`，验证工具位于 `scripts/validation/website`。临时消费者、报告、截图、生成材料与站点制品统一位于仓库同级 `capability-graph-artifacts`；站点配置和使用入口见 [website/README.md](website/README.md)。
+文档站点的正式测试位于根 `test/website`，固定样例位于 `test/fixtures/website`，验证工具位于 `scripts/validation/website`。临时消费者、报告、截图、生成材料与站点制品统一位于仓库同级 `capability-graph-artifacts`；站点配置和使用入口见 [website/README.md](https://github.com/devcodex-labs/capability-graph/blob/main/website/README.md)。
 
 `npm run build:tests` 单独清理并编译测试，`evaluate` 也使用此入口。根包及私有 MCP 示例的构建清理只接受已知、归当前包所有的输出目录，拒绝符号链接或普通文件，不跟随输出链接删除其他目录。
 

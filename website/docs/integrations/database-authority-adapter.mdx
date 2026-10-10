@@ -12,12 +12,12 @@ description: 提供稳定只读数据库快照、严格扫描顺序、关系反�
 `openView(providerId)` 返回一个不可变逻辑快照。Core 对它执行分阶段校验：
 
 1. A：扫描时校验每条字段和 Provider 级文档映射、严格顺序，收集完整 ID/摘要，并增量生成候选哈希；此时不判端点。
-2. B：扫描结束后逐 ID 重读，基于全量 ID 验证正向端点，同时从 `requires` 生成每个目标的预期反向计数与流摘要。
-3. C：独立检查 `parents`、`specializes` 和 `requires` 三张 DAG。
-4. D：逐页核对每个能力的完整 `requires/requiredBy` 流，不能只验证返回的少量边。
+2. B：扫描结束后逐 ID 重读，基于全量 ID 验证 `parents/specializes/requires/related` 四类正向端点，生成正向及对应反向流的预期计数与摘要。
+3. C：分页遍历 `parents`、`specializes` 和 `requires` 三张 DAG，核对 B 的来源摘要；每个 DFS 栈帧保留有界关系页，不按每条边重读完整记录。
+4. D：再次点读核验记录，并逐页核对全部八类正反关系流及游标进展，包含空流，不能只验证返回的少量边。
 5. E：最后点读或空图扫描证明视图可读，通过后才发布。
 
-Adapter 必须按 `capabilityId` 严格升序扫描，游标单调前进，并同时遵守条目数和 UTF-8 页字节预算。`requiredBy` 必须完整等于源 `requires` 的反转；查询期 Core 再次整流核验后才返回任何成功页。这会使反向查询成本随入度增长，接入时需实测。
+Adapter 必须按 `capabilityId` 严格升序扫描，游标单调前进，并同时遵守条目数和 UTF-8 页字节预算。`children/specializedBy/requiredBy/relatedBy` 必须分别完整等于四类正向关系的反转；查询期 Core 再次核验完整关系流后才返回成功页。初始化包含多次关系扫描，关系查询成本随该完整流长度增长，接入时需实测事务和网络开销。
 
 Core 拥有 read view 的 `close()` 调用，但会在仍有查询 pin 时延迟退休。Provider metadata、`sourceRevision`、知识根和记录在该 view 生命周期内必须稳定。
 

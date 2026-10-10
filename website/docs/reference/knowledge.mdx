@@ -62,6 +62,8 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 
 1.1.0 支持在 `providers[]` 每项配置 `knowledgeRoots.docs = { kind: 'directory', rootDir: '/approved/docs' }` 或 `knowledgeRoots.installed = { kind: 'package', packageName: '@scope/library', resolveFrom: '/consumer/project' }`。locator 例如 `{ type: 'relative-file', root: 'installed', path: 'README.md' }`，公开 source 为 `root:installed/README.md`。根、包版本和 manifest 指纹在私有 view 中捕获；不执行包入口，不发给 Retriever。安装包未包含的文档需另绑定官方目录或 URL。
 
+根别名必须匹配 `^[A-Za-z][A-Za-z0-9_-]{0,63}$`：首字符是英文字母，总长 1–64 字符，其余允许英文字母、数字、下划线和连字符。`installed`、`vextjs-docs` 合法，`vextjs.docs`、中文别名和空字符串会使 open 返回 `CG_CONFIG_INCOMPLETE`。这限制别名格式；实际目录路径仍支持中文和空格。完整配置与分页调用见[添加知识：三类来源](../guides/add-local-knowledge#三类来源与同一分页调用)。
+
 ## readDocuments
 
 `ReadDocumentsQuery` 包含非空 `selected`、可选 `knowledgeIds/roles/locales`、范围和修订。同维取并、异维取交；先筛选再应用每次最多 8 篇的预算和 Reader。`DocumentReadBatch` 的 `knowledgeState` 区分无关联、筛选后为空和匹配，逐项结果保留错误槽。`DocumentRead` 携带能力身份、文档路由元数据、来源、内容类型、内容身份、正文和精确字节。
