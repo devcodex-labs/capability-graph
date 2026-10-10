@@ -52,23 +52,33 @@ export async function verifyDocumentationProvider({ graph, recall, exported, sou
   }
   await recall.rebuild(graph);
   const tasks = JSON.parse(await readFile(new URL('../../../test/fixtures/vextjs/documentation-retrieval-tasks.json', import.meta.url), 'utf8'));
+  assert.deepEqual([...new Set(tasks.flatMap((task) => task.expected))].sort(),
+    exported.manifest.capabilities.map((item) => item.capabilityId).sort(), 'Independent tasks must cover every official topic');
   const retrieval = [];
   for (const task of tasks) {
-    const candidates = await graph.retrieveCapabilities({ text: task.query, limit: 10 });
+    const candidates = await graph.retrieveCapabilities({ text: task.query, limit: 5 });
     const ids = candidates.items.map((item) => item.id.capabilityId);
     assert(task.expected.every((id) => ids.includes(id)), `${task.id}: expected documentation task omitted`);
+    assert(task.expected.every((id) => ids.indexOf(id) < task.maxRank), `${task.id}: relevant capability ranked too low`);
+    assert((task.excluded ?? []).every((id) => !ids.includes(id)), `${task.id}: explicitly excluded capability recalled`);
     if (!task.expected.length) assert.equal(ids.length, 0, `${task.id}: unsupported request recommended`);
-    else {
+    else if (task.chapter) {
       const document = exported.manifest.documents.find((item) => item.chapter === task.chapter);
       for (const id of task.expected) assert(document.capabilityIds.includes(id), `${task.id}: required official chapter unbound`);
       const evidence = await bound.queryKnowledge({ selected: task.expected.map((capabilityId) => ({ capabilityId })),
-        knowledgeIds: [document.knowledgeId], text: task.text, limit: 3 });
+        knowledgeIds: [document.knowledgeId], text: task.text ?? document.title, limit: 3 });
       assertKnowledgeEvidence(evidence, task.id);
       const bytes = await readFile(path.join(sourceRoot, document.originalPath));
       for (const hit of evidence.items) assert.equal(bytes.subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
     }
     retrieval.push({ id: task.id, candidateIds: ids, expected: task.expected, officialChapter: task.chapter, status: 'passed' });
   }
+  const positive = retrieval.filter((item) => item.expected.length);
   return { capabilities: exported.count, documents: results, retrieval, modelCalls: 0,
+    retrievalMetrics: { taskCount: tasks.length, coveredTopics: new Set(tasks.flatMap((task) => task.expected)).size,
+      recallAt5: positive.reduce((sum, item) => sum + item.expected.filter((id) => item.candidateIds.includes(id)).length / item.expected.length, 0) / positive.length,
+      top1Rate: positive.filter((item) => item.expected.includes(item.candidateIds[0])).length / positive.length,
+      meanPrecisionAt5: positive.reduce((sum, item) => sum + item.expected.filter((id) => item.candidateIds.includes(id)).length / item.candidateIds.length, 0) / positive.length,
+      unknownFalsePositives: retrieval.filter((item) => !item.expected.length).reduce((sum, item) => sum + item.candidateIds.length, 0) },
     limitation: 'Complete document inventory and original-byte reading; implementation/Agent coverage is separate' };
 }

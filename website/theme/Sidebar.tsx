@@ -41,7 +41,10 @@ export function Sidebar() {
       <button type="button" className="cg-sidebar-close" aria-label="关闭文档导航"
         onClick={() => document.querySelector<HTMLElement>('.rp-sidebar-menu__mask')?.click()}>关闭导航</button>
       <label>跳转分区 <select aria-label="跳转分区" defaultValue="" onChange={(event) => {
-        const section = document.getElementById(event.target.value);
+        const id = event.target.value;
+        const index = Number(id.slice('cg-section-'.length));
+        setData((previous) => previous.map((item, position) => position === index && 'items' in item ? { ...item, collapsed: false } : item));
+        const section = document.getElementById(id);
         section?.scrollIntoView({ block: 'start' });
         section?.querySelector<HTMLElement>('a')?.focus({ preventScroll: true });
         event.target.value = '';

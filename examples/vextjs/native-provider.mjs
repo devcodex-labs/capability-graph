@@ -81,7 +81,7 @@ export async function exportNativeProvider({ catalog, providerId = 'vextjs', ver
     await writeFile(path.join(output, bodyPath), item.body);
     await writeFile(path.join(output, 'capabilities', `${capabilityId}.json`), JSON.stringify({ capabilityId, name: `${item.title} (${item.id})`,
       description: `${item.kind}; ${item.status}. ${item.summary}`,
-      whenToUse: `Consult native ${item.kind} guidance for ${item.domains?.join(', ') || 'VextJS'}; status=${item.status}; verify project prerequisites before execution.`,
+      whenToUse: `Consult native ${item.kind} guidance for ${item.domains?.join(', ') || 'VextJS'}; status=${item.status}; verify project prerequisites before execution. ${[...item.body].slice(0, 400).join('')}`,
       related: (item.relatedIds ?? []).filter((id) => ids.has(id)).map(capabilityIdFor),
       knowledge: [{ kind: 'document', knowledgeId: item.id, role: item.kind, title: item.title, summary: item.summary,
         locator: { type: 'relative-file', path: bodyPath } }] }, null, 2) + '\n');

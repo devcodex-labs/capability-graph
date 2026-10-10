@@ -1,13 +1,559 @@
 [
-  { "id": "routing", "query": "API 路由 defineRoutes", "expected": ["routing"], "chapter": "guide/routing.md", "text": "defineRoutes" },
-  { "id": "validation", "query": "请求响应 schema", "expected": ["validation"], "chapter": "guide/validation.md", "text": "schema" },
-  { "id": "mongo", "query": "原生分页 多数据库 Models", "expected": ["database"], "chapter": "guide/database.md", "text": "MonSQLize" },
-  { "id": "plugin", "query": "插件 setup onReady onClose", "expected": ["plugins"], "chapter": "guide/plugins.md", "text": "onReady" },
-  { "id": "frontend", "query": "服务端页面 layout document", "expected": ["frontend.rendering"], "chapter": "frontend/ssr.md", "text": "SSR" },
-  { "id": "jobs", "query": "jobs worker scheduler retry", "expected": ["jobs"], "chapter": "guide/jobs.md", "text": "Job" },
-  { "id": "cluster", "query": "Cluster rolling reload 状态检查", "expected": ["cluster"], "chapter": "guide/cluster.md", "text": "Cluster" },
-  { "id": "openapi", "query": "OpenAPI Docs 机器文档", "expected": ["openapi"], "chapter": "guide/openapi.md", "text": "OpenAPI" },
-  { "id": "cookies", "query": "cookie session csrf", "expected": ["cookies-session"], "chapter": "guide/cookies-session.md", "text": "CSRF" },
-  { "id": "typed", "query": "构建 typegen", "expected": ["build"], "chapter": "guide/build.md", "text": "typegen" },
-  { "id": "unknown", "query": "quantum teleportation zyxunavailable", "expected": [] }
+  {
+    "id": "quick-start",
+    "query": "新建应用，先运行 Hello World",
+    "expected": [
+      "quick-start"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/quick-start.md"
+  },
+  {
+    "id": "project-structure",
+    "query": "查看项目结构与目录划分",
+    "expected": [
+      "project-structure"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/project-structure.md"
+  },
+  {
+    "id": "routing",
+    "query": "注册 HTTP 路由并定义请求路径",
+    "expected": [
+      "routing"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/routing.md"
+  },
+  {
+    "id": "validation",
+    "query": "为接口添加参数校验和 schema",
+    "expected": [
+      "validation"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/validation.md"
+  },
+  {
+    "id": "services",
+    "query": "将业务逻辑放入服务层并声明依赖",
+    "expected": [
+      "services"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/services.md"
+  },
+  {
+    "id": "middleware",
+    "query": "为请求添加中间件",
+    "expected": [
+      "middleware"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/middleware.md"
+  },
+  {
+    "id": "plugins",
+    "query": "插件如何在 setup、onReady 和 onClose 执行",
+    "expected": [
+      "plugins"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/plugins.md"
+  },
+  {
+    "id": "database",
+    "query": "使用 MonSQLize 和 Models 访问数据库",
+    "expected": [
+      "database"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/database.md"
+  },
+  {
+    "id": "configuration",
+    "query": "加载应用配置并覆盖 default 设置",
+    "expected": [
+      "configuration"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/configuration.md"
+  },
+  {
+    "id": "openapi",
+    "query": "自动生成 OpenAPI 接口文档",
+    "expected": [
+      "openapi"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/openapi.md"
+  },
+  {
+    "id": "testing",
+    "query": "使用 createTestApp 测试接口",
+    "expected": [
+      "testing"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/testing.md"
+  },
+  {
+    "id": "build",
+    "query": "运行 vext build 并生成 typegen 类型",
+    "expected": [
+      "build"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/build.md"
+  },
+  {
+    "id": "cluster",
+    "query": "Cluster 多进程如何 rolling reload",
+    "expected": [
+      "cluster"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/cluster.md"
+  },
+  {
+    "id": "application",
+    "query": "获取 VextApp 和请求上下文 VextRequest",
+    "expected": [
+      "application"
+    ],
+    "maxRank": 3,
+    "chapter": "api/context.md"
+  },
+  {
+    "id": "cache",
+    "query": "缓存接口响应并设置 ttl",
+    "expected": [
+      "cache"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/cache.md"
+  },
+  {
+    "id": "rate-limit",
+    "query": "对请求设置 rateLimit 限流",
+    "expected": [
+      "rate-limit"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/rate-limit.md"
+  },
+  {
+    "id": "cookies-session",
+    "query": "设置 cookie、session 与 CSRF",
+    "expected": [
+      "cookies-session"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/cookies-session.md"
+  },
+  {
+    "id": "security",
+    "query": "使用 permission-core 做认证与权限控制",
+    "expected": [
+      "security"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/security.md"
+  },
+  {
+    "id": "uploads",
+    "query": "处理 multipart 文件上传",
+    "expected": [
+      "uploads"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/uploads.md"
+  },
+  {
+    "id": "jobs",
+    "query": "Job 后台任务失败后调度重试",
+    "expected": [
+      "jobs"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/jobs.md"
+  },
+  {
+    "id": "adapters",
+    "query": "如何选择 Hono 或 Fastify Adapter",
+    "expected": [
+      "adapters"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/adapters.md"
+  },
+  {
+    "id": "cli",
+    "query": "vext CLI 如何初始化和启动项目",
+    "expected": [
+      "cli"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/cli.md"
+  },
+  {
+    "id": "deployment",
+    "query": "将应用部署到 production 环境",
+    "expected": [
+      "deployment"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/deployment.md"
+  },
+  {
+    "id": "error-handling",
+    "query": "统一处理异常与错误响应",
+    "expected": [
+      "error-handling"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/error-handling.md"
+  },
+  {
+    "id": "fetch",
+    "query": "用 app.fetch 调用 HTTP 服务并设置 timeout",
+    "expected": [
+      "fetch"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/fetch.md"
+  },
+  {
+    "id": "logger",
+    "query": "记录 logger 日志和 access log",
+    "expected": [
+      "logger"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/logger.md"
+  },
+  {
+    "id": "preload",
+    "query": "在启动时 preload 预加载数据",
+    "expected": [
+      "preload"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/preload.md"
+  },
+  {
+    "id": "hot-reload",
+    "query": "开发环境 hot reload 热重载",
+    "expected": [
+      "hot-reload"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/hot-reload.md"
+  },
+  {
+    "id": "i18n",
+    "query": "按 locale 切换 i18n 国际化语言",
+    "expected": [
+      "i18n"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/i18n.md"
+  },
+  {
+    "id": "mcp-generation",
+    "query": "生成 MCP 代码和依赖知识",
+    "expected": [
+      "mcp-generation"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/mcp-generation.md"
+  },
+  {
+    "id": "observability",
+    "query": "用 OpenTelemetry tracing 观察应用",
+    "expected": [
+      "observability"
+    ],
+    "maxRank": 3,
+    "chapter": "examples/opentelemetry.md"
+  },
+  {
+    "id": "nacos-integration",
+    "query": "接入 Nacos 配置与服务发现",
+    "expected": [
+      "nacos-integration"
+    ],
+    "maxRank": 3,
+    "chapter": "examples/nacos-integration.md"
+  },
+  {
+    "id": "frontend.overview",
+    "query": "了解前端入门、项目结构和路线图",
+    "expected": [
+      "frontend.overview"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/overview.md"
+  },
+  {
+    "id": "frontend.rendering",
+    "query": "选择服务端 SSR 或 CSR SPA 渲染",
+    "expected": [
+      "frontend.rendering"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/rendering-modes.md"
+  },
+  {
+    "id": "frontend.layouts",
+    "query": "组织 Layout 组件与 document 错误页",
+    "expected": [
+      "frontend.layouts"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/layouts-and-components.md"
+  },
+  {
+    "id": "frontend.hydration",
+    "query": "检查页面 hydration 水合问题",
+    "expected": [
+      "frontend.hydration"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/hydration-validation.md"
+  },
+  {
+    "id": "frontend.static-assets",
+    "query": "将静态资源部署到 CDN",
+    "expected": [
+      "frontend.static-assets"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/static-assets-and-cdn.md"
+  },
+  {
+    "id": "frontend.styles",
+    "query": "在前端引入 CSS 与 JSCSS 样式",
+    "expected": [
+      "frontend.styles"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/styles-and-assets.md"
+  },
+  {
+    "id": "frontend.data",
+    "query": "生成 API Client contracts 并管理数据流",
+    "expected": [
+      "frontend.data"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/api-client-and-contracts.md"
+  },
+  {
+    "id": "frontend.cache",
+    "query": "页面 render data 缓存如何 refresh",
+    "expected": [
+      "frontend.cache"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/render-data-and-cache.md"
+  },
+  {
+    "id": "frontend.configuration",
+    "query": "设置 frontend configuration 前端配置",
+    "expected": [
+      "frontend.configuration"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/configuration.md"
+  },
+  {
+    "id": "frontend.build",
+    "query": "前端 build deploy 与 code splitting",
+    "expected": [
+      "frontend.build"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/build-and-deploy.md"
+  },
+  {
+    "id": "frontend.development",
+    "query": "开发前端时启用 fast refresh",
+    "expected": [
+      "frontend.development"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/dev-workflow.md"
+  },
+  {
+    "id": "frontend.diagnostics",
+    "query": "定位前端 diagnostics 与 leak scan",
+    "expected": [
+      "frontend.diagnostics"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/diagnostics-and-leak-scan.md"
+  },
+  {
+    "id": "frontend.seo",
+    "query": "生成 SEO Sitemap 和 Robots",
+    "expected": [
+      "frontend.seo"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/seo-sitemap.md"
+  },
+  {
+    "id": "frontend.performance",
+    "query": "为前端设置 performance budgets",
+    "expected": [
+      "frontend.performance"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/performance-budgets.md"
+  },
+  {
+    "id": "validation-natural",
+    "query": "为接口加请求参数校验",
+    "expected": [
+      "validation"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/validation.md"
+  },
+  {
+    "id": "routing-natural",
+    "query": "增加一个 HTTP 请求入口",
+    "expected": [
+      "routing"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/routing.md"
+  },
+  {
+    "id": "cache-negative",
+    "query": "不要数据库，只需要响应缓存",
+    "expected": [
+      "cache"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/cache.md",
+    "excluded": [
+      "database",
+      "validation"
+    ]
+  },
+  {
+    "id": "fetch-negative",
+    "query": "不用服务端渲染，只调用 app.fetch 请求外部 HTTP",
+    "expected": [
+      "fetch"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/fetch.md",
+    "excluded": [
+      "frontend.rendering"
+    ]
+  },
+  {
+    "id": "session-natural",
+    "query": "怎样保持用户 session 并设置 cookie",
+    "expected": [
+      "cookies-session"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/cookies-session.md"
+  },
+  {
+    "id": "jobs-natural",
+    "query": "后台任务失败以后应该怎样重试",
+    "expected": [
+      "jobs"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/jobs.md"
+  },
+  {
+    "id": "rendering-negative",
+    "query": "服务端只输出 HTML，不做客户端水合",
+    "expected": [
+      "frontend.rendering"
+    ],
+    "maxRank": 3,
+    "chapter": "frontend/ssr.md",
+    "excluded": [
+      "frontend.hydration"
+    ]
+  },
+  {
+    "id": "database-natural",
+    "query": "数据库能否按条件查询 Models 并做 CRUD",
+    "expected": [
+      "database"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/database.md"
+  },
+  {
+    "id": "logger-natural",
+    "query": "记录每次请求的 access log",
+    "expected": [
+      "logger"
+    ],
+    "maxRank": 3,
+    "chapter": "api/access-log.md"
+  },
+  {
+    "id": "plugins-natural",
+    "query": "启动插件时先执行 setup，停止时执行 onClose",
+    "expected": [
+      "plugins"
+    ],
+    "maxRank": 3,
+    "chapter": "guide/plugins.md"
+  },
+  {
+    "id": "unknown-english",
+    "query": "quantum teleportation zyxunavailable",
+    "expected": []
+  },
+  {
+    "id": "unknown-chinese",
+    "query": "没有匹配能力的量子传送器",
+    "expected": []
+  },
+  {
+    "id": "unknown-training",
+    "query": "怎样训练大语言模型",
+    "expected": []
+  },
+  {
+    "id": "unknown-gpu",
+    "query": "为显卡编写 CUDA 内核",
+    "expected": []
+  },
+  {
+    "id": "unknown-orbit",
+    "query": "在卫星上计算行星轨道",
+    "expected": []
+  },
+  {
+    "id": "compound-data-service",
+    "query": "把数据库访问放入服务层，使用 Models",
+    "expected": [
+      "database",
+      "services"
+    ],
+    "maxRank": 5
+  },
+  {
+    "id": "compound-route-validation",
+    "query": "注册 HTTP 路由，并添加 schema 参数校验",
+    "expected": [
+      "routing",
+      "validation"
+    ],
+    "maxRank": 5
+  }
 ]

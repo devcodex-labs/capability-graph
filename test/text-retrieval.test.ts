@@ -33,6 +33,23 @@ const config = (root: string) => ({ hostAllowedProviders: ['alpha'], integration
 const query = (capabilityId: string, text = 'validation') => ({ selected: [{ capabilityId }], knowledgeIds: [`GUIDE-${capabilityId}`], text });
 const change = (providerId: string, staticRevision: string, reason: SourceChange['reason']): SourceChange => ({ providerId, staticRevision, reason });
 
+test('capability recall uses Chinese phrases, rejects unknown requests and separates explicit negation', async () => {
+  const source = await sources(); let graph: CapabilityGraph | undefined;
+  try {
+    for (const [id, name, description, whenToUse] of [
+      ['a', '响应缓存', '缓存 HTTP 接口响应', '设置缓存 ttl'],
+      ['b', '数据库', '数据库访问与持久化', '使用 MonSQLize Models CRUD'],
+      ['c', '参数校验', '请求响应数据契约', '校验请求 schema'],
+    ]) await writeFile(path.join(source.first, `${id}.capability.json`), JSON.stringify({ capabilityId: id, name, description, whenToUse }));
+    const recall = new TextCapabilityRetriever();
+    graph = await CapabilityGraph.open({ ...config(source.first), capabilityRetriever: recall });
+    await recall.rebuild(graph);
+    assert.equal((await graph.retrieveCapabilities({ text: '没有匹配能力的量子传送器' })).items.length, 0);
+    assert.deepEqual((await graph.retrieveCapabilities({ text: '不要数据库，只需要响应缓存' })).items.map((item) => item.id.capabilityId), ['a']);
+    assert.equal((await graph.retrieveCapabilities({ text: '校验请求 schema' })).items[0]?.id.capabilityId, 'c');
+  } finally { await graph?.close(); await source.close(); }
+});
+
 test('in-flight queries keep one configuration and unrelated invalidation preserves publication', async () => {
   for (const reconfigure of [false, true]) {
     const source = await sources();

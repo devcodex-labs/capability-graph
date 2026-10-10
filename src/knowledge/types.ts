@@ -18,6 +18,12 @@ export interface KnowledgeReader {
   stream?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, options: {
     chunkBytes: number; signal?: AbortSignal;
   }): AsyncIterable<{ bytes: Uint8Array; contentType: string; source: string }>;
+  /** Optional proof that the current source still matches a previously fully hashed contentId.
+   * Return true only after revalidation with a strong validator or immutable source identity.
+   * False requests a full scan; unavailable/aborted verification must throw. Never use timestamps alone.
+   * Core may retain a bounded private snapshot for body pages; this does not cap document size. */
+  isContentCurrent?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, contentId: KnowledgeContentId,
+    options: { signal?: AbortSignal }): Promise<boolean>;
 }
 export interface KnowledgeScanResult {
   readonly contentId: KnowledgeContentId; readonly totalBytes: number; readonly contentType: string; readonly source: string;

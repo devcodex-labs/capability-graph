@@ -54,8 +54,8 @@ test('home process is vertical and ordered', async ({ page }, testInfo) => {
 test('mobile home exposes the first action without scrolling', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./');
-  await expect(page.getByRole('link', { name: '安装', exact: true }).filter({ visible: true }).last()).toBeInViewport();
-  await expect(page.getByRole('link', { name: '创建一个能力并发现它', exact: true })).toBeInViewport();
+  await expect(page.getByRole('main').getByRole('link', { name: '安装预览包', exact: true })).toBeInViewport();
+  await expect(page.getByRole('main').getByRole('link', { name: '创建一个能力并发现它', exact: true })).toBeInViewport();
 });
 
 test('wide desktop keeps the compact navigation controls visible', async ({ page }, testInfo) => {

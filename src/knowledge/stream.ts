@@ -5,10 +5,17 @@ import { LocalFileReader } from "./local-file-reader.js";
 import type { KnowledgeReadContext, KnowledgeReader, KnowledgeScanResult } from "./types.js";
 import { locatorSource, readDocument } from "./read.js";
 
+// Per graph, private, bounded byte copies. Sources without a strong proof are never reused.
+const snapshotMaxBytes = 4_194_304;
+interface Snapshot { reader: KnowledgeReader; bytes: Buffer; summary: KnowledgeScanResult }
+const snapshots = new WeakMap<readonly KnowledgeReader[], Map<string, Snapshot>>();
+export function clearDocumentSnapshots(readers: readonly KnowledgeReader[]) { snapshots.delete(readers); }
+
 /** Hash complete source bytes while retaining only the consumer's bounded working set. */
 export async function scanDocument(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, readers: readonly KnowledgeReader[],
   consume: (bytes: Uint8Array, offset: number) => void | Promise<void>,
-  options: { chunkBytes: number; fallbackMaxBytes: number; signal?: AbortSignal }): Promise<KnowledgeScanResult> {
+  options: { chunkBytes: number; fallbackMaxBytes: number; signal?: AbortSignal; reuseStableSnapshot?: boolean;
+    range?: { startOffset: number; endOffset: number } }): Promise<KnowledgeScanResult> {
   const local = new LocalFileReader();
   let reader: KnowledgeReader | undefined;
   try { reader = local.canRead(ref) ? local : readers.find((item) => item.canRead(ref)); }
@@ -22,6 +29,38 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
     for (let offset = 0; offset < body.bytes.length; offset += options.chunkBytes) await consume(body.bytes.slice(offset, offset + options.chunkBytes), offset);
     return { contentId: body.contentId, contentType: body.contentType, source: body.source, totalBytes: body.bytes.length };
   }
+  let cache: Map<string, Snapshot> | undefined;
+  const key = JSON.stringify([context.providerId, context.staticRevision, context.sourceContext.sourceRevision, ref.knowledgeId, locatorSource(ref)]);
+  if (options.reuseStableSnapshot && reader.isContentCurrent) {
+    cache = snapshots.get(readers);
+    if (!cache) { cache = new Map(); snapshots.set(readers, cache); }
+    const previous = cache.get(key);
+    if (previous) {
+      let current: boolean = false;
+      if (previous.reader === reader) {
+        try {
+          options.signal?.throwIfAborted();
+          current = await reader.isContentCurrent(ref, context, previous.summary.contentId, options.signal ? { signal: options.signal } : {});
+          options.signal?.throwIfAborted();
+        } catch { cache.delete(key); throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
+        if (typeof current !== "boolean") { cache.delete(key); throw new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source" }); }
+      }
+      cache.delete(key);
+      if (current) {
+        cache.set(key, previous);
+        const end = Math.min(previous.bytes.length, options.range?.endOffset ?? previous.bytes.length);
+        try {
+          for (let offset = options.range?.startOffset ?? 0; offset < end; offset += options.chunkBytes) {
+            options.signal?.throwIfAborted();
+            await consume(Uint8Array.from(previous.bytes.subarray(offset, Math.min(end, offset + options.chunkBytes))), offset);
+          }
+          options.signal?.throwIfAborted();
+        } catch { throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
+        return previous.summary;
+      }
+    }
+  }
+  let retained = cache ? Buffer.allocUnsafe(32768) : undefined;
   const hash = createHash("sha256"); let totalBytes = 0; let contentType: string | undefined;
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   let contractFailure: CapabilityGraphError | undefined;
@@ -36,6 +75,17 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
       }
       const bytes = Uint8Array.from(raw.bytes); contentType = raw.contentType;
       decoder.decode(bytes, { stream: true }); hash.update(bytes);
+      if (retained) {
+        const required = totalBytes + bytes.length;
+        if (required > snapshotMaxBytes) retained = undefined;
+        else {
+          if (required > retained.length) {
+            const larger = Buffer.allocUnsafe(Math.min(snapshotMaxBytes, Math.max(required, retained.length * 2)));
+            retained.copy(larger, 0, 0, totalBytes); retained = larger;
+          }
+          retained.set(bytes, totalBytes);
+        }
+      }
       await consume(bytes, totalBytes); totalBytes += bytes.length;
       if (!Number.isSafeInteger(totalBytes)) throw new Error("Source size invalid");
     }
@@ -45,7 +95,16 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
     if (error === contractFailure || (reader === local && error instanceof CapabilityGraphError)) throw error;
     throw new CapabilityGraphError(reader === local ? "CG_SOURCE_UNREADABLE" : "CG_READER_UNAVAILABLE", { nextAction: "repair_source" });
   }
-  return { contentId: `k:${hash.digest("hex").slice(0, 16)}`, totalBytes, contentType, source: locatorSource(ref) };
+  const summary = { contentId: `k:${hash.digest("hex").slice(0, 16)}`, totalBytes, contentType, source: locatorSource(ref) };
+  if (cache && retained) {
+    cache.delete(key);
+    let cachedBytes = [...cache.values()].reduce((sum, entry) => sum + entry.bytes.length, 0);
+    while (cache.size && (cache.size >= 16 || cachedBytes + totalBytes > snapshotMaxBytes)) {
+      const oldest = cache.keys().next().value!; cachedBytes -= cache.get(oldest)!.bytes.length; cache.delete(oldest);
+    }
+    cache.set(key, { reader, bytes: Buffer.from(retained.subarray(0, totalBytes)), summary });
+  }
+  return summary;
 }
 
 /** Full-source hash plus a bounded range. No HTTP Range support is assumed. */
@@ -56,7 +115,9 @@ export async function documentRange(ref: KnowledgeDocumentRef, context: Knowledg
     const start = Math.max(0, options.startOffset - offset);
     const end = Math.min(bytes.length, options.startOffset + options.maxBytes + 4 - offset);
     if (end > start) { const part = bytes.slice(start, end); parts.push(part); length += part.length; }
-  }, { chunkBytes: Math.min(32768, options.maxBytes + 4), fallbackMaxBytes: options.fallbackMaxBytes, ...(options.signal ? { signal: options.signal } : {}) });
+  }, { chunkBytes: Math.min(32768, options.maxBytes + 4), fallbackMaxBytes: options.fallbackMaxBytes,
+    reuseStableSnapshot: true, range: { startOffset: options.startOffset, endOffset: options.startOffset + options.maxBytes + 4 },
+    ...(options.signal ? { signal: options.signal } : {}) });
   if (options.startOffset > summary.totalBytes) throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
   const buffer = Buffer.concat(parts, length);
   if (buffer.length && (buffer[0]! & 0xc0) === 0x80) throw new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input", details: { reason: "offset_not_utf8_boundary" } });

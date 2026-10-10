@@ -232,6 +232,7 @@ for (const mode of ['light', 'dark'] as const) {
     await page.goto('./');
     const hint = page.locator('.rp-search-button__hotkey');
     await expect(hint).toHaveCSS('opacity', '1');
+    await page.locator('.rp-doc-layout__sidebar').getByRole('button', { name: '展开集成', exact: true }).click();
     for (const text of [page.locator('.rp-doc-layout__sidebar .rp-badge--info').last(), hint]) {
     const contrast = await text.evaluate((element) => {
       const rgba = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);

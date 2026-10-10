@@ -5,7 +5,7 @@ description: 官方文档主题 Provider、原生 MCP 独立审计、分层运�
 
 # VextJS 集成
 
-<span className="cg-status">仅合同</span>
+<span className="cg-status">默认合同回归；固定来源有独立实测</span>
 
 仓库提供 examples/vextjs/ 的官方文档导出器、原生 MCP 审计工具、stdio 客户端和运行快照适配器。默认回归验证接入合同；真实验证需要固定的 VextJS 安装快照及仓库外实际项目。它们是源码示例，不属于 Core 的 npm 导出。Core 继续保持框架无关。
 
@@ -14,6 +14,8 @@ description: 官方文档主题 Provider、原生 MCP 独立审计、分层运�
 面向接入的 Provider 按官方文档主题定义 routing、validation、plugins、database 等能力。capabilities/ 使用 JSON 定义，knowledge/ 按官方 guide/api/frontend/specification 等层级保存原始 Markdown/MDX；metadata/source-manifest.json 保存来源和章节清单，metadata/native-id-map.json 保存原生身份关联。章节关联由集成作者维护，一项能力可以读取多个指南、API 和规范，不按每个页面机械生成一项能力。
 
 固定快照共 91 篇文档，关联到 46 个主题能力；5 篇导航或资源材料明确列为 reference-only。清单记录每篇文档的归属、哈希和验证范围。新增未分类章节或必需章节缺失会阻止导出。原文可读取不代表其中全部功能已经执行验证。
+
+官方文档的独立入口是 `node scripts/validation/vextjs-documentation.mjs <已构建的固定框架目录> <完整 commit>`。它核对全部原文字节、正文分页还原和覆盖 46 个主题的 63 条独立任务，包含中文未知需求、否定与组合任务。CI 自动执行该入口；全新安装项目的 HTTP、数据库、任务及 HTTPS 业务验收由另一个 CI 作业执行。词项检索结果不代表模型或 Agent 的成功率。
 
 原生 MCP 的 capability、rule、recipe、knowledge、workflow 在独立审计中保留 ID、status、正文、catalog digest 和来源身份。该验证目录的 native.c03 等 ID 不进入公开文档 Provider；正文按原字节保存为 Markdown，机器目录与来源信息存入 metadata/。vext:// 仅是原生来源引用，不是内核支持的 URI Reader。
 

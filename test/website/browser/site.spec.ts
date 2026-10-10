@@ -2,7 +2,7 @@ import { expect, test } from './fixtures';
 
 const base = 'https://devcodex-labs.github.io/capability-graph/';
 
-test('top navigation is compact and all sidebar sections are expanded by default', async ({ page }) => {
+test('sidebar keeps section links visible and expands the current section', async ({ page }) => {
   await page.goto('./');
   const labels = await page.locator('.rp-nav-menu--right > li > a').allTextContents();
   expect(labels).toEqual(['v1', 'GitHub']);
@@ -19,18 +19,20 @@ test('top navigation is compact and all sidebar sections are expanded by default
   const sectionBody = (name: string) => sidebar.getByRole('link', { name, exact: true })
     .locator('xpath=../following-sibling::div[1]');
   for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
-    await expect.poll(() => sectionBody(section).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
+    if (section === '快速开始') await expect(sectionBody(section)).toBeVisible();
+    else await expect(sectionBody(section)).toBeHidden();
   }
   const sidebarLabels = await sidebar.getByRole('link').allTextContents();
   expect(sidebarLabels.every((label) => /[\u3400-\u9fff]/u.test(label))).toBe(true);
   expect(sidebarLabels.indexOf('使用指南')).toBeLessThan(sidebarLabels.indexOf('核心概念'));
-  await expect(sidebar.getByRole('link', { name: '渐进发现与按需读取', exact: true })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: '渐进发现与按需读取', exact: true })).toBeHidden();
 
   await page.goto('getting-started/first-provider');
   await expect(page.locator('h1')).toContainText('创建第一个 Provider');
-  for (const section of ['快速开始', '核心概念', '使用指南', '集成', '示例', 'API 参考', '故障排查']) {
-    await expect.poll(() => sectionBody(section).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThan(0);
-  }
+  await expect(sectionBody('快速开始')).toBeVisible();
+  await page.goto('reference/');
+  await expect(sectionBody('API 参考')).toBeVisible();
+  await expect(sidebar.getByRole('button', { name: '收起API 参考', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('home section links use canonical index routes and quick start continues to installation', async ({ page }) => {
@@ -59,7 +61,7 @@ test('first Provider starts with a complete runnable path', async ({ page }) => 
   await expect(page.locator('h2').first()).toContainText('最快跑通');
   await expect(page.locator('pre').getByText('node discover.mjs', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '完整受检示例目录' })).toHaveCount(0);
-  await expect(page.getByRole('main')).toContainText('不需要克隆仓库');
+  await expect(page.getByRole('main')).toContainText('取得 1.1.0 预览包后');
   await expect(page.getByText('npm run check:examples', { exact: true })).toHaveCount(0);
 });
 
@@ -79,6 +81,7 @@ test('task navigation keeps API design in integrations and derives section jumps
   await page.goto('./');
   const sidebar = page.locator('.rp-doc-layout__sidebar');
   const integration = sidebar.locator('[data-section="集成"]');
+  await sidebar.getByRole('button', { name: '展开集成', exact: true }).click();
   await expect(integration.getByRole('link', { name: '设计 Provider API', exact: true })).toHaveAttribute('href', '/capability-graph/getting-started/provider-owned-api');
   await expect(sidebar.locator('[data-section="快速开始"]').getByRole('link', { name: '设计 Provider API' })).toHaveCount(0);
   const options = await sidebar.getByLabel('跳转分区').locator('option').allTextContents();
@@ -86,6 +89,7 @@ test('task navigation keeps API design in integrations and derives section jumps
   expect(options.slice(1)).toEqual(groups);
   const url = page.url();
   await sidebar.getByLabel('跳转分区').selectOption({ label: '故障排查' });
+  await expect(sidebar.getByRole('button', { name: '收起故障排查', exact: true })).toHaveAttribute('aria-expanded', 'true');
   await expect(sidebar.getByRole('link', { name: '故障排查', exact: true })).toBeInViewport();
   await expect(page).toHaveURL(url);
 });

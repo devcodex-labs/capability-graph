@@ -22,11 +22,13 @@ test('strong ETag snapshot downloads a long source once, revalidates each page a
   let body = Buffer.from('source 中文🙂\n'.repeat(10000)); let version = '"1"'; let downloads = 0; let conditional = 0;
   const server = createServer((request, response) => {
     if (request.headers['if-none-match'] === version) { conditional++; response.writeHead(304, { etag: version }); response.end(); }
-    else { downloads++; response.writeHead(200, { etag: version, 'content-type': 'text/markdown' }); response.end(body); }
+    else { if (request.method === 'GET') downloads++; response.writeHead(200, { etag: version, 'content-type': 'text/markdown' }); response.end(body); }
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); assert(address && typeof address !== 'string'); const origin = `http://127.0.0.1:${address.port}`;
   const reader = new HttpKnowledgeReader({ allowedOrigins: [origin], snapshot: { directory, maxBytes: 1_000_000 } });
+  let scans = 0; let scannedBytes = 0; const stream = reader.stream.bind(reader);
+  reader.stream = async function* (...args) { scans++; for await (const chunk of stream(...args)) { scannedBytes += chunk.bytes.length; yield chunk; } };
   const db = new FakeDatabase([record('a', { knowledge: [ref(origin + '/guide')] })]);
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'], readers: [reader],
     providers: [{ providerId: 'seed', authority: { kind: 'database', adapter: { id: 'metadata', openView: async () => db } } }] });
@@ -36,6 +38,8 @@ test('strong ETag snapshot downloads a long source once, revalidates each page a
     do { const page = await bound.readDocumentPage({ ...query, ...(cursor ? { cursor } : {}) }); text += page.text;
       firstCursor ??= page.nextCursor; cursor = page.nextCursor; pages++; } while (cursor);
     assert.deepEqual(Buffer.from(text), body); assert.equal(downloads, 1); assert.equal(conditional, pages - 1);
+    assert.equal(scans, 1, 'continuations validate the strong source identity without scanning the snapshot again');
+    assert.equal(scannedBytes, body.length);
     assert.equal(reader.cachedSnapshotBytes, body.length);
     body = Buffer.from('changed 中文🙂\n'.repeat(10000)); version = '"2"';
     await assert.rejects(bound.readDocumentPage({ ...query, cursor: firstCursor }), { code: 'CG_REVISION_MISMATCH' });
@@ -44,6 +48,36 @@ test('strong ETag snapshot downloads a long source once, revalidates each page a
     await graph.close(); await reader.close(); assert.deepEqual(await readdir(directory), []);
     await new Promise<void>((resolve) => { server.close(() => resolve()); server.closeAllConnections(); }); await removeTestDirectory(directory);
   }
+});
+
+test('conditional verification rejects outages and invalid validators, falls back when HEAD is unsupported, and cancels I/O', async () => {
+  const directory = await createTestDirectory('http-proof-'); let mode = 'valid'; let gets = 0;
+  const body = Buffer.from('stable source '.repeat(5000));
+  const server = createServer((request, response) => {
+    if (request.method === 'HEAD') {
+      if (mode === 'slow') return;
+      const status = mode === 'outage' ? 503 : mode === 'unsupported' ? 405 : mode === 'partial' ? 206 : 304;
+      response.writeHead(status, { etag: mode === 'mismatch' ? '"other"' : '"fixed"' }); response.end();
+    } else { gets++; response.writeHead(200, { etag: '"fixed"', 'content-type': 'text/plain' }); response.end(body); }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address(); assert(address && typeof address !== 'string'); const origin = `http://127.0.0.1:${address.port}`;
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [origin], timeoutMs: 100, snapshot: { directory } });
+  const document = ref(origin + '/guide');
+  try {
+    const read = await reader.read(document, context, { maxBytes: body.length });
+    assert.equal(await reader.isContentCurrent(document, context, read.contentId, {}), true);
+    assert.equal(await reader.isContentCurrent(document, context, 'k:0000000000000000', {}), false);
+    mode = 'unsupported'; assert.equal(await reader.isContentCurrent(document, context, read.contentId, {}), false);
+    for (mode of ['outage', 'mismatch', 'partial', 'slow']) {
+      await assert.rejects(reader.isContentCurrent(document, context, read.contentId, {})); assert.equal(reader.activeRequests, 0);
+    }
+    const controller = new AbortController();
+    const pending = reader.isContentCurrent(document, context, read.contentId, { signal: controller.signal });
+    const timer = setTimeout(() => controller.abort(), 20);
+    try { await assert.rejects(pending); } finally { clearTimeout(timer); }
+    assert.equal(reader.activeRequests, 0); assert.equal(gets, 1);
+  } finally { await reader.close(); server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); await removeTestDirectory(directory); }
 });
 
 test('weak validators and oversized snapshots remain fully readable; HTML and unsolicited partial bodies fail', async () => {

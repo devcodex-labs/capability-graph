@@ -10,9 +10,16 @@ import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 // A transport profile, not an Agent or retrieval-quality benchmark. Owned HTTP I/O is measured.
 const root = await createTemporaryDirectory('capability-graph-knowledge-profile-');
 const bodies = Array.from({ length: 8 }, (_, i) => Buffer.from((`# Document ${i}\n\nneedle${i} 中文🙂 exact bytes\n\n`).repeat(4000)));
+const pageBody = Buffer.alloc(1_048_576, 120);
 let requests = 0; let servedBytes = 0;
 const sockets = new Set();
 const server = createServer((req, res) => {
+  if (req.url === '/paged') {
+    requests++; res.setHeader('etag', '"fixed-page-source"'); res.setHeader('content-type', 'text/plain');
+    if (req.headers['if-none-match'] === '"fixed-page-source"') { res.writeHead(304).end(); return; }
+    if (req.method === 'GET') servedBytes += pageBody.length;
+    res.end(pageBody); return;
+  }
   const index = Number(req.url?.slice(1));
   if (!Number.isInteger(index) || !bodies[index]) { res.writeHead(404).end(); return; }
   requests++; servedBytes += bodies[index].length;
@@ -70,8 +77,30 @@ try {
       }
     } finally { try { await graph?.close(); } finally { await transport.close(); assert.equal(transport.activeRequests, 0); } }
   }
-  console.log(JSON.stringify({ node: process.version, platform: process.platform, modelCalls: 0, results,
-    limitation: 'Synthetic loopback workload with six warm samples per case. Full-source hashes still require full-source I/O; streaming bounds transfer buffers and avoids rebuilding cached lexical chunks. Do not infer production throughput or Agent success.' }, null, 2));
+  await writeFile(path.join(root, 'paged.capability.json'), JSON.stringify({ capabilityId: 'paged', name: 'Paged source', description: 'Byte-exact pagination profile', whenToUse: 'Read source pages',
+    knowledge: [{ kind: 'document', knowledgeId: 'PAGED', role: 'guide', locator: { type: 'http', url: `${origin}/paged` } }] }));
+  const pagination = [];
+  for (const stableProof of [false, true]) {
+    const transport = new HttpKnowledgeReader({ allowedOrigins: [origin], snapshot: { directory: path.join(root, 'snapshots') } });
+    let streamCalls = 0; let streamedBytes = 0; let validations = 0; let graph;
+    const reader = { id: 'paged-source', canRead: (ref) => transport.canRead(ref), read: (...args) => transport.read(...args),
+      async *stream(...args) { streamCalls++; for await (const part of transport.stream(...args)) { streamedBytes += part.bytes.length; yield part; } },
+      ...(stableProof ? { isContentCurrent: (...args) => { validations++; return transport.isContentCurrent(...args); } } : {}) };
+    const before = { requests, servedBytes }; const started = performance.now();
+    try {
+      graph = await CapabilityGraph.open({ hostAllowedProviders: ['profile'], integrationEnabledProviders: ['profile'],
+        providers: [{ providerId: 'profile', authority: { kind: 'file', rootDir: root } }], readers: [reader] });
+      let cursor; let text = ''; let pages = 0;
+      do { const page = await graph.forProvider('profile').readDocumentPage({ capabilityId: 'paged', knowledgeId: 'PAGED', ...(cursor ? { cursor } : {}) });
+        text += page.text; cursor = page.nextCursor; pages++; } while (cursor);
+      assert.equal(text, pageBody.toString()); assert.equal(pages, 32); assert.equal(streamCalls, stableProof ? 1 : 32);
+      assert.equal(streamedBytes, pageBody.length * streamCalls); assert.equal(transport.activeRequests, 0);
+      pagination.push({ stableProof, sourceBytes: pageBody.length, pages, streamCalls, streamedBytes, validations,
+        httpRequests: requests - before.requests, servedBytes: servedBytes - before.servedBytes, elapsedMs: performance.now() - started });
+    } finally { await graph?.close(); await transport.close(); }
+  }
+  console.log(JSON.stringify({ node: process.version, platform: process.platform, modelCalls: 0, results, pagination,
+    limitation: 'Synthetic loopback workload. Stable-source body pages reuse a bounded, fully hashed private snapshot after strong revalidation; sources without that proof still require complete scans. Knowledge search rechecks full sources. Do not infer production throughput or Agent success.' }, null, 2));
 } finally {
   if (listening) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
   assert.equal(sockets.size, 0); await rm(root, { recursive: true, force: true });

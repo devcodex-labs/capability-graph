@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdir, readFile, rm, writeFile, symlink } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile, symlink, cp } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 import { createTemporaryDirectory, repositoryRoot } from '../../scripts/lib/artifact-paths.mjs';
 import { exportVextProvider } from '../../examples/vextjs/documentation-provider.mjs';
 import { documentationTopics } from '../../examples/vextjs/official-documents.mjs';
+import { verifyVextSource, assertVerifiedDocument } from '../../examples/vextjs/source-provenance.mjs';
 
 // Synthetic contract material, deliberately marked caller-declared; real upstream verification is separate.
 async function fixture(root) {
@@ -64,5 +66,42 @@ test('documentation inventory rejects newly unclassified, missing and symlinked 
       await symlink(path.join(docs, 'guide/plugins.md'), path.join(docs, 'guide/routing.md'));
       await assert.rejects(exportVextProvider({ ...options, outputDir: path.join(root, 'linked') }), /symlink unsupported/);
     }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('verified export binds the checkout and committed bytes, including changes hidden from git status', async () => {
+  const root = await createTemporaryDirectory('vext-docs-provenance-');
+  try {
+    const options = await fixture(root);
+    const git = (...args) => execFileSync('git', ['-C', options.sourceRoot, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    // Controlled build modules exercise provenance mechanics; real VextJS is a separate CI input.
+    for (const [file, body] of [
+      ['package.json', JSON.stringify({ name: 'vextjs', version: '2.0.0', type: 'module' })],
+      ['scripts/implementation-manifest.mjs', 'export const inspectBuildInputs = () => ({ inputDigest: "controlled", packageVersion: "2.0.0" });'],
+      ['src/lib/project/implementation-fingerprint.mjs', 'export const fingerprintImplementationTree = () => "controlled-output";'],
+      ['dist/.implementation.json', JSON.stringify({ state: 'complete', inputDigest: 'controlled', outputDigest: 'controlled-output', digest: 'controlled' })],
+    ]) {
+      const target = path.join(options.sourceRoot, file); await mkdir(path.dirname(target), { recursive: true }); await writeFile(target, body);
+    }
+    git('init', '--quiet'); git('add', '.');
+    git('-c', 'user.name=Capability Graph Tests', '-c', 'user.email=tests@example.invalid', 'commit', '--quiet', '-m', 'Controlled source fixture');
+    options.source = await verifyVextSource({ frameworkRoot: options.sourceRoot, sourceIdentity: git('rev-parse', 'HEAD') });
+    const good = await exportVextProvider({ ...options, outputDir: path.join(root, 'good') });
+    assert.equal(good.manifest.sourceVerification, 'verified-fixed-source-build');
+    const alternate = path.join(root, 'alternate'); await cp(options.sourceRoot, alternate, { recursive: true });
+    await assert.rejects(exportVextProvider({ ...options, sourceRoot: alternate, outputDir: path.join(root, 'alternate-output') }), /differs from the verified checkout/);
+    const originalPath = 'website/docs/zh/guide/routing.md';
+    const original = await readFile(path.join(options.sourceRoot, originalPath));
+    assertVerifiedDocument(options.source, originalPath, original);
+    assert.throws(() => assertVerifiedDocument(options.source, originalPath, Buffer.from('replaced')), /differs from the verified commit/);
+    git('update-index', '--assume-unchanged', originalPath);
+    await writeFile(path.join(options.sourceRoot, originalPath), '# Controlled replacement\n');
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '');
+    await assert.rejects(exportVextProvider({ ...options, outputDir: path.join(root, 'drift') }), /differs from the verified commit/);
+    git('update-index', '--no-assume-unchanged', originalPath);
+    await assert.rejects(exportVextProvider({ ...options, outputDir: path.join(root, 'dirty') }), /tracked source changed/);
+    await writeFile(path.join(options.sourceRoot, originalPath), original);
+    git('-c', 'user.name=Capability Graph Tests', '-c', 'user.email=tests@example.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'Changed controlled checkout');
+    await assert.rejects(exportVextProvider({ ...options, outputDir: path.join(root, 'new-commit') }), /checkout commit changed/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

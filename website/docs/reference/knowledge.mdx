@@ -7,7 +7,7 @@ import Contracts from '@generated/snippets/contracts-knowledge.mdx';
 
 # 知识接口
 
-<span className="cg-status">可用</span> <span className="cg-status">仅合同</span>
+<span className="cg-status">本地读取可用；远程与检索后端需配置</span>
 
 ## KnowledgeRef
 
@@ -121,8 +121,8 @@ do {
 
 可指定 `startOffset/maxBytes` 读取范围，或传 `cursor` 续读；不能同时指定 `cursor/startOffset`。偏移必须在 UTF-8 边界。分页优先在较近的段落或围栏行结束；超长单行、代码块通过明确的连续范围读取。游标绑定 Provider、文档身份、静态修订、来源路径和全文哈希。来源正文变化，即使静态修订没变，旧游标也返回 `CG_REVISION_MISMATCH`。
 
-本地读取逐块计算完整哈希并检查打开文件的身份与变更；HTTP 参考 Reader 支持无 Range 的来源，流式读取全文，只保留所选范围，整体期限或 `signal` 会终止实际连接。每页核验全文意味着额外 I/O，不能把范围响应字节数当实际来源读取量。旧 Reader 仅实现 `read` 时采用有界全文回退；超过回退容量或需要真实取消时应实现 `stream`。失败后已启动的读取与资源清理完成才结束查询。
+本地读取逐块计算完整哈希并检查打开文件的身份与变更；HTTP 参考 Reader 支持无 Range 的来源，整体期限或 `signal` 会终止实际连接。Reader 可通过 `isContentCurrent` 提供稳定来源证明，让续页复用 Core 已完整核验的私有副本，每实例缓存最多 4 MiB、16 条。没有该证明、缓存未命中或文档超缓存容量时继续完整扫描，因此范围响应字节数不等于实际来源读取量。普通可变本地文件仍每页完整核验。旧 Reader 仅实现 `read` 时采用有界全文回退；超过回退容量或需要真实取消时应实现 `stream`。失败后已启动的读取与资源清理完成才结束查询。
 
-HTTP 源码参考支持注入宿主 Agent 兼容代理，在仓库外保存受容量、条目及期限约束的完整快照。强 ETag 的 304 可复用已取得正文；无验证器、弱 ETag 或超缓存预算回退流式全文 GET。ETag 不替代内容哈希，200 新正文拒绝旧 cursor，未经完整来源证明的 206 被拒绝。全文、Specification、分页和检索保留原始 BOM/CRLF；MD/MDX 的 MIME 一致。
+HTTP 源码参考支持注入宿主 Agent 兼容代理，在仓库外保存受容量、条目及期限约束的完整快照。首次全文哈希绑定强 ETag，续页条件 HEAD 的 304 可证明 Core 私有副本仍有效；不支持 HEAD、无验证器、弱 ETag 或超缓存预算时回退全文核验。ETag 不替代首次内容哈希，200 新正文拒绝旧 cursor，未经完整来源证明的 206 被拒绝。全文、Specification、分页和检索保留原始 BOM/CRLF；MD/MDX 的 MIME 一致。
 
 <Contracts />

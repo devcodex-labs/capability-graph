@@ -7,7 +7,7 @@ const topic = (capabilityId, name, whenToUse, chapters, nativeIds = []) => ({ ca
 export const documentationTopics = [
   topic('quick-start', '快速开始', '创建 VextJS 项目运行 Hello World', ['guide/introduction.md', 'guide/quick-start.md', 'examples/hello-world.md']),
   topic('project-structure', '项目结构', '发现项目目录 src routes services plugins Models frontend', ['guide/project-structure.md', 'specification/architecture.md'], ['C01', 'C02']),
-  topic('routing', '路由', 'API 路由 defineRoutes method path fullPath', ['guide/routing.md', 'api/route-definition.md', 'specification/http-and-routing.md'], ['C03']),
+  topic('routing', '路由', 'HTTP API 路由 请求入口 注册请求处理 defineRoutes method path fullPath', ['guide/routing.md', 'api/route-definition.md', 'specification/http-and-routing.md'], ['C03']),
   topic('validation', '参数校验', '请求响应 schema validation 校验 数据契约', ['guide/validation.md', 'specification/validation-and-contracts.md'], ['C04']),
   topic('services', '服务层', 'Service 服务依赖图 dependency injection', ['guide/services.md', 'specification/architecture.md'], ['C05']),
   topic('middleware', '中间件', 'Middleware 请求响应中间件', ['guide/middleware.md'], ['C06']),

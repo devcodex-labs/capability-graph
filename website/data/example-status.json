@@ -144,9 +144,13 @@
     "source": "../examples/vextjs",
     "verify": "npm test",
     "runDir": ".",
-    "prerequisites": ["固定安装的 VextJS schema 2 快照", "位于仓库外的实际项目", "真实验证另传框架根、项目根和来源身份"],
-    "entry": "scripts/validation/vextjs.mjs",
-    "proof": "默认自动回归覆盖 Provider/Runtime 接入合同；固定来源的真实 MCP、Redis、MongoDB、浏览器及 Session 验证独立运行，不代表通用生产认证或 Agent 成功率",
+    "prerequisites": [
+      "构建后的固定 VextJS 来源及完整 commit",
+      "源码仓库 npm ci、npm run build、npm run build:tests",
+      "业务验收另需 Docker、MongoDB 与仓库外全新项目"
+    ],
+    "entry": "scripts/validation/vextjs-documentation.mjs",
+    "proof": "默认测试验证接入合同；独立 CI 对固定 VextJS 来源的 91 篇官方原文、46 个主题和独立检索任务实测，并在全新安装项目执行 HTTP、数据库、任务与 HTTPS 业务验证；原生 MCP 为另一个审计入口，不代表生产认证或 Agent 成功率",
     "userResponsibilities": [
       "固定来源并准备实际项目及外部服务；区分公开 HTTP 契约、启动快照与存活证据"
     ],

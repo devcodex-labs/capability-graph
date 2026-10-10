@@ -10,7 +10,7 @@
 
 来源经代理访问时，宿主通过 `agentForUrl` 注入兼容 Node 20/22/24 的 Agent，例如根开发依赖中的 `proxy-agent`。Agent 由宿主管理和关闭，Reader 不接管它的生命周期；代理凭据不进入报告。
 
-可选 `snapshot` 由宿主指定仓库外绝对目录，并配置 `maxBytes`、`maxEntries`、`ttlMs`。只有完整读取且带强 ETag 的正文才写入快照；后续条件请求返回 304 时仍核对本地完整正文的字节数和 SHA-256。弱/无验证器或正文超过缓存预算时继续完整流式读取；快照预算控制缓存保留，不限制可读取文档大小。Reader 的 `close()` 只清理它自己创建的快照子目录。
+可选 `snapshot` 由宿主指定仓库外绝对目录，并配置 `maxBytes`、`maxEntries`、`ttlMs`。只有完整读取且带强 ETag 的正文才写入快照；后续条件请求返回 304 时仍核对本地完整正文的字节数和 SHA-256。弱/无验证器或正文超过缓存预算时继续完整流式读取；快照预算控制缓存保留，不限制可读取文档大小。正文续页还支持可选 `isContentCurrent`：条件 HEAD 的 304 核验已绑定的强 ETag，Core 复用已完整哈希的私有字节副本，每实例最多 4 MiB、16 条，避免重复磁盘扫描和哈希。不支持 HEAD、弱验证器、过期或超缓存容量时重新完整核验。Reader 的 `close()` 只清理它自己创建的快照子目录。
 
 `text-retrieval.ts` 是确定性的词项索引。`TextKnowledgeRetriever` 通过 `scan` 消费大正文，查询时保留有界 Top-K；完整索引仅在 `maxCachedBytes`、`maxCachedEntries` 及选择数预算内缓存，超过预算时继续流式检索。`configure({ pageBytes })` 控制扫描块大小，`maxDocumentBytes` 是兼容旧名称，两者都不表示全文准入上限；只提供 `read` 的旧 access 使用有界全文回退。Core 正文分页接口只保留所选范围，并计算全文哈希；模型决定是否继续读取。
 

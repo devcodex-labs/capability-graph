@@ -23,10 +23,10 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 Registry 当前已发布 `1.0.1`；仓库为待发布 `1.1.0`。新目录模式、知识根别名及正文分页需使用本仓库构建的安装包；提交源码不会发布 npm 包或部署站点。主包只有 ESM 根入口，固定依赖 BCP 47 解析器与 IANA 注册表数据；MCP 示例为独立私有包，不导出 `./mcp`。文档源码位于 [website](website/)。
 
 ```sh
-npm install @devcodex/capability-graph
+npm install @devcodex/capability-graph@1.0.1
 ```
 
-首次接入从[安装](https://devcodex-labs.github.io/capability-graph/getting-started/installation)和[最小 Provider](https://devcodex-labs.github.io/capability-graph/getting-started/first-provider)开始，不需要克隆本仓库或配置知识、Runtime。关系、知识、必要上下文与规范按[进阶教程](https://devcodex-labs.github.io/capability-graph/guides/progressive-discovery)分步接入。下文的完整 Seed 展示增强合同，不是首次接入必须填写的配置。
+上面的 Registry 命令安装已发布 1.0.1。使用下文的目录模式、知识根和分页功能，请先按[当前预览版安装说明](website/docs/getting-started/installation.mdx)构建并安装 1.1.0。本仓库教程与[已部署站点](https://devcodex-labs.github.io/capability-graph/)可能处于不同版本；首次接入按[最小 Provider](website/docs/getting-started/first-provider.mdx)开始，再按[进阶教程](website/docs/guides/progressive-discovery.mdx)增强。
 
 已实现文件权威加载、校验、单 Provider 正式图、跨 Provider 联合目录、范围控制、修订快照、按需知识读取，以及可插拔的数据库、检索和 Runtime 合同。真实 Seed 同时提供普通 API 与 MCP 接入。
 
@@ -103,9 +103,12 @@ directory 只收集 capabilities/**/*.json，缺少目录、目录外遗留定�
 | `getCapabilities` / `getNeighbors` / `listKnowledgeMembers` | 有界详情、八种关系和 Collection 成员发现 |
 | `resolveSelection` | 沿 `requires` 求完整必要上下文闭包，返回边与直接原因 |
 | `readDocuments` / `readSpecification` | 按用途/语言显式读取能力文档或 Provider 规范，逐项返回结果 |
+| `readDocumentPage` / `readSpecificationPage` | 按 UTF-8 字节分页读取正文，保留全文身份与续读游标 |
 | `retrieveCapabilities` | 显式调用已配置召回后端，Core 校验候选身份与修订 |
 | `queryKnowledge` | 对已选知识执行检索，校验证据、内容版本与片段边界 |
 | `queryRuntime` | 查询单 Provider、指定项目和环境下的运行实例 |
+
+大文档使用 `readDocumentPage` / `readSpecificationPage`，模型决定范围与是否续读。默认 32 KiB 是页大小，文档总大小不设准入门槛；全文与本页哈希分开，内容变化拒绝旧游标。旧全文接口保持完整返回语义，超过单次响应容量时改用分页。
 
 已知身份可直接查详情或读取，不强制从目录开始。第一轮目录只含能力摘要；显式选择由调用者决定，Core 只沿 `requires` 补齐必要上下文。分页必须保留过滤条件及修订；检查 `meta.completeness`、`warnings` 和 `nextCursor`，不能把部分结果当成全集。批量结果逐项检查 `ok`。
 
@@ -134,6 +137,8 @@ directory 只收集 capabilities/**/*.json，缺少目录、目录外遗留定�
 - Runtime Core 已实现调度、观察状态与返回校验；[独立 HTTP 参考](examples/seed-runtime/README.md)实际采集应用注册路由，并验证项目环境隔离、实时变化和失败恢复。它不是通用框架扫描器或远程集群监控服务。
 - Adapter 在调用进程内运行，属于显式信任代码；scope 不是进程沙箱。相对知识路径受根目录及真实路径约束，远程读取策略归已配置 Reader。
 - [API 示例](examples/seed-api/README.md)与 [MCP 示例](examples/seed-mcp/README.md)共享 Core。工具命名、认证、宿主意图判断及规范采用归接入方，不属于主包。
+
+官方文档导出、原生 MCP 审计与真实验证入口见 [VextJS 示例](examples/vextjs/README.md)。文档 Provider 的默认入口按官方主题发现；原生目录与运行快照另行审计。
 
 <a id="development"></a>
 
@@ -168,14 +173,12 @@ npm run evaluate
 
 `evaluate` 使用明确期望的 Seed 任务记录正确性、遗漏、UTF-8 返回字节、调用数和本机耗时，不调用模型、不推断真实 Agent 准确率或节省比例。未配置检索后端的质量对照不适用。
 
+CI 的 `test:package:built`、`evaluate:built` 和 website `build:built` 先核对源码及全部输出指纹；普通命令仍从当前源构建。共享 dist 的构建必须串行，临时报告、服务数据和浏览器输出在仓库外。
+
+VextJS CI 分别验证固定来源的官方文档、原生 MCP 和 Session；另一个全新安装项目执行业务验收。独立文档入口：`node scripts/validation/vextjs-documentation.mjs <已构建的固定框架目录> <完整 commit>`，先执行根构建与测试编译。
+
 <a id="license"></a>
 
 ## 许可证
 
 Apache-2.0
-
-大文档使用 `readDocumentPage` / `readSpecificationPage`，模型决定范围与是否续读。默认 32 KiB 是页大小，文档总大小不设准入门槛；全文与本页哈希分开，内容变化拒绝旧游标。旧全文接口保持完整返回语义，超过单次响应容量时改用分页。
-
-VextJS 的固定原生 schema 2 接入与实际验证入口见 [examples/vextjs](examples/vextjs/README.md)。原生目录角色与来源保留，运行快照保持 partial/unknown/unverified；默认回归与外部框架、数据库、浏览器证据分开。
-
-CI 的 `test:package:built`、`evaluate:built` 和 website `build:built` 先核对源码及全部输出指纹；普通命令仍从当前源构建。共享 dist 的构建必须串行，临时报告、服务数据和浏览器输出在仓库外。

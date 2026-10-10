@@ -7,11 +7,26 @@ const terms = (text: string): string[] => [...new Set(text.normalize("NFKC").toL
 const identity = (value: { id: CanonicalCapabilityId; knowledgeId: string }) => `${formatQualifiedId(value.id)}::${value.knowledgeId}`;
 const score = (wanted: readonly string[], indexed: ReadonlySet<string>) => wanted.filter((term) => indexed.has(term)).length;
 
+// Deterministic phrases avoid ICU-dependent segmentation and matches on generic Chinese single characters.
+const capabilityTerms = (text: string): string[] => {
+  const normalized = text.normalize("NFKC").toLowerCase()
+    .replace(/(?:没有|匹配|能力|如何|怎样|怎么|需要|可以|使用|实现|这个|当前|现有|一个|相关|进行|通过)/g, " ")
+    .replace(/[的了把给和与]/g, " ");
+  const result: string[] = normalized.match(/[a-z0-9]+/g) ?? [];
+  for (const phrase of normalized.match(/[\p{Script=Han}]{2,}/gu) ?? []) {
+    const characters = [...phrase];
+    for (let index = 0; index < characters.length - 1; index++) result.push(characters.slice(index, index + 2).join(""));
+  }
+  return [...new Set(result)];
+};
+const positiveQuery = (text: string) => text.replace(/(?:不要|不需要|无需|不用|不使用|不做)[^，,。;；]*(?=[，,。;；]|$)/g, " ");
+
 /** Deterministic lexical recall over a revision-bound public Catalog snapshot. */
 export class TextCapabilityRetriever implements CapabilityRetriever {
   readonly id = "seed-text-capabilities";
   private revisions: Record<string, string> = {};
-  private rows: { id: CanonicalCapabilityId; terms: ReadonlySet<string> }[] = [];
+  private rows: { id: CanonicalCapabilityId; terms: ReadonlySet<string>; nameTerms: ReadonlySet<string> }[] = [];
+  private frequencies = new Map<string, number>();
   constructor(private readonly maxCapabilities = 10000) {
     if (!Number.isSafeInteger(maxCapabilities) || maxCapabilities < 1) throw new Error("Invalid index capacity");
   }
@@ -30,22 +45,30 @@ export class TextCapabilityRetriever implements CapabilityRetriever {
             (page.meta.completeness !== "complete" && !page.nextCursor)) throw new Error("Catalog snapshot incomplete");
         for (const item of page.items) {
           if (rows.length >= this.maxCapabilities) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
-          rows.push({ id: item.id, terms: new Set(terms([item.name, item.description, item.whenToUse, item.distinction].filter(Boolean).join(" "))) });
+          rows.push({ id: item.id, nameTerms: new Set(capabilityTerms(item.name)),
+            terms: new Set(capabilityTerms([item.name, item.description, item.whenToUse, item.distinction].filter(Boolean).join(" "))) });
         }
         cursor = page.nextCursor;
       } while (cursor);
     }
-    this.rows = rows; this.revisions = revisions;
+    const frequencies = new Map<string, number>();
+    for (const row of rows) for (const term of row.terms) frequencies.set(term, (frequencies.get(term) ?? 0) + 1);
+    this.rows = rows; this.revisions = revisions; this.frequencies = frequencies;
   }
   async retrieve(input: Parameters<CapabilityRetriever["retrieve"]>[0]): ReturnType<CapabilityRetriever["retrieve"]> {
     if (input.providerIds.some((provider) => this.revisions[provider] !== input.staticRevisionByProvider[provider])) {
       throw new CapabilityGraphError("CG_INDEX_STALE", { nextAction: "refresh" });
     }
-    const wanted = terms(input.text);
+    const wanted = capabilityTerms(positiveQuery(input.text));
     const allowed = new Set(input.providerIds);
-    const candidates = this.rows.filter((row) => allowed.has(row.id.providerId)).map((row) => ({ row, score: score(wanted, row.terms) }))
-      .filter((item) => item.score > 0).sort((a, b) => b.score - a.score || formatQualifiedId(a.row.id).localeCompare(formatQualifiedId(b.row.id)))
-      .slice(0, input.limit).map(({ row, score }) => ({ id: row.id, score, sourceStaticRevision: this.revisions[row.id.providerId]! }));
+    const ranked = this.rows.filter((row) => allowed.has(row.id.providerId)).map((row) => ({ row,
+      named: wanted.some((term) => row.nameTerms.has(term)),
+      matches: wanted.filter((term) => row.terms.has(term)),
+      score: wanted.reduce((sum, term) => sum + (row.terms.has(term)
+        ? Math.log(1 + this.rows.length / (this.frequencies.get(term) ?? 1)) * (row.nameTerms.has(term) ? 3 : 1) : 0), 0) }))
+      .filter((item) => item.score > 0 && (item.named || item.matches.length >= 2 || item.matches.some((term) => /^[a-z0-9]+$/.test(term))))
+      .sort((a, b) => b.score - a.score || formatQualifiedId(a.row.id).localeCompare(formatQualifiedId(b.row.id)));
+    const candidates = ranked.slice(0, input.limit).map(({ row, score }) => ({ id: row.id, score, sourceStaticRevision: this.revisions[row.id.providerId]! }));
     return { candidates };
   }
   async invalidate(change: SourceChange): Promise<void> { delete this.revisions[change.providerId]; }

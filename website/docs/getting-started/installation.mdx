@@ -9,7 +9,7 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 
 后续教程使用仓库待发布的 1.1.0，包含 directory 布局、知识根别名与正文分页。Registry 的 1.0.1 不支持新增接口；旧库可能忽略新布局选项后返回空目录。无版本安装仍取得 Registry 的 latest，请核对实际版本。
 
-当前验证教程，请在源码仓库运行 `npm ci`、`npm run build`，再执行 `npm pack --pack-destination /absolute/external/packages`。在消费项目安装该目录中的 `devcodex-capability-graph-1.1.0.tgz`。产物目录由宿主选在源码仓库外；发布 1.1.0 后再使用 Registry 安装。这些命令不会发布包。
+当前请使用下方源码安装步骤。打包文件与消费项目都放在源码仓库同级；这些命令不会发布包。首次发现只需两个 JSON 和一个脚本，当前预览版的安装阶段另需取得源码。
 
 把包装在负责加载 Provider、向 Agent 提供 API/MCP 的 Node.js 接入项目中。Provider 定义目录只是数据目录，不必单独安装一份包；一个接入项目可以加载多个 Provider。
 
@@ -19,17 +19,35 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 - 使用 ESM。主包只提供根入口，不提供 CommonJS `require()` 入口或 `./mcp` 子路径。
 - 后续将创建 Provider 定义文件；安装命令本身不会生成它们。
 
-## 从空目录开始
+## 安装当前 1.1.0 预览版
+
+以下命令从一个新的工作目录开始，适用于 Bash、PowerShell 等支持这些命令的终端。需要 Git、npm 和上述 Node.js 版本。`source/` 是源码，`packages/` 保存安装包，`capability-graph-demo/` 是实际使用 Core 的独立项目。
 
 ```sh
+mkdir capability-graph-preview
+cd capability-graph-preview
+git clone --branch main https://github.com/devcodex-labs/capability-graph.git source
+cd source
+npm ci
+npm run build
+mkdir ../packages
+npm pack --ignore-scripts --pack-destination ../packages
+cd ..
 mkdir capability-graph-demo
 cd capability-graph-demo
 npm init -y
 npm pkg set type=module
-npm install @devcodex/capability-graph
+npm install ../packages/devcodex-capability-graph-1.1.0.tgz
+npm ls @devcodex/capability-graph
 ```
 
-已有项目只需安装依赖，并确认模块配置。`npm pkg set type=module` 会在 `package.json` 写入 `"type": "module"`，让 `.js` 使用 ESM；已有 CommonJS 项目可以把接入脚本命名为 `.mjs`，无需改变整个项目的模块规则。
+最后一条应显示 `@devcodex/capability-graph@1.1.0`。以后在消费项目根目录完成[第一次发现](./first-provider)，不在 `source/` 中放置你的 Provider。
+
+已有项目安装上面生成的 tgz 即可，并确认模块配置。`npm pkg set type=module` 会在 `package.json` 写入 `"type": "module"`，让 `.js` 使用 ESM；已有 CommonJS 项目可以把接入脚本命名为 `.mjs`，无需改变整个项目的模块规则。
+
+## Registry 发布版与升级
+
+目前 `npm install @devcodex/capability-graph@1.0.1` 安装的是发布版，只适用于[线上 1.0.1 文档](https://devcodex-labs.github.io/capability-graph/)，不能直接运行本页之后的新版 directory / 正文分页教程。`npm install @devcodex/capability-graph` 同样仍取得 1.0.1。待 1.1.0 实际发布后，才可改为 `npm install @devcodex/capability-graph@1.1.0`，无需取得源码。
 
 ## 验证包入口
 
@@ -38,6 +56,9 @@ npm install @devcodex/capability-graph
 ```js title="check.mjs"
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
+if (typeof CapabilityGraph.prototype.readDocumentPage !== 'function') {
+  throw new Error('本教程需要 1.1.0 的正文分页接口，请按预览版步骤安装并核对 npm ls。');
+}
 console.log(typeof CapabilityGraph.open); // function
 ```
 
@@ -45,7 +66,7 @@ console.log(typeof CapabilityGraph.open); // function
 node check.mjs
 ```
 
-预期输出是 `function`。这只证明包入口可加载；下一页创建 Provider 并成功调用 `open()` 后，才证明定义和加载配置有效。使用 `.mjs` 不需要 TypeScript 编译器。
+预期输出是 `function`。这证明包入口和本教程所需的新接口存在；下一页创建 Provider 并成功调用 `open()` 后，才证明定义和加载配置有效。使用 `.mjs` 不需要 TypeScript 编译器。
 
 ## 安装内容
 

@@ -30,10 +30,14 @@ interface KnowledgeReader {
   stream?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext,
     options: { chunkBytes: number; signal?: AbortSignal }):
     AsyncIterable<{ bytes: Uint8Array; contentType: string; source: string }>;
+  isContentCurrent?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext,
+    contentId: string, options: { signal?: AbortSignal }): Promise<boolean>;
 }
 ```
 
 `canRead()` 必须同步、稳定。Reader 返回的 `source` 要与声明 locator 一致，并严格遵守字节预算；网络连接和资源释放归 Reader 所有。
+
+`isContentCurrent` 是可选的正文续页优化合同，只能在强验证器或不可变来源身份证明当前正文仍匹配已完整核验的 `contentId` 时返回 `true`；不能只比较时间或自报哈希。`false` 让 Core 重新完整扫描，来源故障、取消或超时必须抛错。Core 每个实例最多保留 4 MiB、16 条私有正文副本，关闭时释放；超缓存容量的文档继续流式完整核验。旧 Reader 无需实现此方法。
 
 `KnowledgeReadContext.sourceContext` 只用于本地读取，不能序列化进 Retriever 请求或公开响应。远程引用存在但无 Reader 时返回 `CG_READER_UNCONFIGURED`。
 
@@ -87,6 +91,6 @@ export function createHttpReader(
 
 `stream` 的块预算与 `read` 的全文容量不同；完整来源可任意大，由模型决定读取范围及是否续读。每个块不超过 chunkBytes，UTF-8 可跨传输块，空正文也要输出带 MIME/source 的空块。Core 计算全文哈希，再返回所选范围；旧 Reader 只有 read 时采用有界全文回退，不能假定它能分页读取超出回退容量的来源。
 
-源码 HTTP 参考的 agentForUrl 可接收宿主 ProxyAgent（Node 20/22/24），不向模型暴露代理认证。宿主负责关闭 Agent；Reader.close 关闭实际连接和自己创建的快照子目录。snapshot.directory 为仓库外的宿主专用绝对路径，maxBytes/maxEntries/ttlMs 控制缓存，不限制文档总大小。可靠强 ETag 的 304 复用已有完整快照；无验证器、弱 ETag 或超缓存预算回退全文 GET。200 更新由正文哈希拒绝旧 cursor，206/重定向/压缩响应被拒绝。原始文本 URL 与渲染 HTML 是不同来源，HTML 提取需独立 Reader 和转换溯源。
+源码 HTTP 参考的 agentForUrl 可接收宿主 ProxyAgent（Node 20/22/24），不向模型暴露代理认证。宿主负责关闭 Agent；Reader.close 关闭实际连接和自己创建的快照子目录。snapshot.directory 为仓库外的宿主专用绝对路径，maxBytes/maxEntries/ttlMs 控制缓存，不限制文档总大小。首次全文 GET 的强 ETag 与哈希建立绑定，续页的条件 HEAD 返回 304 后复用 Core 私有副本，避免重新读取和哈希整篇快照；不支持 HEAD、无验证器、弱 ETag 或超缓存预算时回退全文核验。200 更新由正文哈希拒绝旧 cursor，206/重定向/压缩响应被拒绝。普通 stream/read 仍核验完整磁盘快照。原始文本 URL 与渲染 HTML 是不同来源，HTML 提取需独立 Reader 和转换溯源。
 
 外部索引即使不使用 access，也必须配置实际来源 Reader；Core 会核验每个最终文档和片段。利用 access.scan 可以复用当前查询的核验，减少重复读取。参考文本索引配置 maxCachedBytes/maxCachedEntries 控制保留成本，超额继续流式 Top-K，不截断正文；cachedBytes 是保守计账值，不是堆内存峰值。

@@ -4,6 +4,7 @@ import { documents, readSpecification, validateDocumentFilters, validateSelectio
   type ReadDocumentsQuery, type ReadSpecificationQuery } from "./knowledge/read.js";
 import type { KnowledgeReader, KnowledgeRetriever, CapabilityRetriever } from "./knowledge/types.js";
 import { documentBody, specificationBody, validateBodyQuery, type DocumentBodyQuery, type SpecificationBodyQuery } from "./knowledge/pages.js";
+import { clearDocumentSnapshots } from "./knowledge/stream.js";
 import { retrieveCapabilities } from "./retrieval/capabilities.js";
 import { queryKnowledge } from "./retrieval/knowledge.js";
 import type { QueryKnowledgeQuery, RetrieveCapabilitiesQuery } from "./retrieval/types.js";
@@ -33,7 +34,8 @@ function extensions(config: OpenConfig): Extensions {
   const invalid = () => { throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" }); };
   if (!config || typeof config !== "object" || (config.readers !== undefined && !Array.isArray(config.readers))) invalid();
   for (const reader of config.readers ?? []) if (!reader || typeof reader.id !== "string" || !reader.id || typeof reader.canRead !== "function" || typeof reader.read !== "function" ||
-    (reader.stream !== undefined && typeof reader.stream !== "function")) invalid();
+    (reader.stream !== undefined && typeof reader.stream !== "function") ||
+    (reader.isContentCurrent !== undefined && typeof reader.isContentCurrent !== "function")) invalid();
   for (const retriever of [config.knowledgeRetriever, config.capabilityRetriever]) if (retriever !== undefined &&
     (!retriever || typeof retriever.id !== "string" || !retriever.id || typeof retriever.retrieve !== "function")) invalid();
   if (config.runtimeAdapters !== undefined && !Array.isArray(config.runtimeAdapters)) invalid();
@@ -76,7 +78,7 @@ export class CapabilityGraph {
    * Reject new work and release owned views after queued refreshes. Existing query pins may outlive this call.
    * A later close can report delayed cleanup failures; adapter-owned work is not cancelled.
    */
-  close() { return this.host.close(); }
+  close() { clearDocumentSnapshots(this.extensions.readers); return this.host.close(); }
   /** Bind identity/scope, not a static revision. The facade shares this graph's lifecycle and reloads. */
   forProvider(providerId: string): BoundProviderGraph { this.host.assertAllowed(providerId); return new BoundProviderGraph(this.host, providerId, this.extensions); }
   /** List loaded providers in the narrowed scope; any listed unreadable source fails the query. */

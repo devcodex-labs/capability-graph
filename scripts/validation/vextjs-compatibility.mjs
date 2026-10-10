@@ -4,6 +4,7 @@ import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 import { validateVextjs } from './vextjs.mjs';
 import { validateVextSession } from './vextjs-session.mjs';
 import { validateProviderSources } from './provider-sources.mjs';
+import { validateVextDocumentation } from './vextjs-documentation.mjs';
 
 const [frameworkArg, sourceIdentity] = process.argv.slice(2);
 if (!frameworkArg || !sourceIdentity) throw new Error('Usage: node scripts/validation/vextjs-compatibility.mjs <fixed-installed-framework-root> <source-identity>');
@@ -19,5 +20,6 @@ try {
   const native = await validateVextjs({ frameworkRoot, projectRoot, sourceIdentity });
   const documents = await validateProviderSources({ sourceRoot: frameworkRoot, installedProject: projectRoot, sourceIdentity });
   const session = await validateVextSession(frameworkRoot);
-  console.log(JSON.stringify({ native, documents, session }, null, 2));
+  const documentation = await validateVextDocumentation({ frameworkRoot, sourceIdentity });
+  console.log(JSON.stringify({ native, documents, session, documentation }, null, 2));
 } finally { await rm(projectRoot, { recursive: true, force: true }); }

@@ -2,7 +2,7 @@ import { expect, test } from './fixtures';
 
 const queries = [
   ['Provider', /Provider 与 Specification|建模 Provider|创建第一个 Provider/],
-  ['能力关系', /设计关系|关系模型/],
+  ['能力关系', /设计关系|关系模型|身份与关系/],
   ['Runtime', /运行时模型|使用运行时|运行时状态|运行时接口/],
   ['Knowledge', /知识模型|知识读取|KnowledgeReader 接入|KnowledgeRetriever 接入/],
   ['CG_REVISION_MISMATCH', /错误与恢复动作|修订、预算与分页/],
@@ -18,7 +18,7 @@ for (const [query, expectedResult] of queries) {
     await expect(input).toBeVisible();
     await input.fill(query);
     await expect(input).toHaveValue(query);
-    await expect(page.getByRole('link', { name: expectedResult }).filter({ visible: true }).last()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('dialog', { name: '搜索文档' }).getByRole('link', { name: expectedResult }).last()).toBeVisible({ timeout: 10_000 });
   });
 }
 

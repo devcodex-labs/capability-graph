@@ -3,11 +3,45 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { createServer } from "node:http";
-import { CapabilityGraph } from "../src/index.js";
+import { CapabilityGraph, type KnowledgeReader } from "../src/index.js";
+import { FakeDatabase, record } from "./contract/fake-database.js";
 import { contentId } from "../src/knowledge/local-file-reader.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 import { HttpKnowledgeReader } from "../examples/seed-runtime/knowledge-reader.js";
 import { TextKnowledgeRetriever } from "../examples/seed-runtime/text-retrieval.js";
+
+test("stable source reuse is private, graph-scoped and bounded; invalid proof and source drift still fail", async () => {
+  let body = Buffer.from("x".repeat(1_048_576)); let streams = 0; let proofs = 0; let proof: unknown = true;
+  const reader: KnowledgeReader = {
+    id: "stable-source", canRead: () => true, read: async () => { throw new Error("Use stream"); },
+    async *stream(ref, _context, options) {
+      streams++; const bytes = Buffer.from(body);
+      for (let offset = 0; offset < bytes.length; offset += options.chunkBytes)
+        yield { bytes: bytes.subarray(offset, offset + options.chunkBytes), contentType: "text/plain", source: ref.locator.type === "http" ? ref.locator.url : "" };
+    },
+    async isContentCurrent(_ref, _context, id) { proofs++; if (proof === "unavailable") throw new Error("Source down"); return (proof === true ? id === contentId(body) : proof) as boolean; },
+  };
+  const document = { kind: "document" as const, knowledgeId: "DOC", role: "guide", locator: { type: "http" as const, url: "https://source.invalid/guide" } };
+  const openGraph = () => CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"], readers: [reader],
+    providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "source", openView: async () => new FakeDatabase([record("a", { knowledge: [document] })]) } } }] });
+  const graph = await openGraph(); const bound = graph.forProvider("seed"); const query = { capabilityId: "a", knowledgeId: "DOC" };
+  try {
+    let cursor: string | undefined; let text = ""; let firstCursor: string | undefined; let pages = 0;
+    do { const page = await bound.readDocumentPage({ ...query, ...(cursor ? { cursor } : {}) }); text += page.text; firstCursor ??= page.nextCursor; cursor = page.nextCursor; pages++; } while (cursor);
+    assert.equal(text, body.toString()); assert.equal(pages, 32); assert.equal(streams, 1); assert.equal(proofs, 31);
+    const other = await openGraph(); try { await other.forProvider("seed").readDocumentPage(query); assert.equal(streams, 2); } finally { await other.close(); }
+    proof = "unavailable"; await assert.rejects(bound.readDocumentPage({ ...query, cursor: firstCursor }), { code: "CG_READER_UNAVAILABLE" });
+    proof = true; await bound.readDocumentPage(query);
+    proof = "invalid"; await assert.rejects(bound.readDocumentPage({ ...query, cursor: firstCursor }), { code: "CG_ADAPTER_CONTRACT_INVALID" });
+    proof = true; await bound.readDocumentPage(query);
+    body = Buffer.from("y".repeat(body.length));
+    await assert.rejects(bound.readDocumentPage({ ...query, cursor: firstCursor }), { code: "CG_REVISION_MISMATCH" });
+    body = Buffer.from("z".repeat(4_194_305));
+    const first = await bound.readDocumentPage(query); const before = streams;
+    const last = await bound.readDocumentPage({ ...query, startOffset: body.length - 20 });
+    assert.equal(last.text, "z".repeat(20)); assert.equal(first.totalBytes, body.length); assert.equal(streams, before + 1, "oversize sources remain readable with full verification");
+  } finally { await graph.close(); }
+});
 
 async function fixture(run: (graph: CapabilityGraph, root: string, text: string) => Promise<void>) {
   const root = await createTestDirectory("capability-graph-pages-");

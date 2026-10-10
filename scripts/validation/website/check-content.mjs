@@ -64,8 +64,8 @@ if (JSON.stringify(rootSidebarShape) !== JSON.stringify(expectedRootSidebar)) {
 }
 for (const item of rootSidebar) assertChineseNavigationLabel(item.label, `root sidebar ${item.name}`);
 for (const item of rootSidebar.filter(({ type }) => type === 'dir')) {
-  if (item.collapsible !== true || item.collapsed !== false) {
-    fail(`global sidebar section ${item.name} must be collapsible and initially expanded`);
+  if (item.collapsible !== true || typeof item.collapsed !== 'boolean') {
+    fail(`global sidebar section ${item.name} must declare its initial collapse state`);
   }
 }
 const expectedPageTitles = new Map();

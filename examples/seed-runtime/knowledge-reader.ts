@@ -49,8 +49,44 @@ export class HttpKnowledgeReader implements KnowledgeReader {
   private async snapshotDirectory(): Promise<string> {
     return this.directory ??= (async () => { await mkdir(this.options.snapshot!.directory, { recursive: true }); return mkdtemp(path.join(this.options.snapshot!.directory, "cg-http-")); })();
   }
-  /** Strong ETag validates a previously complete local snapshot; weak/no validator falls back to full GET.
-   * No 206 is accepted: Core still hashes the complete source for every page/query. */
+  /** Revalidate the exact representation already hashed by Core, without rereading the disk snapshot.
+   * Conditional HEAD has no body. Unsupported HEAD or a changed validator requests a full stream. */
+  async isContentCurrent(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, contentId: string, options: { signal?: AbortSignal }): Promise<boolean> {
+    if (this.closed || ref.locator.type !== "http") throw new Error("Reader unavailable");
+    const source = ref.locator.url; const url = new URL(source);
+    if (!this.origins.has(url.origin) || url.username || url.password || this.streams.size >= this.maxConcurrent) throw new Error("Source unavailable");
+    options.signal?.throwIfAborted();
+    const snapshot = this.snapshots.get(source);
+    if (!snapshot || snapshot.expires <= Date.now() || contentId !== `k:${snapshot.sha256.slice(0, 16)}`) return false;
+    let finish!: () => void; const done = new Promise<void>((resolve) => { finish = resolve; }); this.streams.add(done);
+    let request: ClientRequest | undefined; let timer: ReturnType<typeof setTimeout> | undefined;
+    const abort = () => request?.destroy(new Error("HTTP knowledge verification aborted"));
+    try {
+      const response = await new Promise<IncomingMessage>((resolve, reject) => {
+        request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
+          method: "HEAD", agent: this.options.agentForUrl?.(url) ?? false,
+          headers: { "accept-encoding": "identity", accept: "text/plain, text/markdown, application/json", "if-none-match": snapshot.etag },
+        }, resolve);
+        this.requests.add(request); request.on("error", reject); options.signal?.addEventListener("abort", abort, { once: true });
+        timer = setTimeout(() => request?.destroy(new Error("HTTP knowledge deadline exceeded")), this.timeoutMs); request.end();
+      });
+      if (response.headers["content-encoding"] && response.headers["content-encoding"] !== "identity") throw new Error("Encoded source unsupported");
+      response.resume(); await new Promise<void>((resolve, reject) => { response.once("end", resolve); response.once("error", reject); });
+      options.signal?.throwIfAborted(); if (this.closed || !response.complete) throw new Error("Reader unavailable");
+      if (response.statusCode === 304) {
+        if (response.headers.etag !== undefined && response.headers.etag !== snapshot.etag) throw new Error("Unbound conditional response");
+        return true;
+      }
+      if ([200, 405, 501].includes(response.statusCode ?? 0)) return false;
+      throw new Error("Source unavailable");
+    } finally {
+      clearTimeout(timer); options.signal?.removeEventListener("abort", abort);
+      if (request) { request.destroy(); if (!request.closed) await new Promise<void>((resolve) => request!.once("close", resolve)); this.requests.delete(request); }
+      finish(); this.streams.delete(done);
+    }
+  }
+  /** Strong ETag validates a previously complete disk snapshot; weak/no validator falls back to full GET.
+   * Normal streams still verify complete bytes; Core may reuse its own proved copy for body pages. No 206 is accepted. */
   async *stream(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext, options: { chunkBytes: number; signal?: AbortSignal }) {
     if (this.closed || ref.locator.type !== "http" || !Number.isSafeInteger(options.chunkBytes) || options.chunkBytes < 1) throw new Error("Reader unavailable");
     const source = ref.locator.url; const url = new URL(source);
