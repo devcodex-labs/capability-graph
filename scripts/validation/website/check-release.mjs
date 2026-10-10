@@ -1,7 +1,8 @@
 import { access, appendFile, readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { repositoryRoot, websiteRoot } from '../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../lib/artifact-paths.mjs';
+import { websiteRoot } from '../../lib/website-paths.mjs';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

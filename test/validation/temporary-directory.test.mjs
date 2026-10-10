@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { createTestDirectory, removeTestDirectory } from '../../dist-test/test/contract/temporary-directory.js';
-import { artifactsRoot, repositoryRoot } from '../../scripts/lib/website-paths.mjs';
+import { artifactsRoot, repositoryRoot } from '../../scripts/lib/artifact-paths.mjs';
 
 test('Core fixtures honor the external artifact root override and clean only their own directory', async () => {
   const parent = await createTestDirectory('fixture-policy-');

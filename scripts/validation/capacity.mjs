@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { CapabilityGraph } from '@devcodex/capability-graph';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 const defaults = { nodes: 10000, providers: 2, concurrency: 10, operations: 1000, durationMs: 0, reloadEvery: 500, reloadRounds: 2 };
 const names = { '--nodes': 'nodes', '--providers': 'providers', '--concurrency': 'concurrency',

@@ -13,7 +13,7 @@ import { TextCapabilityRetriever, TextKnowledgeRetriever } from "./text-retrieva
 /** Real local sources and indexes, with host-owned lifecycle and disposable Provider copy. */
 export async function createHttpRetrievalExample() {
   const repositoryRoot = path.resolve(seedProviderRoot, '../..');
-  const { createTemporaryDirectory } = await import(pathToFileURL(path.join(repositoryRoot, 'scripts/lib/website-paths.mjs')).href);
+  const { createTemporaryDirectory } = await import(pathToFileURL(path.join(repositoryRoot, 'scripts/lib/artifact-paths.mjs')).href);
   const root: string = await createTemporaryDirectory('http-retrieval-');
   let body = '请求校验：在 POST /users 的业务处理器之前验证输入。\n使用请求 Schema 描述必填字段。\n';
   let reads = 0;

@@ -4,7 +4,8 @@ import path from 'node:path';
 import { verifyGeneratedContracts } from './lib/public-contracts.mjs';
 import { verifyReferenceContracts } from './lib/reference-contracts.mjs';
 import { verifyAdapterContracts } from './lib/adapter-contracts.mjs';
-import { generatedRoot, websiteRoot, artifactsRoot, createTemporaryDirectory } from '../../lib/website-paths.mjs';
+import { artifactsRoot, createTemporaryDirectory } from '../../lib/artifact-paths.mjs';
+import { generatedRoot, websiteRoot } from '../../lib/website-paths.mjs';
 
 const docs = path.join(websiteRoot, 'docs');
 const contracts = JSON.parse(await readFile(path.join(generatedRoot, 'contracts/public-api.json'), 'utf8'));

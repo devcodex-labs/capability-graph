@@ -4,7 +4,7 @@ import test from 'node:test';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseTutorial, loadTutorial, materializeTutorial } from '../../../scripts/validation/website/lib/tutorial.mjs';
-import { repositoryRoot, artifactsRoot, createTemporaryDirectory } from '../../../scripts/lib/website-paths.mjs';
+import { repositoryRoot, artifactsRoot, createTemporaryDirectory } from '../../../scripts/lib/artifact-paths.mjs';
 import { CapabilityGraph } from '../../../dist/index.js';
 import { installLocalConsumer } from '../../../scripts/validation/website/lib/consumer.mjs';
 

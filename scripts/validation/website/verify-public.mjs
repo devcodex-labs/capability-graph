@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { repositoryRoot, websiteRoot } from '../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../lib/artifact-paths.mjs';
+import { websiteRoot } from '../../lib/website-paths.mjs';
 
 const expectedOrigin = 'https://devcodex-labs.github.io';
 const expectedBase = `${expectedOrigin}/capability-graph/`;

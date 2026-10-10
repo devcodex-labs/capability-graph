@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { mkdir, realpath, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 // Opt-in fixed-source plugin/Store lifecycle proof; real business paths are separately tested upstream.
 const [frameworkArg, redisUrl, mongoUrl] = process.argv.slice(2);

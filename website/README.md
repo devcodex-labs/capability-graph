@@ -22,10 +22,11 @@ npm run check     # 完整站点验收
 | `test/website/` | 正式单元测试、浏览器测试及其配置 |
 | `test/fixtures/website/` | 固定测试材料，不能补充公开教程缺失的输入 |
 | `scripts/validation/website/` | 内容、合同、示例、包边界和发布验证工具 |
-| `scripts/lib/website-paths.mjs` | 统一的站点与仓库外产物路径 |
+| `scripts/lib/artifact-paths.mjs` | 通用仓库路径、仓库外产物边界及临时目录分配 |
+| `scripts/lib/website-paths.mjs` | 站点路径及生成目录清理 |
 
-临时消费者、一次性脚本、审查报告、截图、trace、日志、生成材料及站点构建制品统一放在**仓库同级 `<仓库名>-artifacts/`**；本项目为 `../capability-graph-artifacts/`。其中 `website/generated/` 存放生成材料，`website/doc_build/` 存放站点制品，`website/playwright/` 存放浏览器结果。历史临时材料位于该目录的 `history/`。
+站点产物默认位于仓库同级 `../capability-graph-artifacts/`：`website/generated/` 存放生成材料，`website/doc_build/` 存放站点制品，`website/playwright/` 存放浏览器结果。
 
-可通过 `CG_ARTIFACTS_DIR` 指定另一个仓库外目录；指向仓库内部或包含仓库的目录会报错。验证消费者安装实际公开 tarball，测试结束只清理自己创建的目录。
+可通过 `CG_ARTIFACTS_DIR` 指定另一个仓库外目录，目录边界及清理规则见[贡献指南](../CONTRIBUTING.md#源码与目录约定)。本地页面验证安装本次构建的 tarball；Registry 验证另安装已发布包。
 
-`build:site`、`build:ai` 是 `build` 的兼容别名；新克隆无需预先生成材料。preview 和浏览器测试复用同一构建。写作及发布约定见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+`build:site`、`build:ai` 是 `build` 的兼容别名；新克隆无需预先生成材料。preview 和浏览器测试复用同一构建。写作、示例真实性及发布约定统一见根目录 [CONTRIBUTING.md](../CONTRIBUTING.md)。

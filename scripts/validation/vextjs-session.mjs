@@ -3,7 +3,7 @@ import { mkdir, writeFile, rm, realpath, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 /** Actual TCP requests, public testing factory and owned Store lifecycle. No request mocks. */
 export async function validateVextSession(frameworkRoot) {

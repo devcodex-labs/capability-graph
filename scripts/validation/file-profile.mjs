@@ -2,7 +2,7 @@ import { writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { FileAuthorityStore } from '../../dist/store/file-authority-store.js';
 import { CapabilityGraph } from '@devcodex/capability-graph';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 const directory = await createTemporaryDirectory('capability-graph-file-profile-');
 const count = Number(process.argv[2] || 1000);

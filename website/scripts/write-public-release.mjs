@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { repositoryRoot, websiteRoot, siteOutputRoot } from '../../scripts/lib/website-paths.mjs';
+import { repositoryRoot } from '../../scripts/lib/artifact-paths.mjs';
+import { websiteRoot, siteOutputRoot } from '../../scripts/lib/website-paths.mjs';
 
 const outputRoot = siteOutputRoot;
 const publicBase = 'https://devcodex-labs.github.io/capability-graph/';

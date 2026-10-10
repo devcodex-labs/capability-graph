@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { repositoryRoot } from '../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../lib/artifact-paths.mjs';
 import { assertDocsBaseline } from './lib/deployment-contract.mjs';
 
 const git = (args) => execFileSync('git', args, { cwd: repositoryRoot, encoding: 'utf8' }).trim();

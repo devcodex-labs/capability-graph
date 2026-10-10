@@ -3,7 +3,7 @@ import { lstat, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const helper = pathToFileURL(path.resolve(import.meta.dirname, "../../../scripts/lib/website-paths.mjs"));
+const helper = pathToFileURL(path.resolve(import.meta.dirname, "../../../scripts/lib/artifact-paths.mjs"));
 const owned = new Map<string, { parent: string; prefix: string }>();
 
 /** Persistent tests share the same outside-repository artifact policy as tools. */

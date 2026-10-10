@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
-import { generatedRoot, repositoryRoot } from '../../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../../lib/artifact-paths.mjs';
+import { generatedRoot } from '../../../lib/website-paths.mjs';
 
 const printer = ts.createPrinter({ removeComments: true });
 const typeFlags = ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;

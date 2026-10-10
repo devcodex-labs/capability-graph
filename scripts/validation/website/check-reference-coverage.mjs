@@ -1,7 +1,8 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '../../../dist/index.js';
-import { repositoryRoot, websiteRoot, generatedRoot, websiteFixtureRoot, createTemporaryDirectory } from '../../lib/website-paths.mjs';
+import { repositoryRoot, createTemporaryDirectory } from '../../lib/artifact-paths.mjs';
+import { websiteRoot, generatedRoot, websiteFixtureRoot } from '../../lib/website-paths.mjs';
 import { verifyReferenceContracts } from './lib/reference-contracts.mjs';
 import { verifyGeneratedContracts } from './lib/public-contracts.mjs';
 import { verifyAdapterContracts } from './lib/adapter-contracts.mjs';

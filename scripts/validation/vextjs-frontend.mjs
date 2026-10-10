@@ -4,7 +4,7 @@ import { mkdir, writeFile, realpath, rm, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import net from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 const framework = await realpath(process.argv[2]); const root = await createTemporaryDirectory('capability-graph-vext-seo-');
 const cli = path.join(framework, 'dist/cli/index.js'); let child; let output = '';

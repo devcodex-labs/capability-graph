@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const repository = fileURLToPath(new URL("../../", import.meta.url));
 const compilerOptions = { target: "ES2022", module: "Node16", moduleResolution: "Node16", types: ["node"], strict: true, skipLibCheck: true };
 async function fixture(run: (root: string, links: string[]) => Promise<void>) {
-  const { artifactsRoot, createTemporaryDirectory } = await import(pathToFileURL(path.join(repository, 'scripts/lib/website-paths.mjs')).href);
+  const { artifactsRoot, createTemporaryDirectory } = await import(pathToFileURL(path.join(repository, 'scripts/lib/artifact-paths.mjs')).href);
   const parent: string = artifactsRoot; const root: string = await createTemporaryDirectory('capability-graph-build-');
   const links: string[] = [];
   try { await run(root, links); }

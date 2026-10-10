@@ -126,7 +126,7 @@ test("MCP docs: page-restored main entry runs the progressive stdio chain and pr
   const repositoryRoot = path.dirname(websiteRoot);
   const helperUrl = pathToFileURL(path.join(repositoryRoot, "scripts/validation/website/lib/tutorial.mjs")).href;
   const { loadTutorial, materializeTutorial, compareFixture } = await import(helperUrl);
-  const { artifactsRoot, createTemporaryDirectory } = await import(pathToFileURL(path.join(repositoryRoot, "scripts/lib/website-paths.mjs")).href);
+  const { artifactsRoot, createTemporaryDirectory } = await import(pathToFileURL(path.join(repositoryRoot, "scripts/lib/artifact-paths.mjs")).href);
   const { installLocalConsumer } = await import(pathToFileURL(path.join(repositoryRoot, "scripts/validation/website/lib/consumer.mjs")).href);
   const allocation = await createTemporaryDirectory(".docs-main-");
   // Preserve the documented layout in an independent installed consumer.

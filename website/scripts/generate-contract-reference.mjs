@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
-import { generatedRoot, repositoryRoot, websiteRoot } from '../../scripts/lib/website-paths.mjs';
+import { repositoryRoot } from '../../scripts/lib/artifact-paths.mjs';
+import { generatedRoot, websiteRoot } from '../../scripts/lib/website-paths.mjs';
 
 const declarationPath = path.join(repositoryRoot, 'dist', 'index.d.ts');
 

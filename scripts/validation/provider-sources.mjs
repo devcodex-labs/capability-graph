@@ -7,7 +7,7 @@ import { CapabilityGraph } from '@devcodex/capability-graph';
 import { bindKnowledgeRoots } from '../../dist/knowledge/roots.js';
 import { HttpKnowledgeReader } from '../../dist-test/examples/seed-runtime/knowledge-reader.js';
 import { TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
-import { createTemporaryDirectory, repositoryRoot } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory, repositoryRoot } from '../lib/artifact-paths.mjs';
 import { verifyVextSource, sha256 } from '../../examples/vextjs/source-provenance.mjs';
 import { officialDocumentMappings } from '../../examples/vextjs/official-documents.mjs';
 import { exportVextProvider } from '../../examples/vextjs/native-provider.mjs';

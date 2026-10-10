@@ -4,7 +4,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { parseDocument } from 'yaml';
-import { createTemporaryDirectory, repositoryRoot } from '../../../scripts/lib/website-paths.mjs';
+import { createTemporaryDirectory, repositoryRoot } from '../../../scripts/lib/artifact-paths.mjs';
 
 test('manual release resume rejects a later branch checkout even when its version is unchanged', async () => {
   const root = await createTemporaryDirectory('release-snapshot-');
@@ -13,7 +13,7 @@ test('manual release resume rejects a later branch checkout even when its versio
     const version = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8')).version;
     const tag = `v${version}`;
     const files = ['package.json', 'package-lock.json', 'website/package.json', 'website/package-lock.json',
-      'README.md', `changelogs/${version}.md`, 'scripts/lib/website-paths.mjs', 'scripts/validation/website/check-release.mjs'];
+      'README.md', `changelogs/${version}.md`, 'scripts/lib/artifact-paths.mjs', 'scripts/lib/website-paths.mjs', 'scripts/validation/website/check-release.mjs'];
     for (const file of files) {
       await mkdir(path.dirname(path.join(root, file)), { recursive: true });
       await cp(path.join(repositoryRoot, file), path.join(root, file));

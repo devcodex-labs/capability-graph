@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 import { TextCapabilityRetriever, TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
-import { createTemporaryDirectory, repositoryRoot } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory, repositoryRoot } from '../lib/artifact-paths.mjs';
 import { VextMcpClient } from '../../examples/vextjs/mcp-client.mjs';
 import { exportVextProvider, readNativeCatalog, decodeNative, capabilityIdFor } from '../../examples/vextjs/native-provider.mjs';
 import { VextNativeRuntimeAdapter } from '../../examples/vextjs/runtime-adapter.mjs';

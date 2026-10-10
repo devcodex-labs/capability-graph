@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { repositoryRoot } from '../../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../../lib/artifact-paths.mjs';
 
 /** Install the actual public tarball, without rewriting tutorial imports. */
 export async function installLocalConsumer(root, { types = false, dependencies = [] } = {}) {

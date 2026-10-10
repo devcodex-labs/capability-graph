@@ -5,7 +5,7 @@ import path from 'node:path';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 import { HttpKnowledgeReader } from '../../dist-test/examples/seed-runtime/knowledge-reader.js';
 import { TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 // A transport profile, not an Agent or retrieval-quality benchmark. Owned HTTP I/O is measured.
 const root = await createTemporaryDirectory('capability-graph-knowledge-profile-');

@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { CapabilityGraph, type KnowledgeRetriever, type SourceChange } from '@devcodex/capability-graph';
 import { TextCapabilityRetriever, TextKnowledgeRetriever } from '../examples/seed-runtime/text-retrieval.js';
 
-const helper = pathToFileURL(path.resolve(import.meta.dirname, '../../scripts/lib/website-paths.mjs'));
+const helper = pathToFileURL(path.resolve(import.meta.dirname, '../../scripts/lib/artifact-paths.mjs'));
 
 async function sources() {
   const { createTemporaryDirectory } = await import(helper.href);

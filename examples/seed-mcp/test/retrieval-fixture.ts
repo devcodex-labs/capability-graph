@@ -7,7 +7,7 @@ export const providerId = "seed.http";
 export const canonical = (capabilityId: string) => ({ providerId, capabilityId });
 export const collectionId = "PROTOCOL-COLLECTION";
 export async function fixture(run: (root: string) => Promise<void>) {
-  const helper = fileURLToPath(new URL('../../../../scripts/lib/website-paths.mjs', import.meta.url));
+  const helper = fileURLToPath(new URL('../../../../scripts/lib/artifact-paths.mjs', import.meta.url));
   const { createTemporaryDirectory } = await import(pathToFileURL(helper).href);
   const root: string = await createTemporaryDirectory('cg-mcp-retrieval-');
   try {

@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { access, cp, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '../../../dist/index.js';
-import { repositoryRoot, websiteRoot, generatedRoot, websiteFixtureRoot, artifactsRoot, createTemporaryDirectory } from '../../lib/website-paths.mjs';
+import { repositoryRoot, artifactsRoot, createTemporaryDirectory } from '../../lib/artifact-paths.mjs';
+import { websiteRoot, generatedRoot, websiteFixtureRoot } from '../../lib/website-paths.mjs';
 import { compareFixture, loadTutorial } from './lib/tutorial.mjs';
 import { installLocalConsumer } from './lib/consumer.mjs';
 

@@ -9,6 +9,7 @@ Capability Graph 为 Provider 自有的 API、MCP 等接入提供协议无关的
 - [查询与更新](#queries)
 - [支持边界](#boundaries)
 - [本地开发](#development)
+- [贡献与维护](CONTRIBUTING.md)
 - [未发布改动](changelogs/unreleased.md)
 - [1.0.1 迁移与变更](changelogs/1.0.1.md)
 - [1.1.0 待发布变更](changelogs/1.1.0.md)
@@ -138,6 +139,8 @@ directory 只收集 capabilities/**/*.json，缺少目录、目录外遗留定�
 
 ## 本地开发
 
+目录、代码约定、文档验证及发布规则统一见[贡献指南](CONTRIBUTING.md)；场景与测试入口见 [test/README.md](test/README.md)。
+
 Node.js 范围：`^20.19.0 || >=22.12.0`。在仓库目录运行：
 
 ```sh
@@ -164,13 +167,6 @@ npm run evaluate
 `npm run build:tests` 单独清理并编译测试，`evaluate` 也使用此入口。根包及私有 MCP 示例的构建清理只接受已知、归当前包所有的输出目录，拒绝符号链接或普通文件，不跟随输出链接删除其他目录。
 
 `evaluate` 使用明确期望的 Seed 任务记录正确性、遗漏、UTF-8 返回字节、调用数和本机耗时，不调用模型、不推断真实 Agent 准确率或节省比例。未配置检索后端的质量对照不适用。
-
-### 代码约定
-
-- 对外接口和 Adapter 合同使用 JSDoc，说明作用域、修订、错误、预算单位及资源所有权；不重复 TypeScript 已表达的类型。
-- 关键算法注释解释校验顺序、生命周期和边界选择，行为修改时同步注释及回归测试，不按行数或注释比例验收。
-- 区分候选失败与查询失败、超时与取消、观察为空与后端不可用。Adapter 错误不能带出内部路径；Core 公开诊断只保留明确投影的字段。
-- 外部审查先复现再修复，异步错误包含严格拒绝模式及失败对照；最低 Node 版本、公开声明和实际安装包都需验证。测试 Fixture 不作为真实后端交付证据。
 
 <a id="license"></a>
 

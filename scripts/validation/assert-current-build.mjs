@@ -1,4 +1,4 @@
 import { assertCurrentBuild } from '../lib/build-state.mjs';
-import { repositoryRoot } from '../lib/website-paths.mjs';
+import { repositoryRoot } from '../lib/artifact-paths.mjs';
 await assertCurrentBuild(repositoryRoot);
 console.log('Current source and complete build output fingerprints verified');

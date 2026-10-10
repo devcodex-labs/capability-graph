@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
-import { artifactsRoot, createTemporaryDirectory } from '../../lib/website-paths.mjs';
+import { artifactsRoot, createTemporaryDirectory } from '../../lib/artifact-paths.mjs';
 
 const expectedVersion = process.argv[2];
 assert(/^\d+\.\d+\.\d+$/.test(expectedVersion), 'freeze the expected package version before installation');

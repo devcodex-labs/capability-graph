@@ -4,7 +4,7 @@ import { copyFile, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { artifactsRoot, createTemporaryDirectory } from "./lib/website-paths.mjs";
+import { artifactsRoot, createTemporaryDirectory } from "./lib/artifact-paths.mjs";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 const npm = process.env.npm_execpath;

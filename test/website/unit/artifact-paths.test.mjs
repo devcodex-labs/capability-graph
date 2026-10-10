@@ -3,11 +3,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { artifactsRoot, createTemporaryDirectory, repositoryRoot } from '../../../scripts/lib/website-paths.mjs';
+import { artifactsRoot, createTemporaryDirectory, repositoryRoot } from '../../../scripts/lib/artifact-paths.mjs';
 
 const helper = new URL('../../../scripts/lib/website-paths.mjs', import.meta.url).href;
+const artifactHelper = new URL('../../../scripts/lib/artifact-paths.mjs', import.meta.url).href;
 const run = (root, code = '') => execFileSync(process.execPath, ['--input-type=module', '--eval',
-  `const api = await import(${JSON.stringify(helper)}); ${code}`], {
+  `const artifacts = await import(${JSON.stringify(artifactHelper)}); const api = await import(${JSON.stringify(helper)}); ${code}`], {
   env: { ...process.env, CG_ARTIFACTS_DIR: root }, encoding: 'utf8', stdio: 'pipe'
 });
 
@@ -26,7 +27,7 @@ test('generated cleanup removes stale files and preserves evidence; links and un
     run(root, 'await api.resetGeneratedDirectory(api.siteOutputRoot);');
     await assert.rejects(readFile(path.join(root, 'website/doc_build/stale.html')), { code: 'ENOENT' });
     assert.equal(await readFile(path.join(root, 'evidence.txt'), 'utf8'), 'preserve');
-    assert.throws(() => run(root, 'await api.resetGeneratedDirectory(api.artifactsRoot);'), /unowned/);
+    assert.throws(() => run(root, 'await api.resetGeneratedDirectory(artifacts.artifactsRoot);'), /unowned/);
     await rm(path.join(root, 'website/doc_build'), { recursive: true });
     await mkdir(path.join(root, 'target'));
     await writeFile(path.join(root, 'target/preserve.txt'), 'preserve');

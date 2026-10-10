@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { repositoryRoot } from '../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../lib/artifact-paths.mjs';
 import { verifyTutorialSuite } from './lib/tutorial.mjs';
 import { verifyLifecycleExample } from './lib/lifecycle.mjs';
 

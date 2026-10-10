@@ -1,4 +1,4 @@
-import { createTemporaryDirectory } from '../../../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../../../lib/artifact-paths.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';

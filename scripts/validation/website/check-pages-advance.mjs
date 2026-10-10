@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { repositoryRoot } from '../../lib/website-paths.mjs';
+import { repositoryRoot } from '../../lib/artifact-paths.mjs';
 import { assertPagesAdvance, readPublishedIdentity } from './lib/deployment-contract.mjs';
 
 const candidateCommit = process.env.DOCS_COMMIT;

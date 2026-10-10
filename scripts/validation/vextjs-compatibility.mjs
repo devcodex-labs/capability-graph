@@ -1,6 +1,6 @@
 import { mkdir, writeFile, symlink, rm, realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { createTemporaryDirectory } from '../lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 import { validateVextjs } from './vextjs.mjs';
 import { validateVextSession } from './vextjs-session.mjs';
 import { validateProviderSources } from './provider-sources.mjs';

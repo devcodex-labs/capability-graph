@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { createTemporaryDirectory } from '../../scripts/lib/website-paths.mjs';
+import { createTemporaryDirectory } from '../../scripts/lib/artifact-paths.mjs';
 import { writeBuildState, assertCurrentBuild } from '../../scripts/lib/build-state.mjs';
 test('explicit built consumers reject missing, edited and deleted source/output rather than reuse stale dist', async () => {
   const root = await createTemporaryDirectory('capability-graph-build-proof-');

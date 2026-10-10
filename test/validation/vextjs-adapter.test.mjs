@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '@devcodex/capability-graph';
-import { createTemporaryDirectory, repositoryRoot } from '../../scripts/lib/website-paths.mjs';
+import { createTemporaryDirectory, repositoryRoot } from '../../scripts/lib/artifact-paths.mjs';
 import { exportVextProvider } from '../../examples/vextjs/native-provider.mjs';
 import { VextNativeRuntimeAdapter } from '../../examples/vextjs/runtime-adapter.mjs';
 
