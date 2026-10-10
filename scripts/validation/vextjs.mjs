@@ -6,10 +6,9 @@ import { CapabilityGraph } from '@devcodex/capability-graph';
 import { TextCapabilityRetriever, TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
 import { createTemporaryDirectory, repositoryRoot } from '../lib/artifact-paths.mjs';
 import { VextMcpClient } from '../../examples/vextjs/mcp-client.mjs';
-import { exportVextProvider, readNativeCatalog, decodeNative, capabilityIdFor } from '../../examples/vextjs/native-provider.mjs';
+import { exportNativeProvider, readNativeCatalog, decodeNative, capabilityIdFor } from '../../examples/vextjs/native-provider.mjs';
 import { VextNativeRuntimeAdapter } from '../../examples/vextjs/runtime-adapter.mjs';
 import { verifyVextSource } from '../../examples/vextjs/source-provenance.mjs';
-import { officialDocumentMappings } from '../../examples/vextjs/official-documents.mjs';
 import { assertTaskRecall, assertKnowledgeEvidence } from './lib/retrieval-assertions.mjs';
 
 /** Opt-in real framework validation. Run after building Core and examples, with an installed fixed Vext source. */
@@ -27,13 +26,12 @@ export async function validateVextjs({ frameworkRoot, projectRoot, sourceIdentit
     const { buildMcpCatalog } = await import(pathToFileURL(path.join(frameworkRoot, 'dist/assistant/catalog.js')).href);
     const expected = buildMcpCatalog(); const catalog = await readNativeCatalog(client, expected);
     const version = JSON.parse(await readFile(path.join(frameworkRoot, 'package.json'), 'utf8')).version;
-    const officialDocuments = await officialDocumentMappings(sourceRoot, catalog, source.commit);
-    const exported = await exportVextProvider({ catalog, version, source, officialDocuments, outputDir: path.join(temporary, 'provider'), repositoryRoot });
+    const exported = await exportNativeProvider({ catalog, version, source, outputDir: path.join(temporary, 'native-audit'), repositoryRoot });
     const recall = new capabilityClass(); const knowledge = new knowledgeClass();
     const runtime = new VextNativeRuntimeAdapter({ client, project: 'pilot', environment: 'verification', projectRoot });
     graph = await graphClass.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
-      providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' },
-        knowledgeRoots: { official: { kind: 'directory', rootDir: sourceRoot } } }], capabilityRetriever: recall, knowledgeRetriever: knowledge, runtimeAdapters: [runtime] });
+      providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' } }],
+      capabilityRetriever: recall, knowledgeRetriever: knowledge, runtimeAdapters: [runtime] });
     await recall.rebuild(graph);
     const tasks = JSON.parse(await readFile(new URL('../../test/fixtures/vextjs/retrieval-tasks.json', import.meta.url), 'utf8'));
     const results = []; let bytes = 0; const durations = [];
@@ -68,7 +66,7 @@ export async function validateVextjs({ frameworkRoot, projectRoot, sourceIdentit
     assert.equal(observation.observation.compatibility, 'unknown'); assert.equal(observation.meta.completeness, 'partial');
     assert(observation.items.every((item) => item.facts.liveness === 'unverified'));
     const sorted = durations.sort((a, b) => a - b);
-    return { node: process.version, platform: process.platform, sourceIdentity, source, officialDocuments, nativeCatalogDigest: catalog.digest, exportedCount: exported.count,
+    return { node: process.version, platform: process.platform, sourceIdentity, source, purpose: 'Independent native MCP audit; not the public documentation Provider', nativeCatalogDigest: catalog.digest, exportedCount: exported.count,
       sourceVerification: exported.manifest.sourceVerification, nativeExports: exported.manifest.nativeExports,
       kinds: Object.fromEntries([...new Set(catalog.items.map((item) => item.kind))].map((kind) => [kind, catalog.items.filter((item) => item.kind === kind).length])),
       modelCalls: 0, responseBytes: bytes, p50Ms: sorted[Math.ceil(sorted.length * .5) - 1], p95Ms: sorted[Math.ceil(sorted.length * .95) - 1],

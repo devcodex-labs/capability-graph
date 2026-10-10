@@ -36,7 +36,7 @@ const report = { status: 'running', node: process.version, platform: process.pla
   coreVersion: JSON.parse(await readFile(path.join(coreRoot, 'package.json'), 'utf8')).version,
   modelCalls: 0, phases: {}, limitation: 'Deterministic integration-authored business application. No model/Agent success claim; Jobs, SSR, hot reload and production load remain outside this phase.' };
 const reportFile = path.join(runRoot, 'reports/consumer.json');
-let runtime; let graph; let client; let mongo; let recall;
+let runtime; let graph; let client; let mongo; let recall; let documentationProvider;
 const phase = async (name, action) => {
   console.log(`Phase: ${name}`);
   report.phases[name] = { status: 'running' };
@@ -144,7 +144,7 @@ async function verifyHttpFailures(original) {
   server.on('connection', (socket) => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   const port = server.address().port; const origin = `http://127.0.0.1:${port}`;
-  const providerRoot = path.join(appRoot, 'providers/http-verification');
+  const providerRoot = path.join(runRoot, 'verification/http/provider');
   await mkdir(path.join(providerRoot, 'capabilities'), { recursive: true });
   await writeFile(path.join(providerRoot, 'provider.json'), JSON.stringify({ providerId: 'http-verification', name: 'Owned HTTP transport verification', version: '1.0.0' }));
   await writeFile(path.join(providerRoot, 'capabilities/config.json'), JSON.stringify({ capabilityId: 'config', name: 'Original Vext config', description: 'Controlled transport over exact original bytes', whenToUse: 'Verify HTTP transport',
@@ -224,24 +224,22 @@ try {
     return validateVextjs({ frameworkRoot, projectRoot: appRoot, sourceRoot, sourceIdentity, graphClass: CapabilityGraph,
       capabilityClass: TextCapabilityRetriever, knowledgeClass: TextKnowledgeRetriever });
   });
-  await phase('discover-select-read-business', async () => {
+  await phase('documentation-provider', async () => {
     const { VextMcpClient } = await repoImport('examples/vextjs/mcp-client.mjs');
-    const { exportVextProvider, readNativeCatalog, capabilityIdFor } = await repoImport('examples/vextjs/native-provider.mjs');
-    const { officialDocumentMappings } = await repoImport('examples/vextjs/official-documents.mjs');
+    const { exportNativeProvider, readNativeCatalog } = await repoImport('examples/vextjs/native-provider.mjs');
+    const { exportVextProvider } = await repoImport('examples/vextjs/documentation-provider.mjs');
+    const { verifyDocumentationProvider } = await repoImport('scripts/validation/lib/documentation-provider-checks.mjs');
     const source = report.phases['package-and-source-identity'].result.source;
     client = new VextMcpClient({ cli: path.join(frameworkRoot, 'dist/cli/index.js'), projectRoot: appRoot });
     await client.initialize();
     const { buildMcpCatalog } = await import(pathToFileURL(path.join(frameworkRoot, 'dist/assistant/catalog.js')).href);
     const catalog = await readNativeCatalog(client, buildMcpCatalog());
     await mkdir(path.join(appRoot, 'providers'));
-    const officialDocuments = await officialDocumentMappings(sourceRoot, catalog, source.commit);
-    const exported = await exportVextProvider({ catalog, source, version: source.version, officialDocuments,
+    documentationProvider = await exportVextProvider({ catalog, source, sourceRoot, version: source.version,
       outputDir: path.join(appRoot, 'providers/vextjs'), repositoryRoot });
-    const requiredNative = ['C03', 'C04', 'C05', 'C07', 'C08', 'C21', 'K05', 'K06'];
-    const requires = requiredNative.map(capabilityIdFor);
-    await writeFile(path.join(exported.rootDir, 'capabilities/business.notes.json'), JSON.stringify({ capabilityId: 'business.notes', name: 'Validated persistent notes with Session and CSRF',
-      description: 'Integration-authored workflow for this actual consumer application', whenToUse: 'create validated notes session csrf database plugin', requires,
-      knowledge: [{ kind: 'document', knowledgeId: 'official-database', role: 'guide', locator: { type: 'relative-file', root: 'official', path: 'website/docs/zh/guide/database.md' } }] }, null, 2));
+    const auditParent = path.join(runRoot, 'verification/native-mcp'); await mkdir(auditParent, { recursive: true });
+    const audit = await exportNativeProvider({ catalog, source, version: source.version,
+      outputDir: path.join(auditParent, 'vextjs'), repositoryRoot });
     const monRoot = path.join(appRoot, 'providers/monsqlize'); await mkdir(path.join(monRoot, 'capabilities'), { recursive: true });
     const installedMon = JSON.parse(await readFile(path.join(appRoot, 'node_modules/monsqlize/package.json'), 'utf8'));
     await writeFile(path.join(monRoot, 'provider.json'), JSON.stringify({ providerId: 'monsqlize', name: 'MonSQLize real installed package', version: installedMon.version }));
@@ -249,23 +247,68 @@ try {
       knowledge: [{ kind: 'document', knowledgeId: 'README', role: 'guide', locator: { type: 'relative-file', root: 'installed', path: 'README.md' } }] }));
     recall = new TextCapabilityRetriever(); const knowledge = new TextKnowledgeRetriever();
     graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs', 'monsqlize'], integrationEnabledProviders: ['vextjs', 'monsqlize'], capabilityRetriever: recall, knowledgeRetriever: knowledge,
-      providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' }, knowledgeRoots: { official: { kind: 'directory', rootDir: sourceRoot } } },
+      providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: documentationProvider.rootDir, definitionLayout: 'directory' } },
         { providerId: 'monsqlize', authority: { kind: 'file', rootDir: monRoot, definitionLayout: 'directory' }, knowledgeRoots: { installed: { kind: 'package', packageName: 'monsqlize', resolveFrom: appRoot } } }] });
+    return { ...await verifyDocumentationProvider({ graph, recall, exported: documentationProvider, sourceRoot }),
+      nativeAudit: { rootDir: audit.rootDir, count: audit.count, manifest: audit.manifest } };
+  });
+  await phase('discover-select-read-business', async () => {
+    const steps = [
+      { capabilityId: 'routes', topic: 'routing' }, { capabilityId: 'validate-input', topic: 'validation' },
+      { capabilityId: 'service-layer', topic: 'services' }, { capabilityId: 'plugin-lifecycle', topic: 'plugins' },
+      { capabilityId: 'persist-notes', topic: 'database' }, { capabilityId: 'protect-session', topic: 'cookies-session' },
+    ];
+    const requiredTopics = steps.map((step) => step.topic);
+    const requires = steps.map((step) => step.capabilityId);
+    const frameworkTopics = requiredTopics.map((capabilityId) => ({ providerId: 'vextjs', capabilityId }));
+    const notesRoot = path.join(appRoot, 'providers/notes-example');
+    await mkdir(path.join(notesRoot, 'capabilities'), { recursive: true });
+    const database = JSON.parse(await readFile(path.join(documentationProvider.rootDir, 'capabilities/database.json'), 'utf8'));
+    const databaseGuide = database.knowledge.find((ref) => ref.knowledgeId === 'guide.database');
+    await writeFile(path.join(notesRoot, 'provider.json'), JSON.stringify({ providerId: 'notes-example', name: 'Integration-authored notes application', version: '1.0.0' }));
+    await writeFile(path.join(notesRoot, 'capabilities/notes.json'), JSON.stringify({ capabilityId: 'notes', name: 'Validated persistent notes with Session and CSRF',
+      description: 'Integration-authored workflow for this actual consumer application', whenToUse: 'create validated notes session csrf database plugin', requires,
+      knowledge: [{ ...databaseGuide, locator: { ...databaseGuide.locator, root: 'vext-docs' } }] }, null, 2));
+    for (const step of steps) {
+      const definition = documentationProvider.manifest.capabilities.find((item) => item.capabilityId === step.topic);
+      const framework = JSON.parse(await readFile(path.join(documentationProvider.rootDir, definition.definitionPath), 'utf8'));
+      await writeFile(path.join(notesRoot, 'capabilities', `${step.capabilityId}.json`), JSON.stringify({ capabilityId: step.capabilityId,
+        name: `Notes: ${framework.name}`, description: 'Application-authored local step; official chapters are references, not cross-Provider requires',
+        whenToUse: `notes application ${step.topic}`, knowledge: framework.knowledge.map((ref) => ({ ...ref, locator: { ...ref.locator, root: 'vext-docs' } })) }, null, 2));
+    }
+    await mkdir(path.join(notesRoot, 'metadata'));
+    await writeFile(path.join(notesRoot, 'metadata/workflow.json'), JSON.stringify({ origin: 'Integration-authored application workflow',
+      localRequires: requires, hostSelectedFrameworkTopics: frameworkTopics,
+      note: 'Core relationships stay within a Provider; the host explicitly selects framework topics across Providers' }, null, 2));
+    await graph.close(); recall = new TextCapabilityRetriever();
+    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs', 'monsqlize', 'notes-example'], integrationEnabledProviders: ['vextjs', 'monsqlize', 'notes-example'],
+      capabilityRetriever: recall, knowledgeRetriever: new TextKnowledgeRetriever(), providers: [
+        { providerId: 'vextjs', authority: { kind: 'file', rootDir: documentationProvider.rootDir, definitionLayout: 'directory' } },
+        { providerId: 'monsqlize', authority: { kind: 'file', rootDir: path.join(appRoot, 'providers/monsqlize'), definitionLayout: 'directory' }, knowledgeRoots: { installed: { kind: 'package', packageName: 'monsqlize', resolveFrom: appRoot } } },
+        { providerId: 'notes-example', authority: { kind: 'file', rootDir: notesRoot, definitionLayout: 'directory' }, knowledgeRoots: { 'vext-docs': { kind: 'directory', rootDir: documentationProvider.rootDir } } },
+      ] });
     await recall.rebuild(graph);
     const candidates = await graph.retrieveCapabilities({ text: 'create validated notes session csrf database plugin', limit: 10 });
-    assert(candidates.items.some((item) => item.id.capabilityId === 'business.notes'));
-    const selection = await graph.resolveSelection({ selected: [{ providerId: 'vextjs', capabilityId: 'business.notes' }] });
+    assert(candidates.items.some((item) => item.id.providerId === 'notes-example' && item.id.capabilityId === 'notes'));
+    const selection = await graph.resolveSelection({ selected: [{ providerId: 'notes-example', capabilityId: 'notes' }] });
     assert.deepEqual(selection.added.map((item) => item.capabilityId).sort(), requires.slice().sort());
+    assert(selection.added.every((item) => item.providerId === 'notes-example'));
+    const frameworkSelection = await graph.resolveSelection({ selected: frameworkTopics });
+    assert.deepEqual(frameworkSelection.resolved.map((item) => item.capabilityId).sort(), requiredTopics.slice().sort());
+    assert(frameworkSelection.resolved.every((item) => item.providerId === 'vextjs'));
+    assert.equal(frameworkSelection.added.length, 0);
     const documents = [];
-    for (const nativeId of requiredNative) {
-      const result = await graph.forProvider('vextjs').readDocumentPage({ capabilityId: capabilityIdFor(nativeId), knowledgeId: nativeId });
-      const expected = await readFile(path.join(exported.rootDir, 'knowledge', `${nativeId}.json`));
-      assert.deepEqual(Buffer.from(result.text), expected); documents.push({ nativeId, contentId: result.contentId, sha256: hash(expected) });
+    for (const capabilityId of requiredTopics) {
+      const knowledgeId = `guide.${capabilityId}`; let cursor; const chunks = []; let contentId;
+      do { const result = await graph.forProvider('vextjs').readDocumentPage({ capabilityId, knowledgeId, ...(cursor ? { cursor } : {}) });
+        chunks.push(Buffer.from(result.text)); cursor = result.nextCursor; contentId = result.contentId; } while (cursor);
+      const expected = await readFile(path.join(documentationProvider.rootDir, 'knowledge/guide', `${capabilityId}.md`));
+      assert.deepEqual(Buffer.concat(chunks), expected); documents.push({ capabilityId, knowledgeId, contentId, sha256: hash(expected) });
     }
-    const hits = await graph.queryKnowledge({ selected: selection.resolved, knowledgeIds: ['K06'], text: 'cookie session csrf', limit: 3 });
+    const hits = await graph.queryKnowledge({ selected: frameworkSelection.resolved, knowledgeIds: ['guide.cookies-session'], text: 'cookie session csrf', limit: 3 });
     assert(hits.items.length > 0);
     for (const hit of hits.items) {
-      const bytes = await readFile(path.join(exported.rootDir, hit.source));
+      const bytes = await readFile(path.join(documentationProvider.rootDir, hit.source));
       assert.equal(bytes.subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
     }
     const port = await freePort(); const applicationFiles = await createBusinessApplication(port);
@@ -308,8 +351,8 @@ try {
     const logout = await request('/notes/logout', { method: 'POST', headers }); assert.equal(logout.response.status, 200); assert.match(logout.response.headers.get('set-cookie'), /Max-Age=0/i);
     const afterLogout = await request('/notes/session', { headers: { cookie } }); assert.equal(afterLogout.json.data.writes, 0); checks.push('logout destroys old Session');
     await closeRuntime(); await assertPortReleased(port); checks.push('plugin LIFO close, database client close and HTTP port release');
-    return { candidates: candidates.items.map((item) => item.id), selection, documents, knowledgeHits: hits.items.length, applicationFiles, checks, port,
-      dependencyProvenance: 'requires edges describe this integration-authored application, not native inferred framework dependencies' };
+    return { candidates: candidates.items.map((item) => item.id), selection, frameworkSelection, documents, knowledgeHits: hits.items.length, applicationFiles, checks, port,
+      dependencyProvenance: 'Local requires describe this authored application; framework topics are explicitly selected by the host, never cross-Provider edges' };
   });
   await phase('database-stop-and-restart', async () => {
     // Only the freshly allocated container may be controlled by this verifier.
@@ -340,24 +383,34 @@ try {
   });
   await phase('document-failures-and-recovery', async () => {
     const original = await readFile(path.join(sourceRoot, 'website/docs/zh/api/config.md'));
-    const localRoot = path.join(appRoot, 'providers/vextjs');
-    const driftFile = path.join(localRoot, 'knowledge/local-drift.md'); await writeFile(driftFile, original);
-    await writeFile(path.join(localRoot, 'capabilities/local-drift.json'), JSON.stringify({ capabilityId: 'local-drift', name: 'Copied official config drift check', description: 'Controlled copy; exact original source hash initially', whenToUse: 'Verify changed bytes and reload',
-      knowledge: [{ kind: 'document', knowledgeId: 'config', role: 'guide', locator: { type: 'relative-file', path: 'knowledge/local-drift.md' } }] }));
-    assert((await graph.reload({ providerId: 'vextjs' })).ok);
-    await assert.rejects(graph.retrieveCapabilities({ text: 'create validated notes', limit: 10 }), { code: 'CG_INDEX_STALE' });
-    await recall.rebuild(graph);
-    assert((await graph.retrieveCapabilities({ text: 'create validated notes', limit: 10 })).items.some((item) => item.id.capabilityId === 'business.notes'));
-    const bound = graph.forProvider('vextjs'); const query = { capabilityId: 'local-drift', knowledgeId: 'config' };
-    const first = await bound.readDocumentPage(query);
-    await writeFile(driftFile, Buffer.concat([original, Buffer.from('\ncontrolled drift\n')]));
-    await assert.rejects(bound.readDocumentPage({ ...query, cursor: first.nextCursor }), { code: 'CG_REVISION_MISMATCH' });
-    await writeFile(driftFile, original);
-    const recovered = await bound.readDocumentPage(query); assert.equal(first.contentId, recovered.contentId);
+    const localRoot = path.join(runRoot, 'verification/document-drift/provider');
+    await mkdir(path.join(localRoot, 'knowledge'), { recursive: true }); await mkdir(path.join(localRoot, 'capabilities'));
+    await writeFile(path.join(localRoot, 'provider.json'), JSON.stringify({ providerId: 'document-drift', name: 'Controlled document drift verification', version: '1.0.0' }));
+    const driftFile = path.join(localRoot, 'knowledge/configuration.md'); await writeFile(driftFile, original);
+    const record = { capabilityId: 'configuration', name: 'Official configuration controlled copy', description: 'Verification-only fixture', whenToUse: 'configuration',
+      knowledge: [{ kind: 'document', knowledgeId: 'config', role: 'guide', locator: { type: 'relative-file', path: 'knowledge/configuration.md' } }] };
+    await writeFile(path.join(localRoot, 'capabilities/configuration.json'), JSON.stringify(record));
+    const localRecall = new TextCapabilityRetriever();
+    const localGraph = await CapabilityGraph.open({ providers: [{ providerId: 'document-drift', authority: { kind: 'file', rootDir: localRoot, definitionLayout: 'directory' } }],
+      hostAllowedProviders: ['document-drift'], integrationEnabledProviders: ['document-drift'], capabilityRetriever: localRecall });
+    try {
+      await localRecall.rebuild(localGraph);
+      await writeFile(path.join(localRoot, 'capabilities/document-drift.json'), JSON.stringify({ ...record, capabilityId: 'document-drift' }));
+      assert((await localGraph.reload({ providerId: 'document-drift' })).ok);
+      await assert.rejects(localGraph.retrieveCapabilities({ text: 'configuration', limit: 10 }), { code: 'CG_INDEX_STALE' });
+      await localRecall.rebuild(localGraph);
+      assert((await localGraph.retrieveCapabilities({ text: 'configuration', limit: 10 })).items.some((item) => item.id.capabilityId === 'configuration'));
+      const bound = localGraph.forProvider('document-drift'); const query = { capabilityId: 'configuration', knowledgeId: 'config' };
+      const first = await bound.readDocumentPage(query);
+      await writeFile(driftFile, Buffer.concat([original, Buffer.from('\ncontrolled drift\n')]));
+      await assert.rejects(bound.readDocumentPage({ ...query, cursor: first.nextCursor }), { code: 'CG_REVISION_MISMATCH' });
+      await writeFile(driftFile, original);
+      const recovered = await bound.readDocumentPage(query); assert.equal(first.contentId, recovered.contentId);
+    } finally { await writeFile(driftFile, original); await localGraph.close(); }
     const http = await verifyHttpFailures(original);
     return { local: ['copied official bytes match original', 'reload rejects stale index', 'explicit index rebuild restores capability recall',
       'changed body rejects old cursor', 'restored source is readable'], originalSha256: hash(original),
-      originalPath: 'website/docs/zh/api/config.md', controlledCopy: 'providers/vextjs/knowledge/local-drift.md',
+      originalPath: 'website/docs/zh/api/config.md', controlledCopy: 'verification/document-drift/provider/knowledge/configuration.md',
       transformation: 'byte-exact copy; negative changes restored', http };
   });
   report.status = 'passed';

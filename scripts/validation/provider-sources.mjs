@@ -9,8 +9,8 @@ import { HttpKnowledgeReader } from '../../dist-test/examples/seed-runtime/knowl
 import { TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
 import { createTemporaryDirectory, repositoryRoot } from '../lib/artifact-paths.mjs';
 import { verifyVextSource, sha256 } from '../../examples/vextjs/source-provenance.mjs';
-import { officialDocumentMappings } from '../../examples/vextjs/official-documents.mjs';
-import { exportVextProvider } from '../../examples/vextjs/native-provider.mjs';
+import { knowledgeIdForChapter } from '../../examples/vextjs/official-documents.mjs';
+import { exportVextProvider } from '../../examples/vextjs/documentation-provider.mjs';
 import { assertKnowledgeEvidence } from './lib/retrieval-assertions.mjs';
 import { verifyInstalledDocuments } from './lib/package-provenance.mjs';
 
@@ -31,8 +31,8 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
   let graph;
   try {
     const { buildMcpCatalog } = await import(pathToFileURL(path.join(frameworkRoot, 'dist/assistant/catalog.js')).href);
-    const catalog = buildMcpCatalog(); const official = await officialDocumentMappings(sourceRoot, catalog, source.commit);
-    const exported = await exportVextProvider({ catalog, version: source.version, source, officialDocuments: official,
+    const catalog = buildMcpCatalog();
+    const exported = await exportVextProvider({ catalog, version: source.version, source, sourceRoot,
       outputDir: path.join(providers, 'vextjs'), repositoryRoot });
     const tasks = JSON.parse(await readFile(new URL('../../test/fixtures/vextjs/document-tasks.json', import.meta.url), 'utf8'));
     const cases = []; const provenance = [];
@@ -48,7 +48,7 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
         originalUrl, originalSha256: sha256(original), readSha256: null, transformation: 'none; direct exact bytes', role, locale,
         sourceIdentity: providerId === 'monsqlize' ? `installed:${monsqlize.name}@${monsqlize.version}` : source.identity });
     };
-    for (const [index, task] of tasks.entries()) await add('vextjs', `docs.${index}`, `DOC-${index}`,
+    for (const task of tasks) await add('vextjs', `sources.${knowledgeIdForChapter(task.path)}`, `source.${knowledgeIdForChapter(task.path)}`,
       { type: 'relative-file', root: 'official', path: `website/docs/zh/${task.path}` }, path.join(sourceRoot, 'website/docs/zh', task.path), task.query, task.evidence);
     await add('vextjs', 'documentation', 'PKG-README', { type: 'relative-file', root: 'installed', path: 'README.md' }, path.join(frameworkRoot, 'README.md'), 'VextJS', 'VextJS');
     const monRoot = path.join(providers, 'monsqlize'); await mkdir(path.join(monRoot, 'capabilities'), { recursive: true });
@@ -120,7 +120,7 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
     const packageDocs = ['README.md', 'CHANGELOG.md', 'MIGRATION.md']; const installedDocuments = [];
     for (const file of packageDocs) { const bytes = await readFile(path.join(frameworkRoot, file)); installedDocuments.push({ file, sha256: sha256(bytes), bytes: bytes.length }); }
     let websitePackaged = true; try { await readFile(path.join(frameworkRoot, 'website/docs/zh/api/config.md')); } catch { websitePackaged = false; }
-    return { node: process.version, platform: process.platform, source, matrix: results, provenance, officialAssociations: official,
+    return { node: process.version, platform: process.platform, source, matrix: results, provenance, officialAssociations: exported.manifest,
       monsqlizeRegistry,
       monsqlize: { name: monsqlize.name, version: monsqlize.version, packageJsonSha256: sha256(await readFile(path.join(monsqlizeRoot, 'package.json'))),
         identityScope: 'Actual installed package and original-document fingerprints; registry integrity is a separate verification' },

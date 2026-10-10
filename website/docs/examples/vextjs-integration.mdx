@@ -1,17 +1,21 @@
 ---
 title: VextJS 集成
-description: 固定原生 MCP schema 2 的 Provider 导出、分层运行证据和真实验证入口。
+description: 官方文档主题 Provider、原生 MCP 独立审计、分层运行证据和真实验证入口。
 ---
 
 # VextJS 集成
 
 <span className="cg-status">仅合同</span>
 
-仓库提供 `examples/vextjs/` 的原生目录导出器、stdio 客户端和运行快照适配器。默认回归验证接入合同；真实验证需要固定的 VextJS 安装快照及仓库外实际项目。它们是源码示例，不属于 Core 的 npm 导出。Core 继续保持框架无关。
+仓库提供 examples/vextjs/ 的官方文档导出器、原生 MCP 审计工具、stdio 客户端和运行快照适配器。默认回归验证接入合同；真实验证需要固定的 VextJS 安装快照及仓库外实际项目。它们是源码示例，不属于 Core 的 npm 导出。Core 继续保持框架无关。
 
 ## 来源与角色
 
-Provider 从原生 MCP 回读 capability、rule、recipe、knowledge、workflow，保留原生 ID、status、正文、catalog digest 和来源身份，生成稳定的 `native.c03` 等身份与可读取的 relative-file 文档。`vext://` 仅是原生来源引用，由导出器转换为实际文件；不是内核支持的 URI Reader。
+面向接入的 Provider 按官方文档主题定义 routing、validation、plugins、database 等能力。capabilities/ 使用 JSON 定义，knowledge/ 按官方 guide/api/frontend/specification 等层级保存原始 Markdown/MDX；metadata/source-manifest.json 保存来源和章节清单，metadata/native-id-map.json 保存原生身份关联。章节关联由集成作者维护，一项能力可以读取多个指南、API 和规范，不按每个页面机械生成一项能力。
+
+固定快照共 91 篇文档，关联到 46 个主题能力；5 篇导航或资源材料明确列为 reference-only。清单记录每篇文档的归属、哈希和验证范围。新增未分类章节或必需章节缺失会阻止导出。原文可读取不代表其中全部功能已经执行验证。
+
+原生 MCP 的 capability、rule、recipe、knowledge、workflow 在独立审计中保留 ID、status、正文、catalog digest 和来源身份。该验证目录的 native.c03 等 ID 不进入公开文档 Provider；正文按原字节保存为 Markdown，机器目录与来源信息存入 metadata/。vext:// 仅是原生来源引用，不是内核支持的 URI Reader。
 
 原生 MCP 缺少分页枚举全部 knowledge 的资源。本例从固定安装快照的目录模块获取发现材料，再核对原生 MCP 的身份、摘要与正文。这个边界只对已核验的 schema 2 成立。`relatedIds` 是可选上下文，不据此推导 requires；原生 Recipe 的 available 也不表示 Core 会执行任务。
 
@@ -19,18 +23,19 @@ Provider 从原生 MCP 回读 capability、rule、recipe、knowledge、workflow�
 
 ## 多来源与正文出处
 
-`knowledge/` 是本例存放原生导出材料的约定，文件 locator 还支持其他获准本地目录、实际安装包；远程文档使用 HTTP locator 和显式配置的 Reader。每个 Provider 可以组合多种来源，不必把官网或安装包文档复制到 `knowledge/`。
+knowledge/ 是本例落地官方原文的约定。文件 locator 还支持其他获准本地目录、实际安装包；远程文档使用 HTTP locator 和显式配置的 Reader。每个 Provider 可以组合多种来源，不必把所有来源复制到 knowledge/。
 
 | 材料 | 正文出处 | 读取方式 |
 |---|---|---|
-| `knowledge/C03.json` 等原生导出 | 固定 VextJS 原生 MCP 回读条目，保留原文并加上来源、身份及角色字段 | 默认 Provider 根内的 relative-file |
-| 官方站点章节 | 固定源码 `website/docs/zh/` 中的原始 Markdown | relative-file，绑定 `knowledgeRoots.official` 目录 |
+| knowledge/guide/routing.md 等落地章节 | 固定源码 website/docs/zh/ 的完整原始 Markdown/MDX；复制前后逐字节一致 | 默认 Provider 根内的 relative-file |
+| 外部官方站点章节 | 固定源码 website/docs/zh/ 的原始文档 | relative-file，绑定 knowledgeRoots.official 目录 |
+| 独立原生 MCP 审计 | 固定 schema 2 的回读正文；机器字段单独存储 | verification/native-mcp/ 中的独立验证 Provider |
 | 安装包 README、CHANGELOG、MIGRATION | 实际 `node_modules/vextjs/` 或 `node_modules/monsqlize/` 中的原文 | relative-file，绑定 package 类型知识根；也可显式绑定已安装目录 |
 | 固定公开 URL | 带完整提交 SHA 的官方 raw URL，正文与同提交本地文件逐字节比较 | HTTP locator，配置宿主 Reader |
 
-导出 JSON 是原生条目的归一化封装，不是官网完整章节的副本。官网章节直接绑定原文；能力与章节的关联表由接入示例作者维护，不冒称 VextJS 官方声明。合同测试中的受控 Fixture 用来验证边界，不能充当官方正文或真实框架证据。
+knowledge/ 只存文档正文；JSON 用于能力定义和来源元数据。原生简短介绍不替代完整官方章节，章节关联不冒称 VextJS 官方声明。合同测试中的受控 Fixture 用来验证边界，不能充当官方正文或真实框架证据。旧验证项目保留历史结构，重新运行入口生成新的文档结构。
 
-定位字段分别类似 `{"type":"relative-file","path":"knowledge/C03.json"}`、`{"type":"relative-file","root":"official","path":"website/docs/zh/api/config.md"}`、`{"type":"relative-file","root":"installed","path":"MIGRATION.md"}` 和 `{"type":"http","url":"https://raw.githubusercontent.com/devcodex-labs/vextjs/固定提交SHA/website/docs/zh/api/config.md"}`。这些是 locator 字段示意；`official`、`installed` 须由接入方在该 Provider 的 `knowledgeRoots` 中显式绑定，URL 中的占位 SHA 必须替换。
+定位字段分别类似 `{"type":"relative-file","path":"knowledge/guide/routing.md"}`、`{"type":"relative-file","root":"official","path":"website/docs/zh/api/config.md"}`、`{"type":"relative-file","root":"installed","path":"MIGRATION.md"}` 和 `{"type":"http","url":"https://raw.githubusercontent.com/devcodex-labs/vextjs/固定提交SHA/website/docs/zh/api/config.md"}`。这些是 locator 字段示意；official、installed 须由接入方在该 Provider 的 knowledgeRoots 中显式绑定，URL 中的占位 SHA 必须替换。
 
 VextJS 与 MonSQLize 分别注册独立 Provider，即使本地 capabilityId、knowledgeId 相同，也按 Provider 隔离。只有启用 directory 布局时，定义才从 `capabilities/**/*.json` 收集；知识来源不因此受限于某个目录名称。
 
@@ -44,7 +49,7 @@ node scripts/validation/vextjs-session.mjs /external/fixed-vextjs
 node scripts/validation/provider-sources.mjs /external/fixed-vextjs-source /external/installed-project SOURCE_ID --https
 ```
 
-第一项回读原生 MCP、导出 Provider、运行独立检索任务并核验片段偏移和运行证据；第二项通过实际 TCP HTTP 验证 Session、CSRF、失效/退出和 Store 关闭。临时应用、Provider、日志和报告放在项目同级专用目录；正式入口在根 scripts/，固定任务及回归在根 test/。外部框架与数据库不加入 website。
+第一项回读原生 MCP，在独立审计目录运行检索任务并核验片段偏移和运行证据；第二项通过实际 TCP HTTP 验证 Session、CSRF、失效/退出和 Store 关闭。临时应用、Provider、日志和报告放在项目同级专用目录；正式入口在根 scripts/，固定任务及回归在根 test/。外部框架与数据库不加入 website。
 
 第三项要求消费项目实际安装对应固定 VextJS 快照与 MonSQLize；固定源码目录须与安装构建匹配。它读取 19 篇官方章节、两个安装包各三篇文档、一个显式绑定的安装目录，以及两篇公开 HTTPS 长/短文。每页核对连续字节偏移、全文/本页哈希、续读标记，完整拼接须等于原始字节；检索必须命中独立期望文本并核对片段偏移。报告保留路径/URL、提交或包身份、原文与读取哈希及转换方式。`--https` 还核验 MonSQLize 注册包的 lockfile integrity；不带此参数的本地矩阵不能证明公网读取。
 
@@ -60,7 +65,9 @@ docker pull mongo:8.0
 node scripts/validation/vextjs-consumer.mjs /external/built-fixed-vextjs-source ef926649926e17543562b8169982fa1786285ecf --https
 ```
 
-入口创建新的仓库外消费者，实际安装当前 Core 构建包、固定 VextJS 包和 MonSQLize，通过消费者安装包的公开入口执行。文档矩阵与原生 MCP 回读后，串联能力召回、Selection/requires、知识读取/检索和真实 TCP 笔记业务：schema 校验、插件加载与关闭、数据库写入/分页、Session、CSRF 和 logout。业务应用与 requires 是集成作者编写的，知识正文仍按上表核验原始出处。
+入口创建新的仓库外消费者，实际安装当前 Core 构建包、固定 VextJS 包和 MonSQLize，通过消费者安装包的公开入口执行。app/providers/vextjs 是官方主题 Provider；全部 91 篇文档核对复制字节，86 篇任务关联文档通过 Core 分页完整还原，5 篇参考资料单列。独立主题检索任务还必须命中指定官方章节。
+
+app/providers/notes-example 是集成作者定义的业务 Provider，requires 描述业务内的路由、校验、服务、插件、持久化和会话保护步骤；宿主显式选择 VextJS 的 routing、validation、services、plugins、database、cookies-session。关系限于同一 Provider，跨 Provider 组合通过宿主选择。能力召回、Selection/requires 和官方正文读取后，验证真实 TCP 笔记业务：schema 校验、插件加载与关闭、数据库写入/分页、Session、CSRF 和 logout。原生审计、文档漂移与受控 HTTP 测试均放在独立 verification/，不加入框架能力目录。
 
 入口另验证停库后的失败与新实例恢复、文档漂移/旧游标、旧索引/重建、HTTP 缓存回退、取消/超时和资源释放。结果按阶段记录在仓库同级专用目录，保留应用、Provider、依赖锁、打包文件、日志及报告；结束时移除自建 MongoDB 容器及匿名卷。`--https` 证明真实公网来源，省略则只有本地来源证据。它是需要外部前置条件的独立验收，不属于默认合同回归；不证明模型/Agent 成功、Jobs、SSR、热重载或生产负载。
 

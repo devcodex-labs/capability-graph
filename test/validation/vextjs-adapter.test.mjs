@@ -4,7 +4,7 @@ import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 import { createTemporaryDirectory, repositoryRoot } from '../../scripts/lib/artifact-paths.mjs';
-import { exportVextProvider } from '../../examples/vextjs/native-provider.mjs';
+import { exportNativeProvider } from '../../examples/vextjs/native-provider.mjs';
 import { VextNativeRuntimeAdapter } from '../../examples/vextjs/runtime-adapter.mjs';
 
 test('native Provider preserves roles, stable source identities and optional context without inventing execution or requires', async () => {
@@ -13,16 +13,17 @@ test('native Provider preserves roles, stable source identities and optional con
   const options = { catalog, version: '2.0.0', source: { identity: 'fixed-source' }, repositoryRoot };
   let graph;
   try {
-    const a = await exportVextProvider({ ...options, outputDir: path.join(root, 'a') });
-    const b = await exportVextProvider({ ...options, outputDir: path.join(root, 'b') });
+    const a = await exportNativeProvider({ ...options, outputDir: path.join(root, 'a') });
+    const b = await exportNativeProvider({ ...options, outputDir: path.join(root, 'b') });
     assert.deepEqual(a.manifest, b.manifest);
     for (const item of catalog.items) assert.deepEqual(await readFile(path.join(a.rootDir, 'capabilities', `native.${item.id.toLowerCase()}.json`)), await readFile(path.join(b.rootDir, 'capabilities', `native.${item.id.toLowerCase()}.json`)));
+    for (const item of catalog.items) assert.equal(await readFile(path.join(a.rootDir, 'knowledge/native', `${item.id}.md`), 'utf8'), item.body);
     graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'], providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: a.rootDir, definitionLayout: 'directory' } }] });
     const detail = await graph.forProvider('vextjs').getCapabilities(['native.id2']); assert(detail.results[0].ok);
     const selection = await graph.forProvider('vextjs').resolveSelection({ selected: ['native.id2'] }); assert.equal(selection.added.length, 0);
     const page = await graph.forProvider('vextjs').readDocumentPage({ capabilityId: 'native.id2', knowledgeId: 'ID2' }); assert.match(page.text, /exact source/); assert(page.complete);
-    await assert.rejects(exportVextProvider({ ...options, catalog: { ...catalog, items: [{ ...catalog.items[0], id: '../escape' }] }, outputDir: path.join(root, 'bad') }), /Invalid native catalog/);
-    await assert.rejects(exportVextProvider({ ...options, outputDir: path.join(repositoryRoot, 'bad') }), /outside/);
+    await assert.rejects(exportNativeProvider({ ...options, catalog: { ...catalog, items: [{ ...catalog.items[0], id: '../escape' }] }, outputDir: path.join(root, 'bad') }), /Invalid native catalog/);
+    await assert.rejects(exportNativeProvider({ ...options, outputDir: path.join(repositoryRoot, 'bad') }), /outside/);
   } finally { await graph?.close(); await rm(root, { recursive: true, force: true }); }
 });
 
@@ -40,7 +41,7 @@ test('native stopped snapshots remain partial and unverified; revision binding r
   const root = await createTemporaryDirectory('capability-graph-vext-public-runtime-');
   let graph;
   try {
-    const exported = await exportVextProvider({ outputDir: path.join(root, 'provider'), repositoryRoot, version: '2.0.0',
+    const exported = await exportNativeProvider({ outputDir: path.join(root, 'provider'), repositoryRoot, version: '2.0.0',
       source: { identity: 'controlled-contract-fixture' }, catalog: { digest: 'controlled-catalog', items: [
         { id: 'C18', kind: 'capability', title: 'Native runtime', summary: 'Contract fixture', body: 'Fixture', status: 'partial', sourceRefs: [], relatedIds: [] },
       ] } });

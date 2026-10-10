@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { mkdir, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isVerifiedSource } from './source-provenance.mjs';
+import { createProviderOutput } from './provider-output.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const nativeKinds = new Set(['capability', 'rule', 'recipe', 'knowledge', 'workflow']);
@@ -51,8 +52,8 @@ export async function readNativeCatalog(client, expected) {
   return { schemaVersion: 2, digest: expected.digest, items: expected.items.map(normalize) };
 }
 
-/** Generate file-authority records and real document bodies into a NEW external directory. */
-export async function exportVextProvider({ catalog, providerId = 'vextjs', version, source, officialDocuments, outputDir, repositoryRoot }) {
+/** Independent MCP audit fixture, never the public documentation Provider. Native IDs exist only in this audit. */
+export async function exportNativeProvider({ catalog, providerId = 'vextjs', version, source, outputDir, repositoryRoot }) {
   if (!/^[a-z][a-z0-9._-]{0,127}$/.test(providerId) || !version || !source?.identity || !catalog?.digest || !Array.isArray(catalog.items)) throw new Error('Explicit source identity and catalog required');
   const mapped = new Set();
   for (const item of catalog.items) {
@@ -60,33 +61,30 @@ export async function exportVextProvider({ catalog, providerId = 'vextjs', versi
         ![item.title, item.summary, item.body, item.status].every((value) => typeof value === 'string' && value.length)) throw new Error('Invalid native catalog');
     mapped.add(capabilityIdFor(item.id));
   }
-  const parent = await realpath(path.dirname(outputDir)); const repository = await realpath(repositoryRoot);
-  const output = path.join(parent, path.basename(outputDir));
-  const below = path.relative(repository, output); const above = path.relative(output, repository);
-  if ((!below.startsWith('..' + path.sep) && !path.isAbsolute(below)) || (!above.startsWith('..' + path.sep) && !path.isAbsolute(above))) throw new Error('Generated Provider must be outside the repository');
-  await mkdir(output); await mkdir(path.join(output, 'knowledge')); await mkdir(path.join(output, 'capabilities'));
+  const output = await createProviderOutput(outputDir, repositoryRoot);
+  await mkdir(path.join(output, 'knowledge/native'));
   const ids = new Set(catalog.items.map((item) => item.id));
   const manifest = { schemaVersion: 1, providerId, version, source, nativeCatalogDigest: catalog.digest,
     mappingDigest: hash(catalog.items), kinds: [...nativeKinds], note: 'Native statuses and dependency applicability are evidence, not execution support. relatedIds are optional context; no necessary dependencies are inferred.' };
-  if (officialDocuments) manifest.officialDocuments = officialDocuments;
   manifest.sourceVerification = isVerifiedSource(source) ? 'verified-fixed-source-build' : 'caller-declared; contract fixture only';
-  manifest.nativeExports = catalog.items.map((item) => { const bytes = Buffer.from(JSON.stringify({ source, catalogDigest: catalog.digest, ...item }, null, 2) + '\n'); return {
+  manifest.purpose = 'Independent native MCP identity/role/readback verification; not the public VextJS task catalog';
+  manifest.nativeExports = catalog.items.map((item) => { const bytes = Buffer.from(item.body); return {
     nativeId: item.id, originalSourceRefs: item.sourceRefs ?? [], originalBodySha256: createHash('sha256').update(item.body).digest('hex'),
-    exportedPath: `knowledge/${item.id}.json`, exportedSha256: createHash('sha256').update(bytes).digest('hex'),
-    transformation: 'Native MCP readback normalized against fixed catalog; source wrapper added; original body retained', role: item.kind,
+    exportedPath: `knowledge/native/${item.id}.md`, exportedSha256: createHash('sha256').update(bytes).digest('hex'),
+    transformation: 'Native MCP readback normalized against fixed catalog; body bytes unmodified; metadata stored separately', role: item.kind,
   }; });
-  await writeFile(path.join(output, 'knowledge/catalog.json'), JSON.stringify(manifest, null, 2) + '\n');
-  await writeFile(path.join(output, 'provider.json'), JSON.stringify({ providerId, name: 'VextJS native MCP knowledge', version,
-    specification: { specificationId: 'native-catalog', version, documents: [{ kind: 'document', knowledgeId: 'SPEC-native', role: 'specification', locator: { type: 'relative-file', path: 'knowledge/catalog.json' } }] } }, null, 2) + '\n');
+  await writeFile(path.join(output, 'metadata/source-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+  await writeFile(path.join(output, 'metadata/native-catalog.json'), JSON.stringify({ source, ...catalog }, null, 2) + '\n');
+  await writeFile(path.join(output, 'provider.json'), JSON.stringify({ providerId, name: 'VextJS native MCP audit fixture', version }, null, 2) + '\n');
   for (const item of catalog.items) {
-    const capabilityId = capabilityIdFor(item.id); const bodyPath = `knowledge/${item.id}.json`;
-    await writeFile(path.join(output, bodyPath), JSON.stringify({ source, catalogDigest: catalog.digest, ...item }, null, 2) + '\n');
+    const capabilityId = capabilityIdFor(item.id); const bodyPath = `knowledge/native/${item.id}.md`;
+    await writeFile(path.join(output, bodyPath), item.body);
     await writeFile(path.join(output, 'capabilities', `${capabilityId}.json`), JSON.stringify({ capabilityId, name: `${item.title} (${item.id})`,
       description: `${item.kind}; ${item.status}. ${item.summary}`,
       whenToUse: `Consult native ${item.kind} guidance for ${item.domains?.join(', ') || 'VextJS'}; status=${item.status}; verify project prerequisites before execution.`,
       related: (item.relatedIds ?? []).filter((id) => ids.has(id)).map(capabilityIdFor),
       knowledge: [{ kind: 'document', knowledgeId: item.id, role: item.kind, title: item.title, summary: item.summary,
-        locator: { type: 'relative-file', path: bodyPath } }, ...(officialDocuments?.mappings.find((mapping) => mapping.nativeId === item.id)?.officialDocuments ?? [])] }, null, 2) + '\n');
+        locator: { type: 'relative-file', path: bodyPath } }] }, null, 2) + '\n');
   }
   return { rootDir: output, manifest, count: catalog.items.length };
 }

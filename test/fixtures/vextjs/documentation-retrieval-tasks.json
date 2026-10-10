@@ -1,0 +1,13 @@
+[
+  { "id": "routing", "query": "API 路由 defineRoutes", "expected": ["routing"], "chapter": "guide/routing.md", "text": "defineRoutes" },
+  { "id": "validation", "query": "请求响应 schema", "expected": ["validation"], "chapter": "guide/validation.md", "text": "schema" },
+  { "id": "mongo", "query": "原生分页 多数据库 Models", "expected": ["database"], "chapter": "guide/database.md", "text": "MonSQLize" },
+  { "id": "plugin", "query": "插件 setup onReady onClose", "expected": ["plugins"], "chapter": "guide/plugins.md", "text": "onReady" },
+  { "id": "frontend", "query": "服务端页面 layout document", "expected": ["frontend.rendering"], "chapter": "frontend/ssr.md", "text": "SSR" },
+  { "id": "jobs", "query": "jobs worker scheduler retry", "expected": ["jobs"], "chapter": "guide/jobs.md", "text": "Job" },
+  { "id": "cluster", "query": "Cluster rolling reload 状态检查", "expected": ["cluster"], "chapter": "guide/cluster.md", "text": "Cluster" },
+  { "id": "openapi", "query": "OpenAPI Docs 机器文档", "expected": ["openapi"], "chapter": "guide/openapi.md", "text": "OpenAPI" },
+  { "id": "cookies", "query": "cookie session csrf", "expected": ["cookies-session"], "chapter": "guide/cookies-session.md", "text": "CSRF" },
+  { "id": "typed", "query": "构建 typegen", "expected": ["build"], "chapter": "guide/build.md", "text": "typegen" },
+  { "id": "unknown", "query": "quantum teleportation zyxunavailable", "expected": [] }
+]

@@ -26,13 +26,13 @@
 | 页面还原、教程负例、发布/防回退规则、手动恢复标签快照与外部产物清理保护 | `website/unit/` | `npm run test:docs` | 文档消费者与发布规则；不代表已经部署 |
 | 导航、搜索、键盘、移动视口及页面元数据 | `website/browser/` | `npm --prefix website run build` 后执行 `npm run test:site`；`npm run test:site:cross` | Chromium 完整回归，Firefox/WebKit 代表性冒烟 |
 | 本地源码标准打包、预构建一致性、独立 tarball 安装/类型、未泄露私有材料 | `scripts/test-package.mjs` | `npm run test:package` | 本地构建包的实装消费者，不证明 Registry 已发布 |
-| 原生角色、稳定导出、未知运行证据及游标漂移；独立任务遗漏、零命中与无依据推荐拒绝 | `validation/vextjs-adapter.test.mjs`、`validation/retrieval-gates.test.mjs` | `npm test` | 接入合同与受控检索门槛，不代表真实框架运行 |
+| 官方 Markdown 字节保留、语义能力、元数据隔离、未分类/缺失章节拒绝；原生角色、稳定导出、未知运行证据及游标漂移；独立任务遗漏、零命中与无依据推荐拒绝 | `validation/vextjs-documentation.test.mjs`、`validation/vextjs-adapter.test.mjs`、`validation/retrieval-gates.test.mjs` | `npm test` | 接入合同与受控检索门槛，不代表真实框架运行 |
 | 显式复用构建时拒绝旧源、输出改动和孤儿文件 | `validation/build-state.test.mjs` | `npm test` | 构建指纹合同 |
 
 `scripts/validation/website/check-registry-install.mjs` 在匹配发布版本与部署身份的工作流中独立安装 Registry 包；它与 `test:package` 的本地构建包验证是不同证据。
 
 真实 VextJS MCP、TCP Session 及 VextJS/MonSQLize 多 Provider 来源矩阵的命令、前置条件和来源身份见 [examples/vextjs/README.md](../examples/vextjs/README.md)。`scripts/validation/provider-sources.mjs` 使用固定源码目录、实际安装包及可选公开 HTTPS，执行分页、正文与片段证据、跨 Provider 隔离和 reload 验证；独立任务材料位于 `fixtures/vextjs/`。这些入口需要外部固定来源，不属于默认 `npm test`。
 
-`scripts/validation/vextjs-consumer.mjs` 是可选的全新实装消费者验收，需要 Linux/Docker、已构建并核验的 Vext 固定源码及 `mongo:8.0` 镜像。它标准打包并实际安装当前 Core，使用消费者自己的公开入口重跑来源矩阵和原生 MCP，再验证真实路由/schema、插件、数据库分页、Session/CSRF、停库/重启、来源漂移、取消与关闭。持续维护的 verifier 在 `scripts/validation/lib/vextjs-consumer-checks.mjs`；生成的应用、Provider、tarball、日志及报告全部位于仓库外，完成后自建容器及卷释放。业务应用为集成作者编写，知识正文保留可核验原始出处；零模型调用，不证明 Agent 成功率。运行命令与证明边界见上述 README。
+`scripts/validation/vextjs-consumer.mjs` 是可选的全新实装消费者验收，需要 Linux/Docker、已构建并核验的 Vext 固定源码及 `mongo:8.0` 镜像。它标准打包并实际安装当前 Core，使用消费者自己的公开入口重跑来源矩阵、原生 MCP，并核对全部官方 Markdown/MDX 的原始字节、主题关联和分页读取；独立任务位于 `fixtures/vextjs/documentation-retrieval-tasks.json`。再通过独立 notes-example Provider 的业务内 requires 与宿主对 VextJS 主题的显式选择，验证真实路由/schema、插件、数据库分页、Session/CSRF、停库/重启、来源漂移、取消与关闭；不创建跨 Provider 关系。持续维护的 verifier 在 `scripts/validation/lib/vextjs-consumer-checks.mjs`，文档检查在 `scripts/validation/lib/documentation-provider-checks.mjs`；生成的应用、Provider、tarball、日志及报告全部位于仓库外，原生审计、漂移和受控 HTTP 材料位于独立 verification/，完成后自建容器及卷释放。业务应用为集成作者编写，知识正文保留可核验原始出处；零模型调用，不证明 Agent 成功率。运行命令与证明边界见上述 README。
 
 真实数据库驱动、模型/Agent 任务、生产容量和长期负载需要对应项目及运行条件；默认回归不能证明这些交付。VextJS 的真实验证需外部固定来源与服务，独立记录执行证据。屏幕阅读器和真实用户走读也需要独立执行证据。CI 声明 Windows/Linux 与 Node 20.19.0、22.12.0、24.19.0，实际通过情况以具体运行记录为准。
