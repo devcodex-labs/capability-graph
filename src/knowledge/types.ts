@@ -24,6 +24,15 @@ export interface KnowledgeReader {
    * Core may retain a bounded private snapshot for body pages; this does not cap document size. */
   isContentCurrent?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, contentId: KnowledgeContentId,
     options: { signal?: AbortSignal }): Promise<boolean>;
+  /** Optional exact range of an already fully scanned representation. Core first revalidates
+   * isContentCurrent, then verifies these bytes against its private block hashes.
+   * contentId identifies the complete source, not the returned range. Return undefined to
+   * request a full scan when the representation is unavailable; throw on I/O failure.
+   * Offsets are UTF-8 bytes, end-exclusive; cancellation must release owned resources. */
+  readRange?(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, options: {
+    contentId: KnowledgeContentId; startOffset: number; endOffset: number; signal?: AbortSignal;
+  }): Promise<{ bytes: Uint8Array; contentId: KnowledgeContentId; contentType: string;
+    source: string; totalBytes: number } | undefined>;
 }
 export interface KnowledgeScanResult {
   readonly contentId: KnowledgeContentId; readonly totalBytes: number; readonly contentType: string; readonly source: string;

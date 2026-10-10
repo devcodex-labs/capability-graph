@@ -1,6 +1,14 @@
 import { CapabilityGraphError, formatQualifiedId, parseQualifiedId,
   type CanonicalCapabilityId, type BudgetConfig, type BudgetOverrides,
-  type ErrorShape, type BatchItem, type BatchResult, type ProviderResult, type NeighborPage } from "@devcodex/capability-graph";
+  type ErrorShape, type BatchItem, type BatchResult, type ProviderResult, type NeighborPage, type KnowledgeReader } from "@devcodex/capability-graph";
+
+const rangeReader: NonNullable<KnowledgeReader["readRange"]> = async (_ref, _context, options) => ({
+  bytes: new Uint8Array(options.endOffset - options.startOffset), contentId: options.contentId,
+  contentType: "text/plain", source: "https://example.test/document", totalBytes: options.endOffset,
+});
+// @ts-expect-error Range results must identify the complete source length.
+const incompleteRangeReader: NonNullable<KnowledgeReader["readRange"]> = async () => ({ bytes: new Uint8Array(), contentId: "k:1", source: "x", contentType: "text/plain" });
+void [rangeReader, incompleteRangeReader];
 
 const id: CanonicalCapabilityId = { providerId: "seed.http", capabilityId: "route.http" };
 const encoded: string = formatQualifiedId(id);

@@ -10,7 +10,9 @@
 
 来源经代理访问时，宿主通过 `agentForUrl` 注入兼容 Node 20/22/24 的 Agent，例如根开发依赖中的 `proxy-agent`。Agent 由宿主管理和关闭，Reader 不接管它的生命周期；代理凭据不进入报告。
 
-可选 `snapshot` 由宿主指定仓库外绝对目录，并配置 `maxBytes`、`maxEntries`、`ttlMs`。只有完整读取且带强 ETag 的正文才写入快照；后续条件请求返回 304 时仍核对本地完整正文的字节数和 SHA-256。弱/无验证器或正文超过缓存预算时继续完整流式读取；快照预算控制缓存保留，不限制可读取文档大小。正文续页还支持可选 `isContentCurrent`：条件 HEAD 的 304 核验已绑定的强 ETag，Core 复用已完整哈希的私有字节副本，每实例最多 4 MiB、16 条，避免重复磁盘扫描和哈希。不支持 HEAD、弱验证器、过期或超缓存容量时重新完整核验。Reader 的 `close()` 只清理它自己创建的快照子目录。
+可选 `snapshot` 由宿主指定仓库外绝对目录，并配置 `maxBytes`、`maxEntries`、`ttlMs`。只有完整读取且带强 ETag 的正文才写入快照；后续条件 GET 返回 304 时仍核对本地完整正文的字节数和 SHA-256。弱/无验证器或正文超过磁盘快照预算时继续完整流式读取；快照预算控制缓存保留，不限制可读取文档大小。
+
+正文续页支持 `isContentCurrent`：条件 HEAD 的 304 核验已绑定的强 ETag。Core 复用已完整哈希的私有副本，正文与证明共用每实例最多 4 MiB、16 条。启用磁盘快照时还提供 `readRange`，较大正文只读取所需的证明块，由 Core 用首次扫描留下的 SHA-256 独立核对原始字节；不要求来源支持 HTTP Range。缺失快照回退完整读取，损坏快照明确失败；不支持 HEAD、弱验证器、过期或超磁盘预算时重新完整核验。Reader 的 `close()` 等待在途范围读取和租用结束，只清理自己创建的快照子目录。
 
 `text-retrieval.ts` 是确定性的词项索引。`TextKnowledgeRetriever` 通过 `scan` 消费大正文，查询时保留有界 Top-K；完整索引仅在 `maxCachedBytes`、`maxCachedEntries` 及选择数预算内缓存，超过预算时继续流式检索。`configure({ pageBytes })` 控制扫描块大小，`maxDocumentBytes` 是兼容旧名称，两者都不表示全文准入上限；只提供 `read` 的旧 access 使用有界全文回退。Core 正文分页接口只保留所选范围，并计算全文哈希；模型决定是否继续读取。
 
@@ -19,6 +21,8 @@
 流式分块增量统计 UTF-8 字节，避免短行密集时反复统计整个剩余字符串。空行、纯标点或停用词过滤后没有词项的块仍推进原始字节偏移，但不占用索引缓存条目；缓存预算不足时仍完成全文扫描和 Top-K 检索。
 
 构建 Core 和测试源码后，可运行 `node scripts/validation/knowledge-profile.mjs` 测量受控 HTTP 来源。基准分别覆盖可缓存、短行密集和容量溢出场景，每个场景使用独立检索器及固定选择，记录实际 `cachedSelections`、`cachedEntries`、`cachedBytes`，分别汇总冷查询、索引缓存命中、未命中和零命中。索引命中仍会核验实际来源，不表示免除 HTTP 读取；无样本的耗时字段为 null，缓存字节计账也不等于堆内存峰值。
+
+`node --expose-gc scripts/validation/knowledge-page-profile.mjs` 验证 5 MiB 合成来源的 160 页、6 个并发范围查询及无强证明的完整扫描回退。各场景使用独立子进程，分别记录完整扫描字节、范围读取字节、HTTP 请求，以及分页和并发阶段的采样内存峰值。可用 `--baseline-core /absolute/dist/index.js` 对照已验证的旧 Core。采样峰值包含来源服务和测试消费者，不等于缓存保留量；耗时用于观察趋势，不作为共享环境的硬性通过阈值。
 
 检索按已选 targets 重查内容身份，零命中也需要有效证据。静态定义、正文或分块配置变更后，由接入方显式重建或调用 invalidate，Core 不自动刷新。这条路径使用零次模型调用，证明本机 HTTP 和检索链路，不证明语义搜索质量或 Agent 任务成功率。临时 Provider 位于仓库同级 `capability-graph-artifacts`，结束后关闭 Reader、graph、HTTP 服务并清理自建目录。正式回归位于根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts`。
 

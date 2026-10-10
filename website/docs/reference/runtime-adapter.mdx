@@ -51,7 +51,7 @@ Core 限制 hits 数量、snippet 字节、内容边界和访问范围。过期�
 
 `canRead(ref)` 同步决定是否支持非本地来源。Core 选择第一个匹配的自定义 Reader；内置本地 Reader 优先处理 `relative-file`。
 
-可选 `isContentCurrent(ref, context, contentId, { signal? })` 用于正文续页的稳定来源核验。只有强验证器或不可变来源证明才能返回 true；false 重新完整扫描，故障必须抛错，不能用文件时间代替内容证明。Core 的私有副本每实例最多 4 MiB、16 条，超额仍可流式读取；详见[KnowledgeReader 接入](../integrations/knowledge-reader)。
+可选 `isContentCurrent(ref, context, contentId, { signal? })` 用于正文续页的稳定来源核验。只有强验证器或不可变来源证明才能返回 true；false 重新完整扫描，故障必须抛错，不能用文件时间代替内容证明。较大正文可再实现 `readRange`，由 Core 用首次扫描留下的分块哈希验证范围。私有正文与证明共用每实例最多 4 MiB、16 条，超额仍可流式读取；详见[KnowledgeReader 接入](../integrations/knowledge-reader)。
 
 `read(ref, context, { maxBytes })` 返回精确 bytes、contentType、contentId 和 source。Reader 不得替换声明 locator，必须遵守最大字节并保证 `contentId` 对应真实 bytes；`sourceContext.knowledgeRootDir` 不能进入公共响应。无匹配 Reader 使用 `CG_READER_UNCONFIGURED`，执行失败使用 `CG_READER_UNAVAILABLE` 或 Core 投影的读取错误。
 

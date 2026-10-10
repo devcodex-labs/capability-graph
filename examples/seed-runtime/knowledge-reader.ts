@@ -6,7 +6,8 @@ import path from "node:path";
 import type { KnowledgeReader, KnowledgeDocumentRef, KnowledgeReadContext } from "@devcodex/capability-graph";
 
 type ReadResult = Awaited<ReturnType<KnowledgeReader["read"]>>;
-interface Snapshot { file: string; etag: string; sha256: string; contentType: string; bytes: number; expires: number; leases: number; retired: boolean }
+type FileIdentity = { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint; ctimeNs: bigint };
+interface Snapshot { file: string; identity: FileIdentity; etag: string; sha256: string; contentType: string; bytes: number; expires: number; leases: number; retired: boolean }
 interface SnapshotOptions { directory: string; maxBytes?: number; maxEntries?: number; ttlMs?: number }
 interface Options { allowedOrigins: readonly string[]; timeoutMs?: number; maxConcurrent?: number;
   /** Host-owned Agent (e.g. proxy-agent on Node 20/22/24); Reader never closes it. */
@@ -24,6 +25,7 @@ export class HttpKnowledgeReader implements KnowledgeReader {
   private readonly snapshotLimits?: { maxBytes: number; maxEntries: number; ttlMs: number };
   private directory?: Promise<string>;
   private closed = false;
+  readonly readRange?: NonNullable<KnowledgeReader["readRange"]>;
   constructor(private readonly options: Options) {
     this.timeoutMs = options.timeoutMs ?? 2000; this.maxConcurrent = options.maxConcurrent ?? 4;
     if (![this.timeoutMs, this.maxConcurrent].every((value) => Number.isSafeInteger(value) && value > 0) || !options.allowedOrigins.length) throw new Error("Explicit origins and positive HTTP limits are required");
@@ -36,6 +38,7 @@ export class HttpKnowledgeReader implements KnowledgeReader {
       if (!path.isAbsolute(options.snapshot.directory)) throw new Error("Snapshot directory must be an absolute host-owned path outside the source checkout");
       this.snapshotLimits = { maxBytes: options.snapshot.maxBytes ?? 16_777_216, maxEntries: options.snapshot.maxEntries ?? 8, ttlMs: options.snapshot.ttlMs ?? 300_000 };
       if (!Object.values(this.snapshotLimits).every((value) => Number.isSafeInteger(value) && value > 0)) throw new Error("Invalid snapshot budgets");
+      this.readRange = this.readSnapshotRange.bind(this);
     }
   }
   get activeRequests(): number { return this.requests.size; }
@@ -83,6 +86,50 @@ export class HttpKnowledgeReader implements KnowledgeReader {
       clearTimeout(timer); options.signal?.removeEventListener("abort", abort);
       if (request) { request.destroy(); if (!request.closed) await new Promise<void>((resolve) => request!.once("close", resolve)); this.requests.delete(request); }
       finish(); this.streams.delete(done);
+    }
+  }
+  /** Read only a leased, fully downloaded representation after Core's strong revalidation.
+   * Core independently verifies aligned block hashes; file identity detects local replacement
+   * or edits early, and is never used as proof that the remote source is current. */
+  private async readSnapshotRange(ref: KnowledgeDocumentRef, _context: KnowledgeReadContext,
+    options: Parameters<NonNullable<KnowledgeReader["readRange"]>>[2]): ReturnType<NonNullable<KnowledgeReader["readRange"]>> {
+    if (this.closed || ref.locator.type !== "http" || this.streams.size >= this.maxConcurrent) throw new Error("Reader unavailable");
+    if (![options.startOffset, options.endOffset].every(Number.isSafeInteger) || options.startOffset < 0 || options.endOffset < options.startOffset) throw new Error("Invalid range");
+    options.signal?.throwIfAborted();
+    const source = ref.locator.url; const snapshot = this.snapshots.get(source);
+    if (!snapshot || snapshot.expires <= Date.now() || options.contentId !== `k:${snapshot.sha256.slice(0, 16)}`) return undefined;
+    if (options.endOffset > snapshot.bytes) throw new Error("Invalid range");
+    let finish!: () => void; const done = new Promise<void>((resolve) => { finish = resolve; }); this.streams.add(done);
+    snapshot.leases++; let handle: FileHandle | undefined;
+    const unchanged = (actual: FileIdentity) => Object.entries(snapshot.identity).every(([key, value]) => actual[key as keyof FileIdentity] === value);
+    try {
+      try { handle = await open(snapshot.file, "r"); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        if (this.snapshots.get(source) === snapshot) await this.retire(source);
+        return undefined;
+      }
+      if (!unchanged(await handle.stat({ bigint: true }))) throw new Error("Snapshot changed");
+      const bytes = Buffer.alloc(options.endOffset - options.startOffset); let offset = 0;
+      while (offset < bytes.length) {
+        options.signal?.throwIfAborted(); if (this.closed) throw new Error("Reader unavailable");
+        const { bytesRead } = await handle.read(bytes, offset, Math.min(32768, bytes.length - offset), options.startOffset + offset);
+        if (!bytesRead) throw new Error("Snapshot incomplete"); offset += bytesRead;
+      }
+      options.signal?.throwIfAborted(); if (this.closed || !unchanged(await handle.stat({ bigint: true }))) throw new Error("Snapshot changed");
+      if (this.snapshots.get(source) === snapshot) { this.snapshots.delete(source); this.snapshots.set(source, snapshot); }
+      return { bytes, contentId: options.contentId, source, contentType: snapshot.contentType, totalBytes: snapshot.bytes };
+    } catch (error) {
+      if (this.snapshots.get(source) === snapshot) await this.retire(source);
+      throw error;
+    } finally {
+      try {
+        try { await handle?.close(); }
+        finally {
+          snapshot.leases--;
+          if (snapshot.retired && !snapshot.leases) await rm(snapshot.file, { force: true });
+        }
+      } finally { finish(); this.streams.delete(done); }
     }
   }
   /** Strong ETag validates a previously complete disk snapshot; weak/no validator falls back to full GET.
@@ -161,9 +208,14 @@ export class HttpKnowledgeReader implements KnowledgeReader {
       if (!emitted) yield { bytes: new Uint8Array(), source, contentType };
       if (writer && temporary && !this.closed) {
         await writer.close(); writer = undefined;
+        const inspection = await open(temporary, "r"); let identity: FileIdentity;
+        try {
+          const stat = await inspection.stat({ bigint: true });
+          identity = { dev: stat.dev, ino: stat.ino, size: stat.size, mtimeNs: stat.mtimeNs, ctimeNs: stat.ctimeNs };
+        } finally { await inspection.close(); }
         while (this.snapshots.size && (this.snapshots.size >= this.snapshotLimits!.maxEntries || this.cachedSnapshotBytes + total > this.snapshotLimits!.maxBytes)) await this.retire(this.snapshots.keys().next().value!);
         await this.retire(source);
-        this.snapshots.set(source, { file: temporary, etag: etag!, sha256: sourceHash.digest("hex"), bytes: total, contentType, expires: Date.now() + this.snapshotLimits!.ttlMs, leases: 0, retired: false }); published = true;
+        this.snapshots.set(source, { file: temporary, identity, etag: etag!, sha256: sourceHash.digest("hex"), bytes: total, contentType, expires: Date.now() + this.snapshotLimits!.ttlMs, leases: 0, retired: false }); published = true;
       }
     } finally {
       clearTimeout(timer); options.signal?.removeEventListener("abort", abort);

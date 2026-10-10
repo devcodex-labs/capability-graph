@@ -35,6 +35,7 @@ function extensions(config: OpenConfig): Extensions {
   if (!config || typeof config !== "object" || (config.readers !== undefined && !Array.isArray(config.readers))) invalid();
   for (const reader of config.readers ?? []) if (!reader || typeof reader.id !== "string" || !reader.id || typeof reader.canRead !== "function" || typeof reader.read !== "function" ||
     (reader.stream !== undefined && typeof reader.stream !== "function") ||
+    (reader.readRange !== undefined && typeof reader.readRange !== "function") ||
     (reader.isContentCurrent !== undefined && typeof reader.isContentCurrent !== "function")) invalid();
   for (const retriever of [config.knowledgeRetriever, config.capabilityRetriever]) if (retriever !== undefined &&
     (!retriever || typeof retriever.id !== "string" || !retriever.id || typeof retriever.retrieve !== "function")) invalid();

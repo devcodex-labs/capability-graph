@@ -7,9 +7,19 @@ import { locatorSource, readDocument } from "./read.js";
 
 // Per graph, private, bounded byte copies. Sources without a strong proof are never reused.
 const snapshotMaxBytes = 4_194_304;
-interface Snapshot { reader: KnowledgeReader; bytes: Buffer; summary: KnowledgeScanResult }
+const proofBlockBytes = 32768;
+interface Snapshot { reader: KnowledgeReader; bytes?: Buffer; hashes?: Buffer; summary: KnowledgeScanResult }
+const snapshotBytes = (snapshot: Snapshot) => (snapshot.bytes?.length ?? 0) + (snapshot.hashes?.length ?? 0);
 const snapshots = new WeakMap<readonly KnowledgeReader[], Map<string, Snapshot>>();
 export function clearDocumentSnapshots(readers: readonly KnowledgeReader[]) { snapshots.delete(readers); }
+function rememberSnapshot(cache: Map<string, Snapshot>, key: string, snapshot: Snapshot): void {
+  cache.delete(key);
+  let cachedBytes = [...cache.values()].reduce((sum, entry) => sum + snapshotBytes(entry), 0);
+  while (cache.size && (cache.size >= 16 || cachedBytes + snapshotBytes(snapshot) > snapshotMaxBytes)) {
+    const oldest = cache.keys().next().value!; cachedBytes -= snapshotBytes(cache.get(oldest)!); cache.delete(oldest);
+  }
+  cache.set(key, snapshot);
+}
 
 /** Hash complete source bytes while retaining only the consumer's bounded working set. */
 export async function scanDocument(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, readers: readonly KnowledgeReader[],
@@ -47,20 +57,66 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
       }
       cache.delete(key);
       if (current) {
-        cache.set(key, previous);
-        const end = Math.min(previous.bytes.length, options.range?.endOffset ?? previous.bytes.length);
         try {
-          for (let offset = options.range?.startOffset ?? 0; offset < end; offset += options.chunkBytes) {
-            options.signal?.throwIfAborted();
-            await consume(Uint8Array.from(previous.bytes.subarray(offset, Math.min(end, offset + options.chunkBytes))), offset);
+          if (previous.bytes) {
+            const end = Math.min(previous.bytes.length, options.range?.endOffset ?? previous.bytes.length);
+            for (let offset = options.range?.startOffset ?? 0; offset < end; offset += options.chunkBytes) {
+              options.signal?.throwIfAborted();
+              await consume(Uint8Array.from(previous.bytes.subarray(offset, Math.min(end, offset + options.chunkBytes))), offset);
+            }
+            options.signal?.throwIfAborted(); rememberSnapshot(cache, key, previous); return previous.summary;
           }
-          options.signal?.throwIfAborted();
-        } catch { throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
-        return previous.summary;
+          if (previous.hashes && reader.readRange && options.range) {
+            options.signal?.throwIfAborted();
+            const end = Math.min(previous.summary.totalBytes, options.range.endOffset);
+            if (options.range.startOffset > end) { rememberSnapshot(cache, key, previous); return previous.summary; }
+            const startOffset = Math.floor(options.range.startOffset / proofBlockBytes) * proofBlockBytes;
+            const endOffset = Math.min(previous.summary.totalBytes, Math.ceil(end / proofBlockBytes) * proofBlockBytes);
+            const body = await reader.readRange(ref, context, { contentId: previous.summary.contentId, startOffset, endOffset,
+              ...(options.signal ? { signal: options.signal } : {}) });
+            options.signal?.throwIfAborted();
+            if (body !== undefined) {
+              const invalid = (reason: string) => new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source", details: { reason } });
+              if (!body || !(body.bytes instanceof Uint8Array) || body.bytes.length !== endOffset - startOffset ||
+                  body.contentId !== previous.summary.contentId || body.source !== previous.summary.source ||
+                  body.contentType !== previous.summary.contentType || body.totalBytes !== previous.summary.totalBytes) throw invalid("reader_range_invalid");
+              const bytes = Buffer.from(body.bytes);
+              for (let offset = 0; offset < bytes.length; offset += proofBlockBytes) {
+                const index = (startOffset + offset) / proofBlockBytes;
+                const expected = previous.hashes.subarray(index * 32, (index + 1) * 32);
+                const actual = createHash("sha256").update(bytes.subarray(offset, offset + proofBlockBytes)).digest();
+                if (!actual.equals(expected)) throw invalid("reader_range_hash_mismatch");
+              }
+              for (let offset = options.range.startOffset; offset < end; offset += options.chunkBytes) {
+                options.signal?.throwIfAborted();
+                await consume(Uint8Array.from(bytes.subarray(offset - startOffset, Math.min(end, offset + options.chunkBytes) - startOffset)), offset);
+              }
+              options.signal?.throwIfAborted(); rememberSnapshot(cache, key, previous); return previous.summary;
+            }
+          }
+        } catch (error) {
+          if (error instanceof CapabilityGraphError && error.code === "CG_ADAPTER_CONTRACT_INVALID") throw error;
+          throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" });
+        }
       }
     }
   }
   let retained = cache ? Buffer.allocUnsafe(32768) : undefined;
+  // Flat fixed-block digests share the existing private cache budget. They let Core verify
+  // an external range independently without retaining a large body or trusting its claimed hash.
+  let proofHashes = cache && reader.readRange ? Buffer.allocUnsafe(1024) : undefined;
+  let proofHash = proofHashes ? createHash("sha256") : undefined; let proofUsed = 0; let proofLength = 0;
+  const finishProof = () => {
+    if (!proofHashes || !proofHash) return;
+    const required = proofLength + 32;
+    if (required > snapshotMaxBytes) { proofHashes = undefined; proofHash = undefined; return; }
+    if (required > proofHashes.length) {
+      const larger = Buffer.allocUnsafe(Math.min(snapshotMaxBytes, proofHashes.length * 2));
+      proofHashes.copy(larger, 0, 0, proofLength); proofHashes = larger;
+    }
+    proofHashes.set(proofHash.digest(), proofLength); proofLength = required;
+    proofHash = createHash("sha256"); proofUsed = 0;
+  };
   const hash = createHash("sha256"); let totalBytes = 0; let contentType: string | undefined;
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   let contractFailure: CapabilityGraphError | undefined;
@@ -75,6 +131,11 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
       }
       const bytes = Uint8Array.from(raw.bytes); contentType = raw.contentType;
       decoder.decode(bytes, { stream: true }); hash.update(bytes);
+      for (let offset = 0; proofHash && offset < bytes.length;) {
+        const end = Math.min(bytes.length, offset + proofBlockBytes - proofUsed);
+        proofHash.update(bytes.subarray(offset, end)); proofUsed += end - offset; offset = end;
+        if (proofUsed === proofBlockBytes) finishProof();
+      }
       if (retained) {
         const required = totalBytes + bytes.length;
         if (required > snapshotMaxBytes) retained = undefined;
@@ -91,18 +152,16 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
     }
     decoder.decode(); options.signal?.throwIfAborted();
     if (contentType === undefined) throw new Error("Missing stream metadata");
+    if (proofUsed) finishProof();
   } catch (error) {
     if (error === contractFailure || (reader === local && error instanceof CapabilityGraphError)) throw error;
     throw new CapabilityGraphError(reader === local ? "CG_SOURCE_UNREADABLE" : "CG_READER_UNAVAILABLE", { nextAction: "repair_source" });
   }
   const summary = { contentId: `k:${hash.digest("hex").slice(0, 16)}`, totalBytes, contentType, source: locatorSource(ref) };
-  if (cache && retained) {
-    cache.delete(key);
-    let cachedBytes = [...cache.values()].reduce((sum, entry) => sum + entry.bytes.length, 0);
-    while (cache.size && (cache.size >= 16 || cachedBytes + totalBytes > snapshotMaxBytes)) {
-      const oldest = cache.keys().next().value!; cachedBytes -= cache.get(oldest)!.bytes.length; cache.delete(oldest);
-    }
-    cache.set(key, { reader, bytes: Buffer.from(retained.subarray(0, totalBytes)), summary });
+  if (cache && (retained || proofHashes)) {
+    const snapshot: Snapshot = { reader, summary, ...(retained ? { bytes: Buffer.from(retained.subarray(0, totalBytes)) }
+      : { hashes: Buffer.from(proofHashes!.subarray(0, proofLength)) }) };
+    rememberSnapshot(cache, key, snapshot);
   }
   return summary;
 }
