@@ -33,4 +33,6 @@
 
 真实 VextJS MCP、TCP Session 及 VextJS/MonSQLize 多 Provider 来源矩阵的命令、前置条件和来源身份见 [examples/vextjs/README.md](../examples/vextjs/README.md)。`scripts/validation/provider-sources.mjs` 使用固定源码目录、实际安装包及可选公开 HTTPS，执行分页、正文与片段证据、跨 Provider 隔离和 reload 验证；独立任务材料位于 `fixtures/vextjs/`。这些入口需要外部固定来源，不属于默认 `npm test`。
 
+`scripts/validation/vextjs-consumer.mjs` 是可选的全新实装消费者验收，需要 Linux/Docker、已构建并核验的 Vext 固定源码及 `mongo:8.0` 镜像。它标准打包并实际安装当前 Core，使用消费者自己的公开入口重跑来源矩阵和原生 MCP，再验证真实路由/schema、插件、数据库分页、Session/CSRF、停库/重启、来源漂移、取消与关闭。持续维护的 verifier 在 `scripts/validation/lib/vextjs-consumer-checks.mjs`；生成的应用、Provider、tarball、日志及报告全部位于仓库外，完成后自建容器及卷释放。业务应用为集成作者编写，知识正文保留可核验原始出处；零模型调用，不证明 Agent 成功率。运行命令与证明边界见上述 README。
+
 真实数据库驱动、模型/Agent 任务、生产容量和长期负载需要对应项目及运行条件；默认回归不能证明这些交付。VextJS 的真实验证需外部固定来源与服务，独立记录执行证据。屏幕阅读器和真实用户走读也需要独立执行证据。CI 声明 Windows/Linux 与 Node 20.19.0、22.12.0、24.19.0，实际通过情况以具体运行记录为准。

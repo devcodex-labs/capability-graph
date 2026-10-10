@@ -15,7 +15,8 @@ import { assertKnowledgeEvidence } from './lib/retrieval-assertions.mjs';
 import { verifyInstalledDocuments } from './lib/package-provenance.mjs';
 
 /** Real direct-source matrix. All generated provider definitions/snapshots are outside the repository. */
-export async function validateProviderSources({ sourceRoot, installedProject, includeHttps = false, sourceIdentity }) {
+export async function validateProviderSources({ sourceRoot, installedProject, includeHttps = false, sourceIdentity,
+  graphClass = CapabilityGraph, knowledgeClass = TextKnowledgeRetriever, readerClass = HttpKnowledgeReader }) {
   sourceRoot = await realpath(sourceRoot); installedProject = await realpath(installedProject);
   const bindings = await bindKnowledgeRoots({ vext: { kind: 'package', packageName: 'vextjs', resolveFrom: installedProject }, mongo: { kind: 'package', packageName: 'monsqlize', resolveFrom: installedProject } });
   const frameworkRoot = bindings.vext.rootDir; const monsqlizeRoot = bindings.mongo.rootDir;
@@ -25,7 +26,7 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
   const temporary = await createTemporaryDirectory('capability-graph-provider-sources-');
   const providers = path.join(temporary, 'providers'); await mkdir(providers);
   const agent = new ProxyAgent();
-  const reader = new HttpKnowledgeReader({ allowedOrigins: ['https://raw.githubusercontent.com'], timeoutMs: 30000,
+  const reader = new readerClass({ allowedOrigins: ['https://raw.githubusercontent.com'], timeoutMs: 30000,
     agentForUrl: () => agent, snapshot: { directory: path.join(temporary, 'snapshots') } });
   let graph;
   try {
@@ -72,10 +73,10 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
         await add('vextjs', capabilityId, knowledgeId, { type: 'http', url }, path.join(sourceRoot, originalPath), query, evidence, 'guide', url);
       }
     }
-    const knowledge = new TextKnowledgeRetriever();
+    const knowledge = new knowledgeClass();
     const monsqlizeRegistry = includeHttps ? await verifyInstalledDocuments({ packageRoot: monsqlizeRoot, lockRoot: sourceRoot,
       outputDirectory: temporary, documents: ['package.json', 'README.md', 'CHANGELOG.md', 'MIGRATION.md'] }) : undefined;
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs', 'monsqlize'], integrationEnabledProviders: ['vextjs', 'monsqlize'], readers: [reader], knowledgeRetriever: knowledge,
+    graph = await graphClass.open({ hostAllowedProviders: ['vextjs', 'monsqlize'], integrationEnabledProviders: ['vextjs', 'monsqlize'], readers: [reader], knowledgeRetriever: knowledge,
       providers: [
         { providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' }, knowledgeRoots: {
           official: { kind: 'directory', rootDir: sourceRoot }, installed: { kind: 'package', packageName: 'vextjs', resolveFrom: installedProject },

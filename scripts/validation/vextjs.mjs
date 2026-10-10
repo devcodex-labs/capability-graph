@@ -13,7 +13,8 @@ import { officialDocumentMappings } from '../../examples/vextjs/official-documen
 import { assertTaskRecall, assertKnowledgeEvidence } from './lib/retrieval-assertions.mjs';
 
 /** Opt-in real framework validation. Run after building Core and examples, with an installed fixed Vext source. */
-export async function validateVextjs({ frameworkRoot, projectRoot, sourceIdentity, sourceRoot = frameworkRoot }) {
+export async function validateVextjs({ frameworkRoot, projectRoot, sourceIdentity, sourceRoot = frameworkRoot,
+  graphClass = CapabilityGraph, capabilityClass = TextCapabilityRetriever, knowledgeClass = TextKnowledgeRetriever }) {
   frameworkRoot = await realpath(frameworkRoot); projectRoot = await realpath(projectRoot);
   sourceRoot = await realpath(sourceRoot);
   const source = await verifyVextSource({ frameworkRoot, sourceRoot, sourceIdentity });
@@ -28,9 +29,9 @@ export async function validateVextjs({ frameworkRoot, projectRoot, sourceIdentit
     const version = JSON.parse(await readFile(path.join(frameworkRoot, 'package.json'), 'utf8')).version;
     const officialDocuments = await officialDocumentMappings(sourceRoot, catalog, source.commit);
     const exported = await exportVextProvider({ catalog, version, source, officialDocuments, outputDir: path.join(temporary, 'provider'), repositoryRoot });
-    const recall = new TextCapabilityRetriever(); const knowledge = new TextKnowledgeRetriever();
+    const recall = new capabilityClass(); const knowledge = new knowledgeClass();
     const runtime = new VextNativeRuntimeAdapter({ client, project: 'pilot', environment: 'verification', projectRoot });
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
+    graph = await graphClass.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
       providers: [{ providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' },
         knowledgeRoots: { official: { kind: 'directory', rootDir: sourceRoot } } }], capabilityRetriever: recall, knowledgeRetriever: knowledge, runtimeAdapters: [runtime] });
     await recall.rebuild(graph);

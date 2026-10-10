@@ -50,6 +50,20 @@ node scripts/validation/provider-sources.mjs /external/fixed-vextjs-source /exte
 
 如果第一项使用实际 tarball 安装根，而不是源码 checkout 的构建目录，第四个参数须传入对应固定源码目录。安装包不包含完整 `website/`，官网章节不能凭空从包中读取。
 
+## 独立实装业务验证
+
+需要已构建的固定 VextJS 源码、Linux/Docker，以及预先安装的 `mongo:8.0` 镜像。在仓库根目录构建 Core 和示例后运行：
+
+```bash
+npm run build && npm run build:tests
+docker pull mongo:8.0
+node scripts/validation/vextjs-consumer.mjs /external/built-fixed-vextjs-source ef926649926e17543562b8169982fa1786285ecf --https
+```
+
+入口创建新的仓库外消费者，实际安装当前 Core 构建包、固定 VextJS 包和 MonSQLize，通过消费者安装包的公开入口执行。文档矩阵与原生 MCP 回读后，串联能力召回、Selection/requires、知识读取/检索和真实 TCP 笔记业务：schema 校验、插件加载与关闭、数据库写入/分页、Session、CSRF 和 logout。业务应用与 requires 是集成作者编写的，知识正文仍按上表核验原始出处。
+
+入口另验证停库后的失败与新实例恢复、文档漂移/旧游标、旧索引/重建、HTTP 缓存回退、取消/超时和资源释放。结果按阶段记录在仓库同级专用目录，保留应用、Provider、依赖锁、打包文件、日志及报告；结束时移除自建 MongoDB 容器及匿名卷。`--https` 证明真实公网来源，省略则只有本地来源证据。它是需要外部前置条件的独立验收，不属于默认合同回归；不证明模型/Agent 成功、Jobs、SSR、热重载或生产负载。
+
 ## 运行证据的覆盖边界
 
 | 来源 | 能证明什么 | 需要额外核验什么 |

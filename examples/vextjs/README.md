@@ -43,6 +43,26 @@ vextjs.mjs 会核验完整 Git SHA、跟踪源未改变、源输入及实际安�
 node scripts/validation/provider-sources.mjs /external/fixed-vextjs-source /external/installed-project FIXED_COMMIT --https
 ```
 
+### 全新实装消费者与真实业务验收
+
+在 Linux、可用 Docker 和已构建的固定 Vext 源码下，下面入口创建全新的仓库外项目，标准打包并实际安装当前 Core 与固定 Vext tarball、lockfile 对应的 MonSQLize。不会使用旧消费者或 node_modules 链接。先安装 Docker 的 `mongo:8.0` 镜像；入口读取其不可变 digest，并记录实际镜像身份。
+
+```bash
+npm run build && npm run build:tests
+docker pull mongo:8.0
+node scripts/validation/vextjs-consumer.mjs /external/built-fixed-vextjs-source ef926649926e17543562b8169982fa1786285ecf --https
+```
+
+`--https` 启用两篇真实公开 URL 与 MonSQLize 注册包完整性核验；省略时仅证明 26 个本地来源用例。Core 通过新项目 `node_modules/@devcodex/capability-graph` 的公开入口执行，并逐文件核对实际安装内容。参考 Reader/词法检索器复制到外部应用，保留源码路径和哈希；不是主包的新导出。原有 28 来源/53 页矩阵和 73 原生条目回读使用这份实装 Core 再验证。
+
+业务验收串联能力召回、显式 Selection、requires 闭包、原文读取与知识片段，再通过公开 `bootstrap` 启动实际 TCP 应用。笔记业务覆盖 schema 转换和拒绝、插件依赖/ready/LIFO close、MonSQLize 真实写入及数据库分页、独立 MongoDB 驱动读回、Session/CSRF/logout。requires 由集成作者依据本应用声明，不冒称原生框架推断。
+
+入口只控制本次创建的本机 MongoDB 容器：停库后请求须报错，停库启动须失败，新实例在重启后须读回原数据。还验证 reload 的旧索引拒绝及重建、文档漂移与旧游标、HTTP 强/弱 ETag、无快照及超缓存预算、实际取消/超时后的恢复和端口释放。恢复使用新应用实例，不承诺在途请求透明恢复。
+
+默认输出为仓库同级 `capability-graph-artifacts/vextjs-e2e-*/`，也可用 `CG_ARTIFACTS_DIR` 指定专用仓库外父目录；保留 `app/`、原生 Provider、lockfile、`archives/`、`logs/`、`reports/verification.json` 和各阶段结果。成功或失败都清理自建容器及匿名卷。再次运行创建新批次，报告明确区分 passed/failed，默认 `npm test` 不会启动 Docker。
+
+保留的 `app/` 含真实 routes/services/plugins 和 `npm start` 入口。另提供自己拥有的 MongoDB，通过 `VEXT_CONSUMER_MONGO_URI` 和可选 `VEXT_CONSUMER_PORT` 配置即可运行业务应用；完整验收仍从仓库入口创建新项目。该阶段的 Linux 本机证据不能替代既有兼容矩阵，也不证明 Jobs、SSR、热重载、生产负载或模型/Agent 任务成功。
+
 该项目需实际安装对应 Vext 快照及 MonSQLize。分别注册 providers/vextjs、providers/monsqlize；使用相同本地能力/知识 ID 验证隔离和 reload。覆盖 19 篇官方章节、两个包各三篇 README/CHANGELOG/MIGRATION、一个显式绑定安装目录，以及固定公开 HTTPS 的长文和短文，共 28 个来源用例。每页核对连续字节偏移、全文/本页哈希及续读标记，完整拼接必须等于原始正文。--https 还按 lockfile integrity 下载 MonSQLize 注册包并核对安装文档原字节。默认 CI 用已由 npm ci 核验的安装依赖执行本地矩阵；公开 HTTPS opt-in 实测单独记录。
 
 每条记录含原始路径/URL、commit 或包身份、角色、语言、转换方式和 SHA-256；真实源、原生封装、作者关联与受控 Fixture 分开标明。完整安装 Vext 包不包含 website，因此网站指南须另绑定官方目录或固定 raw URL。
