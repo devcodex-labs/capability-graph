@@ -76,6 +76,8 @@ test('verified export binds the checkout and committed bytes, including changes 
     const git = (...args) => execFileSync('git', ['-C', options.sourceRoot, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     // Controlled build modules exercise provenance mechanics; real VextJS is a separate CI input.
     for (const [file, body] of [
+      // These fixture documents deliberately contain CRLF; commit the exact bytes on every platform.
+      ['.gitattributes', 'website/docs/zh/** -text\n'],
       ['package.json', JSON.stringify({ name: 'vextjs', version: '2.0.0', type: 'module' })],
       ['scripts/implementation-manifest.mjs', 'export const inspectBuildInputs = () => ({ inputDigest: "controlled", packageVersion: "2.0.0" });'],
       ['src/lib/project/implementation-fingerprint.mjs', 'export const fingerprintImplementationTree = () => "controlled-output";'],
