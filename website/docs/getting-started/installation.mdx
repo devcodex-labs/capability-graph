@@ -16,7 +16,7 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 ## 前置条件
 
 - Node.js `^20.19.0 || >=22.12.0`，与包内 `engines.node` 完全一致。
-- 使用 ESM。主包只提供根入口，不提供 CommonJS `require()` 入口或 `./mcp` 子路径。
+- 使用 ESM。公开入口为包根、`/mcp`、`/mcp/server`、`/readers/http`；不提供 CommonJS `require()` 入口。
 - 后续将创建 Provider 定义文件；安装命令本身不会生成它们。
 
 ## 安装对应版本
@@ -85,9 +85,11 @@ node check.mjs
 
 ## 安装内容
 
-主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及宿主自定义文档 Reader 的合同。固定依赖 `bcp-47` 与 `language-subtag-registry`，用于独立于宿主 ICU 的语言标签校验。
+主包包含Core、TypeScript类型、文件Authority、本地与正式HTTP Reader、共享12查询工具、独立stdio/HTTP服务及CLI。根、`/mcp`、`/mcp/server`、`/readers/http`四个ESM入口各自提供类型；根SDK导入不启动服务或注册配置。
 
-它不安装 HTTP/MCP Server、数据库驱动、向量数据库、RAG 后端或 VextJS Adapter。MCP SDK 仅用于仓库的独立私有示例；要提供 MCP，由接入项目安装 SDK 并实现协议层。
+运行依赖固定server/node/client2.0.0、Ajv8.17.1、toml-eslint-parser0.10.1，以及语言校验的bcp-47和language-subtag-registry。自有SDK宿主显式声明自己使用的SDK。数据库、向量存储、RAG与VextJS执行由相应宿主或独立模块提供。
+
+正常直接全局安装新增CLI时会注册stdio并关闭临时协议探针，不启动常驻HTTP服务；本地/依赖安装、ignore-scripts或无法证明直接目标时跳过自动接入。完整配置、手动register和卸载步骤见[MCP与CLI接入](../integrations/mcp-and-cli)。先确认本次制品包含这些子入口；已发布旧包不会因本地源码变化获得新能力。
 
 ## 常见问题
 
@@ -188,4 +190,4 @@ Provider 内外目录、node_modules 与 URL Reader 都继续支持。文档总�
 
 ## 下一步
 
-在[创建第一个 Provider](./first-provider)中建立两个 JSON 定义和 `discover.mjs`，完成第一次目录查询。安装不会自动注册框架业务能力，也不会启动 API/MCP 服务。
+在[创建第一个Provider](./first-provider)中建立两个JSON定义和discover.mjs，完成第一次目录查询。需要CLI时继续[MCP与CLI](../integrations/mcp-and-cli)；安装不会创建框架业务能力或启动常驻API/MCP服务。

@@ -1,6 +1,11 @@
 # Provider 自有 MCP 示例
 
-本例是独立私有包，不属于 Core 的发布入口。11 个查询工具复用同一 `CapabilityGraph`，不为每项能力单独注册工具。Provider 自己通过 `seed://provider/specification` 资源提供规范正文；Core 关联 Specification Document 元数据并支持显式读取，但不负责 MCP Resource 投递。
+本例是SDKv1私有宿主，通过主包`/mcp`复用12个共享查询工具，使用example_前缀，不为每项能力单独注册工具。Provider通过seed://provider/specification资源提供自己的规范正文。共享工具支持普通JSON与SDKv1/v2，资源和主入口策略仍由宿主决定。
+
+## 目录导航
+
+- [运行](#运行)
+- [共享工具与参数](#共享工具与参数)
 
 ## 运行
 
@@ -13,4 +18,8 @@
 调用方先列 Provider/目录，按任务选择能力，再调用 `example_resolve_selection` 取得 `requires` 闭包，获取详情、关系与所选知识。`example_list_knowledge_members` 和 `example_list_specification_documents` 只返回有界元数据；正文由 `example_read_documents` 或 `example_read_specification` 按需读取。查询级失败以 `isError: true` 返回 Core 的稳定错误码；批量中的单项失败仍保留原位置。
 
 
-固定使用 SDK 1.30.0 和 zod 3.25.76。已核对 [官方 v1 服务端文档](https://ts.sdk.modelcontextprotocol.io/server) 的高层注册和 stdio 接口，以及 [客户端文档](https://ts.sdk.modelcontextprotocol.io/client) 的工具调用与进程传输；不混用 v2 拆包接口。MCP SDK 依赖及锁文件只位于本示例；主包的运行时依赖仅用于 BCP 47 语言标签校验。
+## 共享工具与参数
+
+固定SDK1.30.0，低层Server合并tools/list和tools/call；查询失败为isError=true、text与structuredContent中的{error:{code,message,nextAction}}，部分槽位失败保留Core原结果。定义、输入和范围来自同一toolkit，名称以example_开头。邻居/文档/Selection都用{providerId,capabilityId}完整身份。
+
+主包正式独立服务采用固定SDKv2，当前私有进程使用v1；工具公共类型不依赖SDK或Zod。完整SDKv1/v2及普通JSON用法见[接入教程](https://devcodex-labs.github.io/capability-graph/integrations/mcp-and-cli)。

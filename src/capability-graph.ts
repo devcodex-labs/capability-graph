@@ -1,6 +1,6 @@
 import { CoreHost, type StaticOpenConfig } from "./core-host.js";
 import { CapabilityGraphError } from "./errors.js";
-import { documents, readSpecification, validateDocumentFilters, validateSelection, validateReadBudgetInput,
+import { documents, readSpecification, validateDocumentFilters, validateSelection, validateReadBudgetInput, validateReadSignal,
   type ReadDocumentsQuery, type ReadSpecificationQuery } from "./knowledge/read.js";
 import type { KnowledgeReader } from "./knowledge/types.js";
 import { documentBody, specificationBody, validateBodyQuery, type DocumentBodyQuery, type SpecificationBodyQuery } from "./knowledge/pages.js";
@@ -57,6 +57,8 @@ export class CapabilityGraph {
     const configured = extensions(config);
     return new CapabilityGraph(await CoreHost.open(config), configured);
   }
+  /** Immutable sorted host/integration configuration scope. Performs no source I/O and contains no revisions or paths. */
+  getProviderScope(): readonly string[] { return Object.freeze([...this.host.scope].sort()); }
   /** Serialize refreshes and publish each provider independently; inspect per-provider failures in the result. */
   reload(options: { providerId?: string } = {}) { return this.host.reload(queryObject(options)); }
   /**
@@ -94,7 +96,7 @@ export class CapabilityGraph {
     queryObject(query);
     try { arrayBudget(ids, this.host.budgets.detail.maxCapabilities); }
     catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
-    const scope = query.requiredStaticRevision === undefined ? undefined : refScope(ids);
+    const scope = query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(ids));
     return this.host.query(scope, query.requiredStaticRevision, (ctx) => details(ctx, ids, query, this.host.budgets));
   }
   /** Continue a known Collection's members without reading any document bodies. */
@@ -120,6 +122,7 @@ export class CapabilityGraph {
   /** Read selected top-level Documents or explicit Collection member IDs; never concatenate a Collection. */
   readDocuments(query: ReadDocumentsQuery) {
     queryObject(query);
+    validateReadSignal(query.signal);
     validateReadBudgetInput(query, this.host.budgets);
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
@@ -140,7 +143,7 @@ export class CapabilityGraph {
   }
   /** Explicitly read selected Provider Specification documents; discovery never triggers this call. */
   readSpecification(query: ReadSpecificationQuery) {
-    queryObject(query); this.host.assertAllowed(query.providerId);
+    queryObject(query); validateReadSignal(query.signal); this.host.assertAllowed(query.providerId);
     validateReadBudgetInput(query, this.host.budgets); validateDocumentFilters(query);
     return this.host.query([query.providerId], query.requiredStaticRevision,
       (ctx) => readSpecification(ctx, query, this.host.budgets, this.extensions.readers));
@@ -178,7 +181,7 @@ export class BoundProviderGraph {
     return this.host.query([this.providerId], query.requiredStaticRevision, (ctx) => catalog(ctx, query, this.host.budgets, this.providerId));
   }
   /** Resolve provider-local string IDs, retaining the original input slots. */
-  getCapabilities(ids: readonly string[], query: CapabilityDetailQuery = {}) {
+  getCapabilities(ids: readonly string[], query: Omit<CapabilityDetailQuery, "requestProviderScope"> = {}) {
     boundQuery(query);
     try { arrayBudget(ids, this.host.budgets.detail.maxCapabilities); }
     catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
@@ -210,6 +213,7 @@ export class BoundProviderGraph {
   /** Read associated Documents; selected contains provider-local string IDs, not canonical objects. */
   readDocuments(query: Omit<ReadDocumentsQuery, "requestProviderScope" | "selected"> & { readonly selected: readonly string[] }) {
     boundQuery(query); if (!Array.isArray(query.selected)) inputInvalid();
+    validateReadSignal(query.signal);
     validateReadBudgetInput(query, this.host.budgets);
     const normalized = { ...query, selected: query.selected.map((capabilityId) => ({ capabilityId })) };
     validateSelection(normalized);
@@ -230,7 +234,7 @@ export class BoundProviderGraph {
   }
   /** Read this Provider's Specification only when explicitly requested. */
   readSpecification(query: Omit<ReadSpecificationQuery, "providerId"> = {}) {
-    boundQuery(query); validateReadBudgetInput(query, this.host.budgets); validateDocumentFilters(query);
+    boundQuery(query); validateReadSignal(query.signal); validateReadBudgetInput(query, this.host.budgets); validateDocumentFilters(query);
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => readSpecification(ctx, { ...query, providerId: this.providerId }, this.host.budgets, this.extensions.readers));
   }

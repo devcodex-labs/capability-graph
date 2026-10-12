@@ -11,7 +11,40 @@ npm view @devcodex/capability-graph@2.0.0 version
 npm install @devcodex/capability-graph@2.0.0
 ```
 
-Node.js：`^20.19.0 || >=22.12.0`。主包只有 ESM 根入口，包含 TypeScript 类型；固定依赖仅为 BCP 47 解析器与语言注册表。2.0 移除了数据库权威来源、能力召回、知识检索和 Runtime，升级前查看[2.0 迁移清单](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/2.0.0.md)。已发布的 1.1.0 与其 tag 保留原有接口。
+Node.js：`^20.19.0 || >=22.12.0`。ESM 与 TypeScript 类型覆盖根 SDK、`/mcp`、`/mcp/server`、`/readers/http` 四个入口；CLI 名称为 `capability-graph`。根 SDK 导入不会启动服务或注册配置。2.0 移除了数据库权威来源、能力召回、知识检索和 Runtime，升级前查看[2.0 迁移清单](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/2.0.0.md)。已发布的 1.1.0 与其 tag 保留原有接口。
+
+## 目录导航
+
+- [当前版本与安装](#当前版本与安装)
+- [最小接入](#最小接入)
+- [MCP工具、服务与CLI](#mcp工具服务与cli)
+- [能做什么](#能做什么)
+- [职责边界](#职责边界)
+- [示例、验证与维护](#示例验证与维护)
+
+## MCP工具、服务与CLI
+
+以下能力对应本次源码与本地打包制品，使用 Registry 前核验确切版本及子入口。未发布时，在当前对应源码根运行 `npm ci`、`npm pack --pack-destination ../packages`，安装本次生成的 tgz；公开站和源码不会自动发布。
+
+| 方式 | 入口与资源归属 |
+|---|---|
+| 普通JSON / 自有模型宿主 | `/mcp` 的 `createCapabilityGraphToolkit(graph)`；12个冻结JSON Schema，宿主决定调用流程，借用graph |
+| SDK v1/v2内嵌 | 同一toolkit分别接低层Server或McpServer.registerTool；可合并Provider自有工具和渐进发现 |
+| 独立stdio/HTTP | `/mcp/server` 的 `createCapabilityGraphServer`；默认127.0.0.1:3333/mcp，借用graph，调用方负责关闭Reader/graph |
+| 全局CLI | `serve/provider/codex/doctor/assist`；服务配置增删下次启动生效 |
+| HTTP文档 | `/readers/http` 的 `HttpKnowledgeReader`；精确Origin、UTF-8字节、取消和可选快照，宿主关闭Reader及自己的Agent |
+
+默认账户配置为 `~/.capability-graph/config.json`，最小内容 `{"schemaVersion":1,"providers":[]}`；`--config`可显式选择文件。下面命令以已有本地打包制品为前提：
+
+```sh
+npm install -g ./packages/devcodex-capability-graph-2.0.0.tgz
+capability-graph provider add --id acme.http --root /absolute/path/providers/acme-http --layout directory
+capability-graph doctor --json
+```
+
+第一条只有在能证明正常直接全局安装时自动注册stdio并完成临时协议探针；不会创建虚构Provider。`--ignore-scripts`、本地/依赖安装或无法证明直接目标时，可运行 `capability-graph codex register`。`provider add --root`填写你实际的目录，示例路径需替换；Provider ID须与该目录的provider.json一致。添加配置后重新启动服务。
+
+诊断分别返回 `installed/configRegistered/localProtocolVerified/clientConnected`；临时探针通过后，外部Codex客户端连接仍可为`unknown`。完整示例、变量来源、配置默认值与排错见[MCP与CLI接入](https://devcodex-labs.github.io/capability-graph/integrations/mcp-and-cli)。卸载前运行 `capability-graph codex unregister`，再 `npm uninstall -g @devcodex/capability-graph`；Provider资料和配置保留。
 
 ## 最小接入
 
@@ -96,12 +129,12 @@ try {
 
 能力图谱负责声明与查询。能力执行、Agent 意图判断、业务项目状态、RAG 的分块索引/Embedding/数据库/排名以及回答生成由宿主或独立模块负责。这里的文档分页是原文访问，不是知识检索。未来 RAG 可以使用公开能力身份、文档引用和分页接口，自行管理索引；主包不预留空检索框架。
 
-MCP 工具名称、认证与协议属于接入项目；主包没有 MCP 子入口。自定义 Reader 是进程内受信任代码，Provider scope 不是执行沙箱。
+共享MCP工具层提供12个查询，独立服务处理协议、入站校验和请求生命周期。Provider可在自己的宿主合并工具、资源和渐进发现策略。自定义Reader是进程内受信任代码，Provider scope不隔离进程。
 
 ## 示例、验证与维护
 
 - [Seed API](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-api)：图谱发现、选择、文档与规范的完整链路。
-- [Seed MCP](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-mcp)：独立私有包，11 个查询工具及规范 Resource。
+- [Seed MCP](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-mcp)：SDK v1私有宿主，复用12个共享查询工具并保留Provider自有规范Resource。
 - [HTTP Reader](https://github.com/devcodex-labs/capability-graph/tree/main/examples/http-reader)：真实 HTTP、原字节分页、ETag、取消和资源清理。
 - [VextJS](https://github.com/devcodex-labs/capability-graph/tree/main/examples/vextjs)：固定来源的官方文档主题、安装包及 URL 读取；验证说明与实际执行范围一致。
 
@@ -109,6 +142,8 @@ MCP 工具名称、认证与协议属于接入项目；主包没有 MCP 子入�
 npm ci
 npm test
 npm run test:package
+npm run test:consumers
+npm run test:install
 npm run evaluate
 npm run demo:http
 npm run evaluate:capacity

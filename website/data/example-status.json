@@ -142,6 +142,18 @@
     ]
   },
   {
+    "id": "mcp-cli-integration",
+    "status": "Runnable",
+    "source": "docs/integrations/mcp-and-cli.mdx",
+    "verify": "npm run test:integration:built",
+    "runDir": ".",
+    "prerequisites": ["root: npm ci", "root: npm run build", "使用本次源码生成的tgz及页面指定SDK版本"],
+    "entry": "页面setup/toolkit/server-v1/server-v2/client/http-server/http-client/reader与cg.config.json",
+    "proof": "冷包消费、页面原样JSON与双SDK/HTTP交换、CLI配置和真实HTTP原字节分页；不证明模型服务或用户Codex当前连接",
+    "userResponsibilities": ["配置自己的Provider与来源", "宿主管理认证、模型API适配和借用资源"],
+    "claims": ["shared JSON tools", "SDK v1/v2 bridge", "standalone HTTP", "formal HTTP Reader"]
+  },
+  {
     "id": "remote-reader",
     "status": "Runnable",
     "source": "../examples/http-reader",
@@ -153,7 +165,7 @@
     "entry": "npm run demo:http",
     "proof": "真实 HTTP 原字节分页、来源变化、ETag、取消与清理",
     "userResponsibilities": [
-      "实现实际后端",
+      "配置实际文档来源",
       "配置访问与生命周期"
     ],
     "claims": [

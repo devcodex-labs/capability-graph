@@ -46,7 +46,7 @@ test("large-source ranges are independently verified; invalid metadata or forged
     assert.equal(scans, before + 1, "an unavailable range falls back to a complete verified scan");
     mode = "valid";
     const controller = new AbortController(); controller.abort(); const beforeRange = ranges;
-    await assert.rejects(bound.readDocumentPage({ ...query, cursor: first.nextCursor, signal: controller.signal }), { code: "CG_READER_UNAVAILABLE" });
+    assert.throws(() => bound.readDocumentPage({ ...query, cursor: first.nextCursor, signal: controller.signal }), { name: "AbortError" });
     assert.equal(ranges, beforeRange);
   } finally { await graph.close(); }
 });

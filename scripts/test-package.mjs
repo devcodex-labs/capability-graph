@@ -45,7 +45,7 @@ try {
   await assert.rejects(realpath(path.join(snapshot, "dist/stale.js")), { code: "ENOENT" });
   console.log("Clean-source standard pack and stale-output rebuild passed (offline, no dist copied)");
   for (const file of packed.files) {
-    assert.ok(["package.json", "README.md", "LICENSE"].includes(file.path) || file.path.startsWith("dist/"),
+    assert.ok(["package.json", "README.md", "LICENSE", "scripts/postinstall.mjs"].includes(file.path) || file.path.startsWith("dist/"),
       `Unexpected package file: ${file.path}`);
   }
   assert(packed.files.every((file) => !/dist\/(?:runtime|retrieval)\/|database-authority-store/.test(file.path)), 'Removed modules must not ship');
@@ -62,9 +62,11 @@ try {
     /README package link has no shipped target/);
   console.log("Installed README links and source-only link negative control passed");
   const metadata = JSON.parse(await readFile(path.join(installed, "package.json"), "utf8"));
-  assert.deepEqual(Object.keys(metadata.exports), ["."]);
-  assert.deepEqual(metadata.dependencies, { "bcp-47": "2.1.1", "language-subtag-registry": "0.4.2" });
-  for (const file of packed.files.filter((item) => item.path.endsWith(".js"))) {
+  assert.deepEqual(Object.keys(metadata.exports), [".", "./mcp", "./mcp/server", "./readers/http"]);
+  assert.deepEqual(metadata.dependencies, { "@modelcontextprotocol/server": "2.0.0", "@modelcontextprotocol/node": "2.0.0", "@modelcontextprotocol/client": "2.0.0", "ajv": "8.17.1", "toml-eslint-parser": "0.10.1", "bcp-47": "2.1.1", "language-subtag-registry": "0.4.2" });
+  assert.deepEqual(metadata.bin, { 'capability-graph': './dist/cli/main.js' });
+  assert.ok(packed.files.some(file => file.path === 'scripts/postinstall.mjs'));
+  for (const file of packed.files.filter((item) => item.path.endsWith(".js") && !/^dist\/(?:mcp|cli)\//.test(item.path))) {
     assert.doesNotMatch(await readFile(path.join(installed, file.path), "utf8"), /@modelcontextprotocol|fixture-runtime-adapter|fake-.*retriever/);
   }
   const output = command(["--input-type=module", "--eval", `
@@ -77,7 +79,9 @@ try {
     assert.equal(api.resolveBudgets, undefined);
     assert.equal(api.bindCapabilityId, undefined);
     for (const name of ['retrieveCapabilities', 'queryKnowledge', 'queryRuntime']) assert.equal(name in api.CapabilityGraph.prototype, false);
-    await assert.rejects(import('@devcodex/capability-graph/mcp'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+    assert.equal(typeof (await import('@devcodex/capability-graph/mcp')).createCapabilityGraphToolkit, 'function');
+    assert.equal(typeof (await import('@devcodex/capability-graph/mcp/server')).createCapabilityGraphServer, 'function');
+    assert.equal(typeof (await import('@devcodex/capability-graph/readers/http')).HttpKnowledgeReader, 'function');
     await assert.rejects(import('@devcodex/capability-graph/hash'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
     console.log('Installed tarball runtime checks passed');
   `], temporary);

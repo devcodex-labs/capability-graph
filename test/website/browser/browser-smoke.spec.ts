@@ -22,7 +22,9 @@ test('browser smoke: keyboard search navigates and Escape restores focus', async
   await button.click(); await input.fill('MCP');
   const first = page.locator('.rp-search-panel__results a').first();
   await expect(first).toBeVisible();
-  const href = await first.getAttribute('href');
+  // The search engine initially selects index 0; ArrowDown selects index 1 when available.
+  const links = page.locator('.rp-search-panel__results a');
+  const href = await links.nth(await links.count() > 1 ? 1 : 0).getAttribute('href');
   await input.press('ArrowDown'); await input.press('Enter');
   await expect(page).toHaveURL(new URL(href!, page.url()).href);
   await expect(page.getByRole('main').locator('h1')).toBeVisible();

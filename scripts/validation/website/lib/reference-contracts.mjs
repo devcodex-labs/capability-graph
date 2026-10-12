@@ -16,6 +16,7 @@ function rowsAfter(source, heading) {
 }
 
 function jsonFence(source, title) {
+  source = source.replaceAll('\r\n', '\n');
   const marker = '```json title="' + title + '"\n';
   const start = source.indexOf(marker);
   assert(start !== -1, `missing reference example: ${title}`);

@@ -1,71 +1,29 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import { CapabilityGraph, CapabilityGraphError, parseQualifiedId } from "@devcodex/capability-graph";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { ListToolsRequestSchema, CallToolRequestSchema, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CapabilityGraph, CapabilityGraphError } from "@devcodex/capability-graph";
+import { createCapabilityGraphToolkit } from "@devcodex/capability-graph/mcp";
 
-const id = z.object({ providerId: z.string(), capabilityId: z.string() });
-const scope = { requestProviderScope: z.array(z.string()).optional(), requiredStaticRevision: z.string().optional() };
-const result = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
-async function call(operation: () => Promise<unknown>) {
-  try { return result(await operation()); }
-  catch (error) {
-    const known = error instanceof CapabilityGraphError;
-    return { ...result({ code: known ? error.code : "CG_PARTIAL_ITEM", message: known ? error.message : "The query failed.",
-      nextAction: known ? error.nextAction : "repair_source", ...(known && error.details ? { details: error.details } : {}) }), isError: true };
-  }
-}
-
-/** Tool names belong to this Provider example; the library has no MCP registry. */
-export function createSeedServer(graph: CapabilityGraph, providerRoot: string): McpServer {
-  const server = new McpServer({ name: "seed-http", version: "0.1.0" });
-  server.registerTool("example_list_providers", { description: "List enabled Provider metadata.", inputSchema: scope },
-    (query) => call(() => graph.listProviders(query)));
-  server.registerTool("example_list_catalog", { description: "Browse static capabilities within an explicit scope and budget.", inputSchema: {
-    ...scope, limit: z.number().int().positive().optional(), cursor: z.string().optional(), capabilityIdPrefix: z.string().optional(), parent: id.optional(),
-  } }, (query) => call(() => graph.listCatalog(query)));
-  server.registerTool("example_get_capabilities", { description: "Read bounded details for explicitly identified capabilities.", inputSchema: {
-    ids: z.array(id), requiredStaticRevision: z.string().optional(), neighborLimitPerKind: z.number().int().nonnegative().optional(), knowledgeLimit: z.number().int().positive().optional(),
-    knowledgeCursors: z.record(z.string()).optional(),
-  } }, ({ ids, ...query }) => call(() => graph.getCapabilities(ids, query)));
-  server.registerTool("example_get_neighbors", { description: "Browse declared graph relations without implicitly selecting them.", inputSchema: {
-    qualifiedId: z.string(), requiredStaticRevision: z.string().optional(), limitPerKind: z.number().int().positive().optional(),
-    kinds: z.array(z.enum(["parents", "children", "specializes", "specializedBy", "related", "relatedBy", "requires", "requiredBy"])).optional(),
-    cursors: z.object({ parents: z.string().optional(), children: z.string().optional(), specializes: z.string().optional(),
-      specializedBy: z.string().optional(), related: z.string().optional(), relatedBy: z.string().optional(),
-      requires: z.string().optional(), requiredBy: z.string().optional() }).optional(),
-  } }, ({ qualifiedId, ...query }) => call(() => graph.getNeighbors(parseQualifiedId(qualifiedId), query)));
-  server.registerTool("example_resolve_selection", { description: "Resolve explicitly selected capabilities and their required context.", inputSchema: {
-    selected: z.array(id), requestProviderScope: z.array(z.string()).optional(),
-    requiredStaticRevisionByProvider: z.record(z.string()).optional(),
-  } }, (query) => call(() => graph.resolveSelection(query)));
-  server.registerTool("example_list_knowledge_members", { description: "Page a declared Collection's document members.", inputSchema: {
-    qualifiedId: z.string(), collectionId: z.string(), cursor: z.string().optional(), limit: z.number().int().positive().optional(),
-    requiredStaticRevision: z.string().optional(),
-  } }, ({ qualifiedId, ...query }) => call(() => graph.listKnowledgeMembers({ ...query, capability: parseQualifiedId(qualifiedId) })));
-  server.registerTool("example_list_specification_documents", { description: "Page one Provider's Specification document metadata.", inputSchema: {
-    providerId: z.string(), cursor: z.string().optional(), limit: z.number().int().positive().optional(),
-    requiredStaticRevision: z.string().optional(),
-  } }, (query) => call(() => graph.listSpecificationDocuments(query)));
-  server.registerTool("example_read_documents", { description: "Read documents declared by the selected capabilities.", inputSchema: {
-    ...scope, selected: z.array(id), knowledgeIds: z.array(z.string()).optional(), roles: z.array(z.string()).optional(),
-    locales: z.array(z.string()).optional(),
-  } }, (query) => call(() => graph.readDocuments(query)));
-  const bodyPage = { knowledgeId: z.string(), startOffset: z.number().int().nonnegative().optional(),
-    maxBytes: z.number().int().positive().optional(), cursor: z.string().optional(), requiredStaticRevision: z.string().optional() };
-  server.registerTool("example_read_document_page", { description: "Read a document page. For large sources, decide whether to continue with nextCursor. Full-document and page hashes are separate.", inputSchema: {
-    ...bodyPage, capability: id,
-  } }, (query, extra) => call(() => graph.readDocumentPage({ ...query, signal: extra.signal })));
-  server.registerTool("example_read_specification_page", { description: "Read one Specification document page and optionally continue with its version-bound cursor.", inputSchema: {
-    ...bodyPage, providerId: z.string(),
-  } }, (query, extra) => call(() => graph.readSpecificationPage({ ...query, signal: extra.signal })));
-  server.registerTool("example_read_specification", { description: "Explicitly read selected Specification documents from one Provider.", inputSchema: {
-    providerId: z.string(), knowledgeIds: z.array(z.string()).optional(), locales: z.array(z.string()).optional(),
-    requiredStaticRevision: z.string().optional(),
-  } }, (query) => call(() => graph.readSpecification(query)));
-  server.registerResource("provider-specification", "seed://provider/specification", { mimeType: "text/markdown" }, async (uri) => {
+/** SDK v1 host: shared JSON query tools and a Provider-owned Specification resource coexist. The caller owns graph lifetime. */
+export function createSeedServer(graph: CapabilityGraph, _providerRoot: string): Server {
+  const toolkit = createCapabilityGraphToolkit(graph, { namePrefix: "example_" });
+  const server = new Server({ name: "seed-http", version: "0.1.0" }, { capabilities: { tools: {}, resources: {} } });
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: toolkit.listTools().map(tool => ({ ...tool, inputSchema: tool.inputSchema as { type: "object" } })),
+  }));
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    // A host with its own tools merges names here before falling through; do not overwrite an existing host handler.
+    const output = await toolkit.callTool(request.params.name, request.params.arguments ?? {}, { signal: extra.signal });
+    return { ...output, content: [...output.content] };
+  });
+  server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: [
+    { name: "provider-specification", uri: "seed://provider/specification", mimeType: "text/markdown" },
+  ] }));
+  server.setRequestHandler(ReadResourceRequestSchema, async request => {
+    if (request.params.uri !== "seed://provider/specification") throw new CapabilityGraphError("CG_NOT_FOUND", { nextAction: "fix_input" });
     const batch = await graph.forProvider("seed.http").readSpecification({ knowledgeIds: ["SPEC-01"] });
     const slot = batch.results[0];
     if (!slot || !slot.ok) throw new CapabilityGraphError(slot && !slot.ok ? slot.error.code : "CG_NOT_FOUND", { nextAction: "repair_source" });
-    return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: slot.value.text }] };
+    return { contents: [{ uri: request.params.uri, mimeType: "text/markdown", text: slot.value.text }] };
   });
   return server;
 }

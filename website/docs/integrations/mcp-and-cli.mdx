@@ -1,0 +1,338 @@
+---
+title: MCP与CLI接入
+description: 共享JSON工具、SDKv1/v2、独立服务、全局CLI及正式HTTP Reader的实际用法。
+---
+
+# MCP与CLI接入
+
+本页对应当前源码和本地打包制品。先按[安装页](../getting-started/installation)取得与本页一致的包；未发布时安装相应源码生成的tgz。不要用旧Registry包运行新增子入口。
+
+## 目录导航
+
+- [准备一个可复用的graph](#准备一个可复用的graph)
+- [1 普通JSON工具与模型宿主](#1-普通json工具与模型宿主)
+- [2 SDK v1宿主](#2-sdk-v1宿主)
+- [3 SDK v2宿主](#3-sdk-v2宿主)
+- [4 独立stdio与HTTP服务](#4-独立stdio与http服务)
+- [5 全局CLI与配置](#5-全局cli与配置)
+- [6 HTTP Reader](#6-http-reader)
+- [工具参数、结果与恢复](#工具参数结果与恢复)
+
+| 使用目标 | 入口 | 谁关闭资源 |
+|---|---|---|
+| 直接查询图谱 | 包根SDK | 创建graph的程序 |
+| 给自有模型宿主提供JSON工具 | `/mcp` | toolkit借用graph，宿主关闭graph/Reader |
+| 加入已有SDK v1/v2宿主 | 同一toolkit，宿主适配SDK | 宿主先关协议，再关自己创建的Reader/graph |
+| 独立stdio/HTTP进程 | CLI或`/mcp/server` | CLI自动管理；SDK handle借用graph，调用方管理 |
+| 读取声明的HTTP原文 | `/readers/http` | 宿主关闭Reader，自己创建的Agent也由宿主关闭 |
+
+## 准备一个可复用的graph
+
+先完成[第一个Provider](../getting-started/first-provider)，使本目录拥有`providers/acme-http/provider.json`与`capabilities/route.json`。本页前五种接入的查询目标是该`acme.http/route`，无需文档、远程地址或业务服务。
+
+在同一个消费项目根保存下面的`setup.mjs`。它是后续`openDemoGraph`变量的完整来源；每个程序调用一次，获得自己拥有的graph。
+
+```js title="setup.mjs"
+import { fileURLToPath } from 'node:url';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+
+export function openDemoGraph() {
+  return CapabilityGraph.open({
+    hostAllowedProviders: ['acme.http'],
+    integrationEnabledProviders: ['acme.http'],
+    providers: [{ providerId: 'acme.http', authority: {
+      kind: 'file', definitionLayout: 'directory',
+      rootDir: fileURLToPath(new URL('./providers/acme-http/', import.meta.url))
+    } }]
+  });
+}
+```
+
+这两份范围名单的交集是宿主上限，`providers`提供真实来源。后续工具请求只能收窄；配置Reader不会自动改写任何文档locator。
+
+## 1 普通JSON工具与模型宿主
+
+保存`toolkit.mjs`并运行`node toolkit.mjs`。这里模拟模型提出的一个工具请求，真正调用共享分派器，不调用模型服务或创建聊天循环。
+
+```js title="toolkit.mjs"
+import { createCapabilityGraphToolkit } from '@devcodex/capability-graph/mcp';
+import { openDemoGraph } from './setup.mjs';
+
+const graph = await openDemoGraph();
+try {
+  const toolkit = createCapabilityGraphToolkit(graph, { allowedProviders: ['acme.http'] });
+  const definitions = toolkit.listTools(); // 固定12个普通JSON Schema；可交给你的模型API适配器。
+  const request = { name: 'capability_graph_list_catalog', arguments: { limit: 20 } };
+  const reply = await toolkit.callTool(request.name, request.arguments);
+  if (reply.isError) throw new Error(JSON.stringify(reply.structuredContent));
+  const value = reply.structuredContent;
+  console.log(JSON.stringify({
+    toolCount: definitions.length,
+    catalog: value.items.map(item => item.id.capabilityId),
+    scope: value.meta.scope
+  }));
+} finally { await graph.close(); }
+```
+
+预期`toolCount=12`、`catalog=["route"]`、`scope=["acme.http"]`。模型API若要求`parameters`字段，把`definition.inputSchema`原样放入该字段；模型回传的JSON参数交给`callTool`。模型SDK的格式转换由你的宿主负责。
+
+| toolkit选项 | 省略时 | 配置含义 |
+|---|---|---|
+| namePrefix | `capability_graph_` | 非空ASCII字母/数字/下划线/连字符；最终名称最多128字符 |
+| allowedProviders | `graph.getProviderScope()` | 必须是graph配置范围的子集；`[]`合法，表示无Provider访问权限 |
+| maxToolResultBytes | `16777216`字节 | 完整text、structuredContent和工具外壳的UTF-8体积，超限返回可恢复诊断，不截JSON |
+
+`callTool(name, arguments, {signal})`的第三个参数属于宿主。不能把signal放进模型JSON；预取消不调用Core。四正文接口等待受控I/O清理后结束取消；忽略signal的第三方Reader只能等其返回。
+
+结果字节限额约束成功数据的完整外壳。超限和输入错误仍返回最小诊断外壳，因此非常小的限额可能小于诊断本身；它不等于HTTP传输帧的硬上限。
+
+## 2 SDK v1宿主
+
+消费项目显式安装`@modelcontextprotocol/sdk@1.30.0`。下面完整Server使用低层API接入普通JSON工具，并追加一个Provider自己的主入口工具；该工具真实读取`route`摘要，保留原批量错误。
+
+```js title="server-v1.mjs"
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { createCapabilityGraphToolkit } from '@devcodex/capability-graph/mcp';
+import { openDemoGraph } from './setup.mjs';
+
+const graph = await openDemoGraph();
+const toolkit = createCapabilityGraphToolkit(graph);
+const mainTool = { name: 'provider_main_entries', description: '只列出Provider显式主入口。',
+  inputSchema: { type: 'object', properties: {}, additionalProperties: false } };
+const server = new Server({ name: 'acme-host', version: '1' }, { capabilities: { tools: {} } });
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [mainTool, ...toolkit.listTools()] }));
+server.setRequestHandler(CallToolRequestSchema, async (request, context) => {
+  if (request.params.name === mainTool.name) {
+    if (Object.keys(request.params.arguments ?? {}).length) {
+      const value = { error: { code: 'PROVIDER_INPUT_INVALID', message: 'provider_main_entries只接受空参数对象。', nextAction: 'fix_input' } };
+      return { isError: true, content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value };
+    }
+    const batch = await graph.forProvider('acme.http').getCapabilities(['route']);
+    const value = { ...batch, results: batch.results.map(slot => slot.ok
+      ? { ...slot, value: { id: slot.value.id, name: slot.value.name, whenToUse: slot.value.whenToUse } } : slot) };
+    return { content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value };
+  }
+  return toolkit.callTool(request.params.name, request.params.arguments ?? {}, { signal: context.signal });
+});
+let closing;
+const close = () => closing ??= (async () => { try { await server.close(); } finally { await graph.close(); } })();
+process.once('SIGTERM', close); process.once('SIGINT', close); process.stdin.once('end', close);
+await server.connect(new StdioServerTransport());
+```
+
+`tools/list`在此宿主返回13个工具，其中12个来自共享层。v1低层handler不会替自有工具校验参数，所以主入口分支自己拒绝非空参数；共享12工具由toolkit校验。已有宿主应把这两个分支并入自己的路由，保留现有处理器。需要完整五工具渐进链和Specification Resource时，继续[Provider自有MCP](./provider-owned-mcp)。
+
+## 3 SDK v2宿主
+
+消费项目显式安装`@modelcontextprotocol/server@2.0.0`与`@modelcontextprotocol/client@2.0.0`。SDKv2使用`fromJsonSchema`和`context.mcpReq.signal`，与v1的接口路径不同。
+
+```js title="server-v2.mjs"
+import { McpServer, fromJsonSchema } from '@modelcontextprotocol/server';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { createCapabilityGraphToolkit } from '@devcodex/capability-graph/mcp';
+import { openDemoGraph } from './setup.mjs';
+
+const graph = await openDemoGraph();
+const toolkit = createCapabilityGraphToolkit(graph);
+const handle = serveStdio(() => {
+  const server = new McpServer({ name: 'acme-v2-host', version: '1' });
+  for (const definition of toolkit.listTools()) {
+    server.registerTool(definition.name, {
+      description: definition.description, inputSchema: fromJsonSchema(definition.inputSchema),
+      annotations: definition.annotations
+    }, (args, context) => toolkit.callTool(definition.name, args, { signal: context.mcpReq.signal }));
+  }
+  return server;
+}, { legacy: 'serve' });
+let closing;
+const close = () => closing ??= (async () => { try { await handle.close(); } finally { await graph.close(); } })();
+process.once('SIGTERM', close); process.once('SIGINT', close); process.stdin.once('end', close);
+```
+
+下面的完整Client可以启动上面的v1或v2Server。保存为`client.mjs`，运行`node client.mjs server-v1.mjs`或`node client.mjs server-v2.mjs`；传入文件名决定启动哪一个宿主。
+
+```js title="client.mjs"
+import { fileURLToPath } from 'node:url';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+const serverFile = process.argv[2] ?? 'server-v2.mjs';
+const transport = new StdioClientTransport({ command: process.execPath,
+  args: [fileURLToPath(new URL(serverFile, import.meta.url))], stderr: 'inherit' });
+const client = new Client({ name: 'acme-client', version: '1' });
+try {
+  await client.connect(transport);
+  const tools = await client.listTools();
+  if (tools.tools.some(tool => tool.name === 'provider_main_entries')) {
+    const main = await client.callTool({ name: 'provider_main_entries', arguments: {} });
+    if (main.isError || main.structuredContent.results[0]?.value?.id?.capabilityId !== 'route') throw new Error('自有主入口结果不符');
+    const invalid = await client.callTool({ name: 'provider_main_entries', arguments: { unexpected: true } });
+    if (!invalid.isError) throw new Error('自有工具未拒绝额外参数');
+  }
+  const reply = await client.callTool({ name: 'capability_graph_list_catalog', arguments: {} });
+  if (reply.isError) throw new Error(JSON.stringify(reply));
+  console.log(JSON.stringify({ catalog: reply.structuredContent.items.map(item => item.id.capabilityId) }));
+} finally { await client.close(); }
+```
+
+两次调用均应输出`catalog=["route"]`；Client关闭并等待它启动的子进程退出。Server stdout用于协议，程序日志写stderr。
+
+## 4 独立stdio与HTTP服务
+
+已有graph时可以直接使用服务handle。这个完整脚本使用port=0让系统分配回环端口，便于重复运行；stderr给出实际URL。Ctrl+C关闭handle后，再关闭本程序创建的graph。CLI缺省端口仍为3333。
+
+```js title="http-server.mjs"
+import { createCapabilityGraphServer } from '@devcodex/capability-graph/mcp/server';
+import { openDemoGraph } from './setup.mjs';
+const graph = await openDemoGraph();
+const server = createCapabilityGraphServer({ graph, transport: 'http', http: { port: 0 } });
+let closing;
+const close = () => closing ??= (async () => { try { await server.close(); } finally { await graph.close(); } })();
+process.once('SIGINT', close); process.once('SIGTERM', close);
+process.stdin.once('end', close); process.stdin.resume(); // 管道关闭也会结束自己拥有的服务。
+console.error(JSON.stringify(await server.start())); // url包含本次分配的端口，把它交给下面Client。
+```
+
+在另一个终端运行`node http-client.mjs 实际URL`，URL取自上面stderr；未传参时使用CLI默认端点。请求头与body包含一致的2026协议元数据；HTTP响应为SSE，下面打印完整响应以便查看目录与metadata。
+
+```js title="http-client.mjs"
+const response = await fetch(process.argv[2] ?? 'http://127.0.0.1:3333/mcp', {
+  method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream',
+    'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'capability_graph_list_catalog' },
+  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {
+    name: 'capability_graph_list_catalog', arguments: {}, _meta: {
+      'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+      'io.modelcontextprotocol/clientInfo': { name: 'acme-http-client', version: '1' },
+      'io.modelcontextprotocol/clientCapabilities': {}
+    }
+  } })
+});
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+console.log(await response.text());
+```
+
+独立服务支持2025-11-25与2026-07-28；未知版本明确拒绝。旧HTTP是stateless POST，GET/DELETE返回405。现代HTTP无GET事件通道或协议session；关闭该请求的响应流会取消该请求，其他客户端继续工作。SDKhandle的`start/close`幂等，关闭后不能重新启动。`graph/Reader`由调用方关闭。
+
+## 5 全局CLI与配置
+
+本地制品安装示例：`npm install -g ./packages/devcodex-capability-graph-2.0.0.tgz`。实际tgz文件名取自本次pack结果。直接全局安装成功时会注册stdio、生成合法空配置、执行并关闭临时协议探针；不会启动常驻HTTP服务。
+
+已有Provider时，保存以下完整`cg.config.json`到消费项目根。相对来源路径按这个配置文件所在目录解析。
+
+```json title="cg.config.json"
+{
+  "schemaVersion": 1,
+  "providers": [{
+    "providerId": "acme.http",
+    "authority": { "kind": "file", "rootDir": "./providers/acme-http", "definitionLayout": "directory" }
+  }]
+}
+```
+
+```sh
+capability-graph serve --transport stdio --config ./cg.config.json
+capability-graph codex register --config ./cg.config.json
+capability-graph codex status --config ./cg.config.json --json
+capability-graph doctor --config ./cg.config.json --json
+```
+
+`serve`持续运行，其他命令在另一个终端执行。默认账户配置是`~/.capability-graph/config.json`，不会搜索cwd；`--config`优先。`codex`目标目录取`--codex-home`、`CODEX_HOME`、`~/.codex`的第一个有效选择。
+
+| 配置 | 默认/单位 | 含义与失败处理 |
+|---|---|---|
+| schemaVersion / providers | 必填1与数组，最多128个唯一ID | 空数组合法；未知字段/坏版本/重复ID拒绝，JSON最多1MiB |
+| provider.enabled / authority | true；file来源 | ID必须与provider.json一致；layout省略遵守Core的legacy默认，provider add默认directory |
+| knowledgeRoots | 省略 | directory.rootDir、package.resolveFrom按配置目录解析，packageName保留 |
+| budgets | Core默认值 | 使用[Core预算字段](../reference/result-meta#预算字段与默认值)，未知组/字段拒绝 |
+| httpReader | 省略，不创建URL Reader | 非空allowedOrigins必填；配置它不会替换local locator |
+| http.host / port / path | 127.0.0.1 / 3333 / /mcp | --host/--port仅覆盖HTTP服务；port范围1~65535 |
+| http.allowedProviders | graph范围 | 子集；非回环须明确提供，[]合法 |
+| http.allowedOrigins / allowedHostnames | 回环实际端点Origin/Host | 缺Origin允许非浏览器请求；present Origin必须匹配，null拒绝 |
+| http.bearerToken | 回环可省略 | 非回环需要非空token与非空Origin/hostname名单；这是静态Bearer，远程TLS由部署网关提供 |
+
+| HTTP限额（http.limits） | 默认 | 单位/结果 |
+|---|---|---|
+| maxClients / maxInFlight | 32 / 64 | 活动TCP socket含keep-alive / 在途请求；超限429 |
+| maxBodyBytes | 1048576 | JSON请求UTF-8字节，超限413 |
+| requestTimeoutMs / drainTimeoutMs | 30000 / 5000 | 请求期限 / 停机等待，之后取消真实I/O并等待清理 |
+| maxToolResultBytes | 16777216 | 整个工具结果外壳；超限CG_TOOL_RESULT_TOO_LARGE |
+
+`provider add/list/remove`保存配置，增删与来源变更在**下次服务启动**生效。Core的reload刷新当前已经配置的Provider。`serve`在stderr显示本次`configDigest`；doctor的新探针检查当前文件，不能证明已有进程已采用新配置。
+
+| 诊断字段 | 可以证明什么 |
+|---|---|
+| installed | 当前包/CLI文件存在 |
+| configRegistered | 当前TOML条目和ownership记录匹配，不用旧安装结果冒报 |
+| localProtocolVerified | 本次临时真实协议探针结果，最多10000毫秒，之后进程已退出 |
+| clientConnected | 外部CLI没有实时客户端证据时unknown；临时探针不能代替用户Codex已连接 |
+
+注册冲突不会覆盖外部同名条目，即使command/args完全一致也不认领；用户改过owned区域时升级/删除失败并保留原内容。`--ignore-scripts`或跳过自动接入时运行显式`codex register`。注册失败能持久保存时保留CLI并给修复动作；无法保存失败结果时npm安装可能失败。
+
+卸载前先`capability-graph codex unregister --config ./cg.config.json`，再`npm uninstall -g @devcodex/capability-graph`；配置和Provider资料保留。退出码0成功、1内部/清理、2用法/配置、3注册/并发冲突、4诊断失败、130取消。`clientConnected=unknown`单独不会导致诊断失败。
+
+## 6 HTTP Reader
+
+这个完整样例在本机创建自己的HTTP来源和临时Provider，分页读取包含BOM、CRLF、中文和emoji的原文，再关闭自己拥有的所有资源。无需公网地址，也不会改写前面创建的Provider。
+
+```js title="reader.mjs"
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import os from 'node:os';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { CapabilityGraph } from '@devcodex/capability-graph';
+import { HttpKnowledgeReader } from '@devcodex/capability-graph/readers/http';
+
+const body = Buffer.from('\ufeff指南\r\n原始内容🙂\r\n');
+const source = createServer((_request, response) => { response.setHeader('content-type', 'text/plain'); response.end(body); });
+await new Promise(resolve => source.listen(0, '127.0.0.1', resolve));
+const origin = `http://127.0.0.1:${source.address().port}`;
+const root = await mkdtemp(path.join(os.tmpdir(), 'cg-reader-demo-'));
+const reader = new HttpKnowledgeReader({ allowedOrigins: [origin], timeoutMs: 2000, maxConcurrent: 4 });
+let graph;
+try {
+  await writeFile(path.join(root, 'provider.json'), JSON.stringify({ providerId: 'remote.demo', name: 'Remote demo', version: '1' }));
+  await writeFile(path.join(root, 'route.capability.json'), JSON.stringify({ capabilityId: 'route', name: 'Route', description: 'A demo', whenToUse: 'Read this demo',
+    knowledge: [{ kind: 'document', knowledgeId: 'guide', role: 'guide', locator: { type: 'http', url: `${origin}/guide` } }] }));
+  graph = await CapabilityGraph.open({ hostAllowedProviders: ['remote.demo'], integrationEnabledProviders: ['remote.demo'],
+    providers: [{ providerId: 'remote.demo', authority: { kind: 'file', rootDir: root } }], readers: [reader] });
+  let cursor, text = '', pages = 0;
+  do {
+    const page = await graph.readDocumentPage({ capability: { providerId: 'remote.demo', capabilityId: 'route' }, knowledgeId: 'guide', maxBytes: 8,
+      ...(cursor ? { cursor } : {}) });
+    text += page.text; cursor = page.nextCursor; pages++;
+  } while (cursor);
+  assert.deepEqual(Buffer.from(text), body);
+  console.log(JSON.stringify({ sameBytes: true, pages, activeRequests: reader.activeRequests }));
+} finally {
+  await reader.close(); await graph?.close(); source.closeAllConnections();
+  await new Promise(resolve => source.close(resolve)); await rm(root, { recursive: true, force: true });
+}
+```
+
+预期`sameBytes=true`、pages大于1、activeRequests=0。`maxBytes=8`是单页UTF-8字节；cursor与startOffset不能同时传。`complete`只有一页包含全篇时才为true，续读看`hasMore/nextCursor`；多页读取的末页可以complete=false。
+
+Reader默认超时2000毫秒、并发4；Reader timeoutMs与服务requestTimeoutMs/drainTimeoutMs须在1～2147483647毫秒内，超出Node计时器范围时配置直接失败，不会静默变成1毫秒。可选`snapshot`的directory须绝对且在所有authority/文档根之外，默认maxBytes=16777216、maxEntries=8、ttlMs=300000。缓存预算不限制文档总大小；弱/无ETag、不支持HEAD或超过缓存预算时回退完整扫描。`agentForUrl`只用于SDK宿主提供自己的Agent，Reader不关闭借用的Agent。CLI的snapshot.directory相对配置目录解析。
+
+## 工具参数、结果与恢复
+
+默认工具名均加`capability_graph_`。所有工具可用`requestProviderScope`收窄；完整字段以`listTools().inputSchema`为准，未知字段和类型拒绝，不进行自动转换。
+
+| 后缀 | 必需参数 | 主要可选参数 |
+|---|---|---|
+| list_providers / list_catalog | `{}` | requestProviderScope、requiredStaticRevision；catalog另有limit/cursor/capabilityIdPrefix/parent |
+| get_provider / list_specification_documents | providerId | revision；后者limit/cursor |
+| get_capabilities | ids完整二元身份数组 | requestProviderScope、revision、neighborLimitPerKind、knowledgeLimit、knowledgeCursors |
+| list_knowledge_members | capability、collectionId | limit/cursor/revision |
+| get_neighbors | capability | kinds八关系、limitPerKind、每组cursors、revision |
+| resolve_selection | selected完整二元身份非空数组 | requestProviderScope、requiredStaticRevisionByProvider映射 |
+| read_documents | selected完整二元身份非空数组 | knowledgeIds/roles/locales、scope/revision |
+| read_document_page | capability、knowledgeId | maxBytes/startOffset或cursor、revision |
+| read_specification / read_specification_page | providerId；page还需knowledgeId | 全文knowledgeIds/locales；page字节范围/游标；revision |
+
+表中的revision是`requiredStaticRevision`，来源于本次查询metadata，不能填写Provider或npm版本。`capability/ids/selected/parent`形状为`{providerId,capabilityId}`，不能用short字符串或qualified显示串。工具集合/点读均支持范围收窄；点读先检Provider归属，批量详情保留原输入失败槽位。
+
+分页limit、limitPerKind、neighborLimitPerKind与knowledgeLimit均为正整数；MCP Schema不接受0。`maxBytes`也是正整数字节，不能超过Core配置的单页上限；游标只能续接原查询范围和筛选条件。可选字段省略时由Core使用当前预算默认值，不把空字符串或null当省略。
+
+查询成功返回等价text JSON与structuredContent；`isError=false`仍要逐项检查results[].ok、完整性、warnings和游标。查询失败返回`{error:{code,message,nextAction,details?}}`，isError=true。工具自有码UNKNOWN/INPUT_INVALID提示fix_input，CANCELLED提示retry，RESULT_TOO_LARGE提示page_or_filter，INTERNAL提示inspect_server_log；实际码均以`CG_TOOL_`开头。Core错误码和nextAction原样保留，SDK协议错误由JSON-RPC层表达。

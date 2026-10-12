@@ -17,7 +17,7 @@ import Contracts from '@generated/snippets/contracts-queries-and-results.mdx';
 
 ## CapabilityDetailQuery
 
-支持 `requiredStaticRevision`、`neighborLimitPerKind`、`knowledgeLimit` 和每能力知识续页游标。详情只返回有界关系摘要和 KnowledgeRef，不递归读取邻居或正文。
+支持`requestProviderScope`、`requiredStaticRevision`、`neighborLimitPerKind`、`knowledgeLimit`和每能力知识续页游标。范围只能收窄，结果metadata使用实际查询范围；绑定Facade拒绝requestProviderScope覆盖。详情只返回有界关系摘要和KnowledgeRef，不递归读取邻居或正文。
 
 逐项 results 检查 ok；成功详情的 neighborSummaries/knowledge 仍可能 truncated，知识摘要可带 nextCursor。getCapabilities 不是导出未裁剪原始定义的接口；需要关系下一页时调用 getNeighbors，需要 Collection 成员时调用 listKnowledgeMembers。
 

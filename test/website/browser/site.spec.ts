@@ -75,7 +75,7 @@ test('tutorial checkpoints and MCP entry remain directly reachable', async ({ pa
   await expect(page.getByRole('main')).toContainText('本节只需要 G0，不需要 G1-G3');
   await page.goto('integrations/provider-owned-mcp#seed-调用示例');
   await expect(page.getByRole('main')).toContainText('node examples/seed-mcp/docs-main-entry/client.mjs');
-  await expect(page.getByRole('main')).toContainText('原 examples/seed-mcp Server 保持 11 个查询工具');
+  await expect(page.getByRole('main')).toContainText('examples/seed-mcp宿主现在复用12个共享查询');
   await expect(page.getByRole('main')).toContainText('只注册五个查询工具');
 });
 

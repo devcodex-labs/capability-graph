@@ -66,6 +66,8 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 
 ## readDocuments
 
+四个正文接口均可传宿主`signal`：调用前取消不进行I/O；批量中途取消使整个调用结束，等待受控I/O清理并停止后续槽位。signal不属于模型JSON参数；忽略signal的自定义Reader只能在其返回后完成取消。
+
 `ReadDocumentsQuery` 包含非空 `selected`、可选 `knowledgeIds/roles/locales`、范围和修订。同维取并、异维取交；先筛选再应用每次最多 8 篇的预算和 Reader。`DocumentReadBatch` 的 `knowledgeState` 区分无关联、筛选后为空和匹配，逐项结果保留错误槽。`DocumentRead` 携带能力身份、文档路由元数据、来源、内容类型、内容身份、正文和精确字节。
 
 只有在 `knowledgeIds` 明确写出成员 ID 时才直接读取 Collection 成员；仅给 Collection ID 不会整读。远程 Document 需要 `KnowledgeReader`。

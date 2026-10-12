@@ -34,6 +34,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:package:built
+      - run: npm run test:consumers:built
+      - run: npm run test:install:built
+      - run: npm run test:integration:built
       - run: npm ci --ignore-scripts
         working-directory: examples/seed-mcp
       - run: npm test

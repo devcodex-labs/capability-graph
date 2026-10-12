@@ -13,7 +13,7 @@ import Contracts from '@generated/snippets/contracts-reader.mdx';
 
 ## 读取与流式访问
 
-`read(ref, context, { maxBytes })` 返回 `bytes/contentType/contentId/source`。字节为原始 UTF-8，不能先去 BOM 或转换换行。正文身份的表达式是 `k:` 加以下结果：
+`read(ref, context, { maxBytes, signal? })`返回`bytes/contentType/contentId/source`。宿主可取消完整读取；实现需等待自己拥有的I/O清理后结束。字节为原始UTF-8，不能先去BOM或转换换行。正文身份的表达式是`k:`加以下结果：
 
 ```ts
 createHash('sha256').update(bytes).digest('hex').slice(0, 16)
@@ -37,6 +37,6 @@ Core 每实例最多保留 4 MiB、16 条私有正文副本或证明。缓存不
 
 `KnowledgeReadContext.sourceContext` 是 Reader 使用的私有来源上下文，不得进入公共响应。Reader 是宿主的受信任代码；Core 的 Provider scope 不隔离进程。访问策略、认证、重定向、超时、连接池和关闭归宿主及 Reader 管理。`graph.close()` 释放图谱资源，不代替关闭 Reader 或 Agent。
 
-实现步骤及完整可编译骨架见 [KnowledgeReader 接入](../integrations/knowledge-reader)。真实 HTTP 实现位于源码 `examples/http-reader`，支持显式 origin、取消、强 ETag 快照与范围读取。
+实现步骤与骨架见[KnowledgeReader接入](../integrations/knowledge-reader)。正式`HttpKnowledgeReader`从`/readers/http`导出，支持显式Origin、取消、强ETag快照与范围读取；示例复用该实现。Reader忽略signal时，Core只能等其返回后终止调用，不能代替停止Reader内部I/O。
 
 <Contracts />

@@ -149,7 +149,7 @@ test("HTTP pages work without Range and abort closes real I/O before returning",
     assert.equal(first.totalBytes, Buffer.byteLength(text)); assert.equal(first.contentId, contentId(Buffer.from(text)));
     const controller = new AbortController(); const pending = bound.readDocumentPage({ capabilityId: "a", knowledgeId: "slow", signal: controller.signal });
     const timer = setTimeout(() => controller.abort(), 30);
-    try { await assert.rejects(pending, { code: "CG_READER_UNAVAILABLE" }); } finally { clearTimeout(timer); }
+    try { await assert.rejects(pending, { name: "AbortError" }); } finally { clearTimeout(timer); }
     assert.equal(reader.activeRequests, 0);
   } finally { await graph?.close(); await reader.close(); server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); await removeTestDirectory(root); }
   assert.equal(sockets, 0);

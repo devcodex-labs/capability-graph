@@ -110,7 +110,7 @@ export async function verifyGeneratedContracts(contracts, coverage, docsRoot, re
     + contracts.symbols.map((item) => item.signature.replace(/\bdeclare (?=(?:class|function|const)\b)/g, '')).join('\n') + '\n}';
   const host = ts.createCompilerHost({ target: ts.ScriptTarget.ES2022, types: [], skipLibCheck: false });
   const originalSource = host.getSourceFile.bind(host);
-  host.getSourceFile = (file, language, ...args) => file === proofName
+  host.getSourceFile = (file, language, ...args) => path.resolve(file) === path.resolve(proofName)
     ? ts.createSourceFile(proofName, proof, language, true) : originalSource(file, language, ...args);
   const proofProgram = ts.createProgram([proofName], { target: ts.ScriptTarget.ES2022, types: [], skipLibCheck: false, noEmit: true }, host);
   const diagnostics = ts.getPreEmitDiagnostics(proofProgram);

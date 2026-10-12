@@ -17,5 +17,5 @@ export function assertReleaseDocumentation({ version, readme, installation, home
     'source fallback must pin the documentation commit');
   assert(installation.includes('pack.json') && installation.includes('p.filename'), 'source install must use this pack result');
   assert(!/(?:此版本|本版本|当前版本)(?:尚未|未)发布/u.test(changelog), 'changelog contains a stale unpublished claim');
-  assert(changelog.startsWith(`# ${version}\n`), 'changelog must identify the release without a preview badge');
+  assert(changelog.replaceAll('\r\n', '\n').startsWith(`# ${version}\n`), 'changelog must identify the release without a preview badge');
 }

@@ -69,7 +69,7 @@ try {
   await assert.rejects(verifyReaderContracts(scratch), /documented Reader algorithm rejected by Core/);
   for (const [page, source] of originals) await writeFile(path.join(scratch, page), source, 'utf8');
   const readerPage = originals.get('integrations/knowledge-reader.mdx');
-  const missingEmptyChunk = readerPage.replace(/      if \(!emitted\) yield \{[^\n]+\};\n/, '');
+  const missingEmptyChunk = readerPage.replace(/      if \(!emitted\) yield \{[^\n]+\};\r?\n/, '');
   assert.notEqual(missingEmptyChunk, readerPage, 'negative control must remove the empty-stream metadata chunk');
   await writeFile(path.join(scratch, 'integrations/knowledge-reader.mdx'), missingEmptyChunk);
   await assert.rejects(verifyReaderContracts(scratch), /documented Reader factory failed to page 0 bytes/);

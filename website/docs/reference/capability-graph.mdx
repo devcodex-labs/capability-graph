@@ -12,6 +12,8 @@ import Contracts from '@generated/snippets/contracts-capability-graph.mdx';
 
 `CapabilityGraph` 是协议无关的顶层入口。它拥有 Authority 视图生命周期，但不启动 API 或 MCP 服务。
 
+`getProviderScope()`返回冻结排序的配置范围快照，不加载来源、不含修订或私有路径。`/mcp`和`/mcp/server`分别提供共享JSON工具与服务handle；资源归属和配置见[MCP与CLI](../integrations/mcp-and-cli)。
+
 | 方法 | 作用 | 关键约束 |
 |---|---|---|
 | `CapabilityGraph.open(config)` | 校验配置和全部初始 Authority | 任一初始来源失败则拒绝 open |

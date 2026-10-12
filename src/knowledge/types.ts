@@ -10,7 +10,7 @@ export interface KnowledgeReader {
   /** Synchronous source match. Core picks the first matching custom reader only for nonlocal sources. */
   canRead(ref: KnowledgeRef): boolean;
   /** Return exact bounded bytes and their k: content hash; source must equal the declared locator. Own I/O cleanup here. */
-  read(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, budget: { maxBytes: number }): Promise<{
+  read(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, budget: { maxBytes: number; signal?: AbortSignal }): Promise<{
     bytes: Uint8Array; contentType: string; contentId: KnowledgeContentId; source: string;
   }>;
   /** Optional bounded-memory transport. Core hashes the entire stream; total document size is not capped.

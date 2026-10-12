@@ -53,8 +53,14 @@ id.providerId = "other";
 import { computeStaticRevision } from "@devcodex/capability-graph";
 // @ts-expect-error Internal configuration normalization is not a public export.
 import { resolveBudgets } from "@devcodex/capability-graph";
-// @ts-expect-error No public MCP package subpath is provided.
-import {} from "@devcodex/capability-graph/mcp";
+import { createCapabilityGraphToolkit, type ToolDefinition, type ToolCallResult } from "@devcodex/capability-graph/mcp";
+function jsonHost(graph: import("@devcodex/capability-graph").CapabilityGraph) {
+  const toolkit = createCapabilityGraphToolkit(graph);
+  const definitions: readonly ToolDefinition[] = toolkit.listTools();
+  const call: Promise<ToolCallResult> = toolkit.callTool(definitions[0]!.name, {});
+  void call;
+}
+void jsonHost;
 // Source definition records remain an internal implementation detail.
 // @ts-expect-error Raw records are no longer public database adapter inputs.
 import type { UnvalidatedCapabilityRecord } from "@devcodex/capability-graph";
@@ -78,6 +84,8 @@ function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, neig
   void bound.readSpecificationPage({ knowledgeId: "SPEC-01" });
   // @ts-expect-error Bound calls cannot override provider scope.
   void bound.listCatalog({ requestProviderScope: ["other"] });
+  // @ts-expect-error Bound detail cannot replace its provider scope.
+  void bound.getCapabilities(["route"], { requestProviderScope: [] });
   // @ts-expect-error Detail does not expose internal full adjacency lists.
   void detail.parents;
 }

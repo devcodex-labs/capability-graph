@@ -1,4 +1,4 @@
-import { CapabilityGraph, type KnowledgeReadContext, type KnowledgeDocumentRef } from "@devcodex/capability-graph";
+import { CapabilityGraph, type KnowledgeReadContext, type KnowledgeDocumentRef } from "../src/index.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, writeFile, readdir } from "node:fs/promises";
@@ -6,7 +6,7 @@ import { createServer, type ServerResponse } from "node:http";
 import path from "node:path";
 import test from "node:test";
 import { FileFixture, record } from './contract/file-fixture.js';
-import { HttpKnowledgeReader } from "../examples/http-reader/knowledge-reader.js";
+import { HttpKnowledgeReader } from "../src/readers/http.js";
 import { assertPortReleased } from "./contract/port-released.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
@@ -199,7 +199,9 @@ test('HTTP Reader returns exact Chinese UTF-8 bytes/hash and rejects actual fail
 test('HTTP deadlines, connection cap and host close actually terminate requests', async () => {
   let arrived!: () => void;
   const firstRequest = new Promise<void>((resolve) => { arrived = resolve; });
-  const source = await httpSource((_url, response) => { response.writeHead(200); response.flushHeaders(); arrived(); });
+  let closingArrived!: () => void;
+  const closingRequest = new Promise<void>(resolve => { closingArrived = resolve; });
+  const source = await httpSource((url, response) => { response.writeHead(200); response.flushHeaders(); arrived(); if (url === '/close') closingArrived(); });
   const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin], timeoutMs: 80, maxConcurrent: 1 });
   const closingReader = new HttpKnowledgeReader({ allowedOrigins: [source.origin], timeoutMs: 5000 });
   try {
@@ -209,9 +211,50 @@ test('HTTP deadlines, connection cap and host close actually terminate requests'
     await assert.rejects(reader.read(ref(`${source.origin}/second`), context, { maxBytes: 32 }));
     await timed; assert.equal(reader.activeRequests, 0);
     const closing = assert.rejects(closingReader.read(ref(`${source.origin}/close`), context, { maxBytes: 32 }));
+    await closingRequest;
     assert.equal(closingReader.activeRequests, 1);
     await closingReader.close(); await closing;
     assert.equal(closingReader.activeRequests, 0);
     await assert.rejects(closingReader.read(ref(`${source.origin}/after-close`), context, { maxBytes: 32 }));
   } finally { await reader.close(); await closingReader.close(); await source.close(); await assertPortReleased(source.port); }
+});
+
+test('formal full reads propagate host abort, wait for socket cleanup and leave borrowed Agents usable', async () => {
+  let arrived!: () => void; const requestArrived = new Promise<void>(resolve => { arrived = resolve; });
+  const source = await httpSource((_url, response) => { response.writeHead(200); response.write('first'); arrived(); });
+  const { Agent } = await import('node:http'); const agent = new Agent({ keepAlive: true });
+  let agentCloses = 0; const destroy = agent.destroy.bind(agent);
+  agent.destroy = () => { agentCloses++; destroy(); };
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin], agentForUrl: () => agent });
+  const document = ref(source.origin + '/slow'); const fixture = new FileFixture([record('a', { knowledge: [document] })]);
+  const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'],
+    providers: [{ providerId: 'seed', authority: fixture.authority }], readers: [reader] });
+  const controller = new AbortController();
+  try {
+    const pending = assert.rejects(graph.readDocuments({ selected: [{ providerId: 'seed', capabilityId: 'a' }], signal: controller.signal }), { name: 'AbortError' });
+    await requestArrived; controller.abort(); await pending; assert.equal(reader.activeRequests, 0);
+    await graph.close(); assert.equal(await reader.isContentCurrent(document, context, 'k:0000000000000000', {}), false);
+    await reader.close();
+    assert.equal(agentCloses, 0, 'Reader must not destroy a host-owned Agent');
+  } finally { await graph.close(); await reader.close(); agent.destroy(); await source.close(); await assertPortReleased(source.port); }
+});
+
+test('closing a paused stream finishes its generator and releases the owned request', async () => {
+  const source = await httpSource((_url, response) => { response.writeHead(200); response.end('paused body'); });
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin] });
+  try {
+    const iterator = reader.stream(ref(source.origin + '/doc'), context, { chunkBytes: 2 });
+    assert.equal((await iterator.next()).done, false);
+    await reader.close(); assert.equal(reader.activeRequests, 0); assert.equal((await iterator.next()).done, true);
+  } finally { await reader.close(); await source.close(); await assertPortReleased(source.port); }
+});
+
+test('snapshot paths inside a document root fail before cache creation', async () => {
+  const root = await createTestDirectory('reader-cache-jail-');
+  const source = await httpSource((_url, response) => { response.end('body'); });
+  const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin], snapshot: { directory: path.join(root, 'cache') } });
+  try {
+    await assert.rejects(reader.read(ref(source.origin + '/doc'), { ...context, sourceContext: { ...context.sourceContext, knowledgeRootDir: root } }, { maxBytes: 32 }), /outside document roots/);
+    assert.deepEqual(await readdir(root), []); assert.equal(reader.activeRequests, 0);
+  } finally { await reader.close(); await source.close(); await assertPortReleased(source.port); await removeTestDirectory(root); }
 });

@@ -7,7 +7,7 @@ description: 用少量 Provider-owned MCP 工具实现主能力、意图收窄�
 
 <span className="cg-status">可运行参考实现</span>
 
-Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程中使用 Core，并把工具设计成渐进发现链：
+Capability Graph提供[共享工具层与独立服务](./mcp-and-cli)。Provider也可以在自己的MCP进程中使用Core，按实际需求设计渐进发现链：
 
 1. **列出主能力**：Provider 显式选择主入口并返回摘要和修订；也可以用 `listCatalog()` 暴露有界平坦目录，但它不会自动只返回根节点。
 2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`。
@@ -16,11 +16,11 @@ Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程�
 5. **解析 Selection**：把明确选中的能力交给 `resolveSelection()`，仅沿 `requires` 补齐必要上下文并展示原因。
 6. **读取文档**：可先分页发现文档元数据，再按需读取正文，或枚举 Collection 成员后读取具体文档。
 
-工具名称、数量、输入 Schema、认证和规范投递由 Provider 决定。参考示例使用私有 MCP 包，避免把 SDK 变成主包运行时依赖。
+Provider自有入口的名称、数量、认证和规范投递由Provider决定。共享工具层的12个查询和普通JSON Schema可用于SDK v1/v2及自有模型宿主；本页五工具示例展示独立的Provider主入口策略。
 
 ## Seed 调用示例
 
-本节是**独立的主入口示例**，使用真实 seed.http 定义，只注册五个查询工具。原 examples/seed-mcp Server 保持 11 个查询工具，example_list_catalog 仍返回五个能力的平坦目录。Core 不自动选择主入口，也不把每个能力注册成一个 MCP 工具。
+本节是**独立的主入口示例**，使用真实seed.http定义，只注册五个查询工具。examples/seed-mcp宿主现在复用12个共享查询，example_list_catalog仍返回五个能力的平坦目录。Core不自动选择主入口，也不把每个能力注册成一个MCP工具。
 
 ### 运行前提与文件
 
@@ -216,7 +216,7 @@ node examples/seed-mcp/docs-main-entry/client.mjs
 
 Server stdout 只用于 JSON-RPC，日志写 stderr。Client finally 关闭 transport；Server 停机关闭自己的 graph。示例不实现生产认证、租户策略、部署或 Agent 自动意图判断。业务状态与正文搜索由宿主独立处理。
 
-原 Seed 的 Specification Resource 与 11 个查询工具仍见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。五工具 Server 没有宣称提供该 Resource。
+Seed的Specification Resource与12个共享查询工具见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。本页五工具Server仅提供本页声明的工具。
 
 ## 错误映射
 

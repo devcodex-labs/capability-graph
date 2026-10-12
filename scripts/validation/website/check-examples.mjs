@@ -6,6 +6,7 @@ import { repositoryRoot, artifactsRoot, createTemporaryDirectory } from '../../l
 import { websiteRoot, generatedRoot, websiteFixtureRoot } from '../../lib/website-paths.mjs';
 import { compareFixture, loadTutorial } from './lib/tutorial.mjs';
 import { installLocalConsumer } from './lib/consumer.mjs';
+import { createCapabilityGraphToolkit } from '../../../dist/mcp/index.js';
 
 // Unit/negative tests are part of the existing check:examples entry, not an optional new script.
 execFileSync(process.execPath, ['--test', path.join(repositoryRoot, 'test/website/unit/tutorial.test.mjs')], {
@@ -46,12 +47,15 @@ assert(vextjs?.status === 'Runnable' && vextjs.source === '../examples/vextjs' &
 
 // Keep the original Seed's documented count tied to the actual registrations.
 const mcpSource = await readFile(path.join(repositoryRoot, 'examples/seed-mcp/src/server.ts'), 'utf8');
-const mcpTools = [...mcpSource.matchAll(/server\.registerTool\("([^"]+)"/g)].map((match) => match[1]);
+assert(mcpSource.includes('createCapabilityGraphToolkit(graph, { namePrefix: "example_" })'), 'Seed must use the shared toolkit');
+const countGraph = await CapabilityGraph.open({ hostAllowedProviders: [], integrationEnabledProviders: [], providers: [] });
+const mcpTools = createCapabilityGraphToolkit(countGraph).listTools().map(tool => tool.name);
+await countGraph.close();
 assert(mcpTools.length > 0 && new Set(mcpTools).size === mcpTools.length, 'Seed MCP tool registrations must be unique');
 for (const file of ['CONTRIBUTING.md', 'examples/seed-mcp/README.md',
   'website/docs/integrations/provider-owned-mcp.mdx', 'website/docs/examples/index.mdx', 'website/docs/examples/seed-provider.mdx']) {
   const prose = await readFile(path.join(repositoryRoot, file), 'utf8');
-  const counts = [...prose.matchAll(/(\d+) 个查询工具/g)].map((match) => Number(match[1]));
+  const counts = [...prose.matchAll(/(\d+)\s*个(?:共享)?查询工具/g)].map((match) => Number(match[1]));
   assert(counts.length > 0 && counts.every((count) => count === mcpTools.length), `${file}: Seed MCP tool count drifted from registrations`);
 }
 
@@ -168,4 +172,5 @@ assert.equal(calls, 1);
 } finally { await rm(readmeRoot, { recursive: true, force: true }); }
 
 await import('./check-doc-code.mjs');
+await import('./check-mcp-integration.mjs');
 console.log(`example check passed: ${statuses.length} status entries, page-only tutorials and independent advanced Fixture`);

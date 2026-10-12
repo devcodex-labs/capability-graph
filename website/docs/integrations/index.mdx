@@ -12,6 +12,7 @@ description: 将 Capability Graph 接入 Node.js、Provider-owned MCP 和文档 
 | 在进程内调用 Core | 最小 Provider；可用 | [Node.js 中使用 Core](./node-api)：open/query/close 的资源归属，不会启动 HTTP 服务 |
 | 给 Agent 设计分层接口 | 最小 Provider，按需增加 G1–G3；受检 API 示例 | [设计 Provider API](../getting-started/provider-owned-api)：主入口、下钻、详情和显式知识读取 |
 | 用 MCP 暴露自己的 Provider | 自备 MCP SDK；有可运行 stdio Server/Client | [Provider 自有 MCP](./provider-owned-mcp)：工具/Resource、错误映射与进程管理 |
+| 复用12查询或运行独立服务/CLI | 取得本页对应源码制品；有冷包与实际安装验证 | [MCP与CLI](./mcp-and-cli)：普通JSON、SDKv1/v2、stdio/HTTP、四状态诊断与正式Reader |
 | 读取非本地文档 | 合同及本机 HTTP 读取参考 | [KnowledgeReader 接入](./knowledge-reader)：严格预算内的 bytes/contentId，不替换 locator |
 
 只读本地文档不需要自定义 Reader，走[添加本地知识](../guides/add-local-knowledge)即可。URL 来源按下方 Reader 合同实现与管理传输；图谱只提供文件声明和原文访问。

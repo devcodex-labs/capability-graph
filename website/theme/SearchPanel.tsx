@@ -48,7 +48,10 @@ function SearchAttempt({ focused, setFocused, value, setValue, onFailureChange, 
   useEffect(() => {
     if (!focused) return;
     if (!modalRef.current) return;
-    const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // WebKit pointer clicks can leave focus on body; restore the visible trigger in that case.
+    const active = document.activeElement;
+    const origin = active instanceof HTMLElement && active !== document.body && !modalRef.current.contains(active)
+      ? active : document.querySelector<HTMLButtonElement>('.rp-search-button');
     const cleanup = containModalFocus(modalRef.current, close, origin);
     inputRef.current?.focus();
     return cleanup;

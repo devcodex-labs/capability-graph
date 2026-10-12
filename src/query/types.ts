@@ -23,6 +23,7 @@ export interface CatalogRecord extends Pick<StaticCapability, "id" | "name" | "d
 export interface CatalogPage { readonly items: readonly CatalogRecord[]; readonly meta: ResultMeta; readonly nextCursor?: string }
 /** Bounded neighbor summaries and knowledge references; neither recursively loads related nodes nor reads bodies. */
 export interface CapabilityDetailQuery {
+  readonly requestProviderScope?: readonly string[];
   readonly requiredStaticRevision?: StaticRevision; readonly neighborLimitPerKind?: number; readonly knowledgeLimit?: number;
   readonly knowledgeCursors?: Readonly<Record<QualifiedCapabilityId, string>>;
 }

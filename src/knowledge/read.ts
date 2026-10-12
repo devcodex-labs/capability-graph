@@ -1,4 +1,5 @@
 import type { BudgetConfig, ResolvedBudgetConfig } from "../budgets.js";
+import { throwIfReadAborted } from "./abort.js";
 import { errorShape, type QueryContext } from "../core-host.js";
 import { CapabilityGraphError, projectAdapterError, type ErrorShape } from "../errors.js";
 import { formatQualifiedId, isKnowledgeId } from "../identity.js";
@@ -15,6 +16,8 @@ export interface ReadDocumentsQuery {
   readonly selected: readonly CapabilityRef[]; readonly knowledgeIds?: readonly string[];
   readonly roles?: readonly string[]; readonly locales?: readonly string[];
   readonly requestProviderScope?: readonly string[]; readonly requiredStaticRevision?: string;
+  /** Host-owned cancellation; a Reader that ignores it must return before cancellation can finish. */
+  readonly signal?: AbortSignal;
 }
 export interface DocumentRead {
   readonly id: CanonicalCapabilityId; readonly knowledgeId: string; readonly contentId: string;
@@ -29,6 +32,12 @@ export type SpecificationReadBatch = BatchResult<SpecificationDocumentRead> & {
 export interface ReadSpecificationQuery {
   readonly providerId: string; readonly knowledgeIds?: readonly string[]; readonly locales?: readonly string[];
   readonly requiredStaticRevision?: string;
+  readonly signal?: AbortSignal;
+}
+/** Reject invalid signals and pre-aborted work before pinning views or starting I/O. */
+export function validateReadSignal(signal?: AbortSignal): void {
+  if (signal !== undefined && !(signal instanceof AbortSignal)) inputInvalid();
+  throwIfReadAborted(signal);
 }
 export const locatorSource = (ref: KnowledgeDocumentRef): string => ref.locator.type === "relative-file" ? (ref.locator.root === undefined ? ref.locator.path : `root:${ref.locator.root}/${ref.locator.path}`) : ref.locator.url;
 export function readContext(context: QueryContext, providerId: string): KnowledgeReadContext {
@@ -36,15 +45,17 @@ export function readContext(context: QueryContext, providerId: string): Knowledg
   return freeze({ providerId, staticRevision: view.staticRevision, sourceContext: { ...view.sourceContext } });
 }
 /** Local-reader priority cannot be overridden; custom results are bounded, copied and content-hash checked before exposure. */
-export async function readDocument(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, maxBytes: number, readers: readonly KnowledgeReader[]): ReturnType<KnowledgeReader["read"]> {
+export async function readDocument(ref: KnowledgeDocumentRef, context: KnowledgeReadContext, maxBytes: number, readers: readonly KnowledgeReader[], signal?: AbortSignal): ReturnType<KnowledgeReader["read"]> {
+  throwIfReadAborted(signal);
   const local = new LocalFileReader();
   let reader: KnowledgeReader | undefined;
   try { reader = local.canRead(ref) ? local : readers.find((candidate) => candidate.canRead(ref)); }
   catch { throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
   if (!reader) throw new CapabilityGraphError("CG_READER_UNCONFIGURED", { nextAction: "configure_backend" });
   let raw: Awaited<ReturnType<KnowledgeReader["read"]>>;
-  try { raw = await reader.read(ref, context, { maxBytes }); }
+  try { raw = await reader.read(ref, context, { maxBytes, ...(signal ? { signal } : {}) }); throwIfReadAborted(signal); }
   catch (error) {
+    throwIfReadAborted(signal);
     if (reader === local && error instanceof CapabilityGraphError) throw error;
     throw projectAdapterError(error, { CG_BUDGET_EXCEEDED: "page_or_filter" }, "CG_READER_UNAVAILABLE", "repair_source");
   }
@@ -115,8 +126,8 @@ function matches(ref: KnowledgeDocumentRef, filters: ReturnType<typeof validateD
 }
 
 async function readValue(ref: KnowledgeDocumentRef, providerId: string, context: QueryContext,
-  budgets: BudgetConfig, readers: readonly KnowledgeReader[]): Promise<Omit<DocumentRead, "id">> {
-  const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxBytes, readers);
+  budgets: BudgetConfig, readers: readonly KnowledgeReader[], signal?: AbortSignal): Promise<Omit<DocumentRead, "id">> {
+  const read = await readDocument(ref, readContext(context, providerId), budgets.read.maxBytes, readers, signal);
   let text: string;
   try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(read.bytes); }
   catch { throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { reason: "invalid_utf8" } }); }
@@ -128,11 +139,12 @@ async function readValue(ref: KnowledgeDocumentRef, providerId: string, context:
 }
 
 async function readSlot(ref: KnowledgeDocumentRef, id: CanonicalCapabilityId, context: QueryContext,
-  budgets: BudgetConfig, readers: readonly KnowledgeReader[]): Promise<DocumentRead> {
-  return { id, ...await readValue(ref, id.providerId, context, budgets, readers) };
+  budgets: BudgetConfig, readers: readonly KnowledgeReader[], signal?: AbortSignal): Promise<DocumentRead> {
+  return { id, ...await readValue(ref, id.providerId, context, budgets, readers, signal) };
 }
 
 export async function documents(context: QueryContext, query: ReadDocumentsQuery, budgets: ResolvedBudgetConfig, readers: readonly KnowledgeReader[], bound?: string): Promise<DocumentReadBatch> {
+  throwIfReadAborted(query.signal);
   validateReadBudgetInput(query, budgets);
   validateSelection(query);
   const filters = validateDocumentFilters(query);
@@ -144,6 +156,7 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
   let associated = false;
   let readCount = 0;
   for (const selected of query.selected) {
+    throwIfReadAborted(query.signal);
     let node: StaticCapability;
     try { node = await capability(context, selected, bound); }
     catch (error) {
@@ -178,11 +191,13 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
   }
   const results: BatchItem<DocumentRead>[] = [];
   for (const [inputIndex, slot] of slots.entries()) {
+    throwIfReadAborted(query.signal);
     if ("error" in slot) { results.push({ inputIndex, ok: false, error: slot.error }); continue; }
     try {
-      results.push({ inputIndex, ok: true, value: await readSlot(slot.ref, slot.node.id, context, budgets, readers) });
-    } catch (error) { results.push({ inputIndex, ok: false, error: errorShape(error) }); }
+      results.push({ inputIndex, ok: true, value: await readSlot(slot.ref, slot.node.id, context, budgets, readers, query.signal) });
+    } catch (error) { throwIfReadAborted(query.signal); results.push({ inputIndex, ok: false, error: errorShape(error) }); }
   }
+  throwIfReadAborted(query.signal);
   return boundedReadBatch<DocumentReadBatch>({ results, knowledgeState: !associated ? "not_associated" : readCount ? "matched" : "filtered_empty",
     meta: { ...context.meta, completeness: results.some((slot) => !slot.ok) ? "partial" : "complete",
     budgets: readBudgetMeta(budgets),
@@ -192,6 +207,7 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
 
 export async function readSpecification(context: QueryContext, query: ReadSpecificationQuery,
   budgets: ResolvedBudgetConfig, readers: readonly KnowledgeReader[]): Promise<SpecificationReadBatch> {
+  throwIfReadAborted(query.signal);
   validateReadBudgetInput(query, budgets);
   const filters = validateDocumentFilters(query);
   if (!context.scope.has(query.providerId)) throw new CapabilityGraphError("CG_SCOPE_DENIED", { nextAction: "narrow_scope" });
@@ -205,15 +221,17 @@ export async function readSpecification(context: QueryContext, query: ReadSpecif
   if (docs.length > budgets.read.maxDocumentsPerCall) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
   const results: BatchItem<SpecificationDocumentRead>[] = [];
   for (const ref of docs) {
+    throwIfReadAborted(query.signal);
     const inputIndex = results.length;
     try { results.push({ inputIndex, ok: true, value: { providerId: query.providerId,
-      ...await readValue(ref, query.providerId, context, budgets, readers) } }); }
-    catch (error) { results.push({ inputIndex, ok: false, error: errorShape(error) }); }
+      ...await readValue(ref, query.providerId, context, budgets, readers, query.signal) } }); }
+    catch (error) { throwIfReadAborted(query.signal); results.push({ inputIndex, ok: false, error: errorShape(error) }); }
   }
   for (const knowledgeId of new Set(query.knowledgeIds ?? [])) if (!known.has(knowledgeId)) {
     results.push({ inputIndex: results.length, ok: false, error: errorShape(new CapabilityGraphError("CG_NOT_FOUND", {
       nextAction: "fix_input", details: { knowledgeId } })) });
   }
+  throwIfReadAborted(query.signal);
   return boundedReadBatch<SpecificationReadBatch>({ results, knowledgeState: !provider.specification ? "not_associated" : docs.length ? "matched" : "filtered_empty",
     meta: { ...context.meta, completeness: results.some((item) => !item.ok) ? "partial" : "complete",
       budgets: readBudgetMeta(budgets) } }, budgets);

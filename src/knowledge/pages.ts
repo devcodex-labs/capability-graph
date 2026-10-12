@@ -1,4 +1,5 @@
 import type { ResolvedBudgetConfig } from "../budgets.js";
+import { throwIfReadAborted } from "./abort.js";
 import type { QueryContext } from "../core-host.js";
 import { CapabilityGraphError } from "../errors.js";
 import { isKnowledgeId } from "../identity.js";
@@ -32,6 +33,7 @@ export function validateBodyQuery(query: Omit<DocumentBodyQuery, "capability">, 
       (query.cursor !== undefined && query.startOffset !== undefined) || (query.maxBytes !== undefined && (!Number.isSafeInteger(query.maxBytes) || query.maxBytes < 1)) ||
       (query.signal !== undefined && !(query.signal instanceof AbortSignal))) inputInvalid();
   if ((query.maxBytes ?? budgets.read.maxPageBytes) > budgets.read.maxPageBytes) throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter" });
+  throwIfReadAborted(query.signal);
 }
 
 async function page(context: QueryContext, ref: KnowledgeDocumentRef, providerId: string, query: Omit<DocumentBodyQuery, "capability">,

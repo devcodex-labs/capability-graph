@@ -15,6 +15,8 @@ const contracts = {
 
 /** Read only explicit tutorial fences. Page text is authoritative; fixtures are never inputs. */
 export function parseTutorial(source, requiredFiles) {
+  // Markdown code blocks render LF on both hosts; checkout CRLF is not tutorial document data.
+  source = source.replaceAll('\r\n', '\n');
   const files = new Map();
   let expected;
   const fences = [...source.matchAll(/```(json|js|md)(?: title="([^"]+)")?\r?\n([\s\S]*?)\r?\n```/g)];

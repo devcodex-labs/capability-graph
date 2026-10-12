@@ -49,6 +49,6 @@ for (const width of [320, 768, 1280]) {
         }
       });
     }
-    expect(routes).toHaveLength(38);
+    expect(routes).toHaveLength(39);
   });
 }

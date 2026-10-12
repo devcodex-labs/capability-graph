@@ -28,16 +28,17 @@ async function connected(run: (client: Client, graph: CapabilityGraph) => Promis
 }
 test("MCP: initialize and enumerate query tools, not one tool per capability", async () => connected(async (client) => {
   const list = await client.listTools();
-  assert.equal(list.tools.length, 11);
+  assert.equal(list.tools.length, 12);
   assert.ok(list.tools.every((tool) => tool.name.startsWith("example_")));
   assert.equal(JSON.stringify(list).includes("D-02"), false);
 }));
 test("MCP: static and document queries exactly match the same Core API", async () => connected(async (client, graph) => {
   const checks: [string, Record<string, unknown>, unknown][] = [
     ["example_list_providers", {}, await graph.listProviders()],
+    ["example_get_provider", { providerId: "seed.http" }, await graph.getProvider("seed.http")],
     ["example_list_catalog", { limit: 2 }, await graph.listCatalog({ limit: 2 })],
     ["example_get_capabilities", { ids: [canonical("route.validation")] }, await graph.getCapabilities([canonical("route.validation")])],
-    ["example_get_neighbors", { qualifiedId: "seed.http::route.validation" }, await graph.getNeighbors(canonical("route.validation"))],
+    ["example_get_neighbors", { capability: canonical("route.validation") }, await graph.getNeighbors(canonical("route.validation"))],
     ["example_resolve_selection", { selected: [canonical("route.validation")] },
       await graph.resolveSelection({ selected: [canonical("route.validation")] })],
     ["example_list_specification_documents", { providerId: "seed.http" }, await graph.listSpecificationDocuments({ providerId: "seed.http" })],
@@ -62,7 +63,7 @@ test("MCP: scope and revision errors preserve Core codes", async () => connected
     let code: string | undefined;
     try { await graph.listCatalog(query); } catch (error) { assert.ok(error instanceof CapabilityGraphError); code = error.code; }
     const result = await client.callTool({ name: "example_list_catalog", arguments: query });
-    assert.equal(result.isError, true); assert.equal(payload(result).code, code);
+    assert.equal(result.isError, true); assert.equal((payload(result).error as { code: string }).code, code);
     assert.equal(JSON.stringify(result).includes(root), false);
   }
 }));
@@ -86,7 +87,7 @@ test("MCP: actual stdio child serves requests and exits on close", async (contex
   let pid: number | null = null;
   try {
     await client.connect(transport); pid = transport.pid; assert.ok(pid);
-    assert.equal((await client.listTools()).tools.length, 11);
+    assert.equal((await client.listTools()).tools.length, 12);
     const result = payload(await client.callTool({ name: "example_list_catalog", arguments: {} }));
     assert.equal((result.items as unknown[]).length, 5);
   } finally { await client.close(); await transport.close(); }

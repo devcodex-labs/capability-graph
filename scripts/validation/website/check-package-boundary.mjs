@@ -18,13 +18,17 @@ const runNpm = (args) => execFileSync(process.execPath, [npm, ...args], {
 
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'package.json'), 'utf8'));
 assert(manifest.name === '@devcodex/capability-graph', 'unexpected package name');
-assert(JSON.stringify(manifest.dependencies) === JSON.stringify({ 'bcp-47': '2.1.1', 'language-subtag-registry': '0.4.2' }),
-  'public package runtime dependencies must match the reviewed BCP 47 validator pair');
+assert(JSON.stringify(manifest.dependencies) === JSON.stringify({ '@modelcontextprotocol/server': '2.0.0',
+  '@modelcontextprotocol/node': '2.0.0', '@modelcontextprotocol/client': '2.0.0', ajv: '8.17.1',
+  'toml-eslint-parser': '0.10.1', 'bcp-47': '2.1.1', 'language-subtag-registry': '0.4.2' }),
+  'public package dependencies must match the confirmed MCP/CLI/Core versions');
 const [dryRun] = JSON.parse(runNpm(['pack', '--dry-run', '--json', '--ignore-scripts']));
 const paths = dryRun.files.map(({ path: file }) => file);
 assert(paths.includes('dist/index.js') && paths.includes('dist/index.d.ts'), 'tarball is missing public entry files');
-assert(paths.every((file) => ['package.json', 'README.md', 'LICENSE'].includes(file) || file.startsWith('dist/')),
-  `tarball includes an unexpected file: ${paths.find((file) => !['package.json', 'README.md', 'LICENSE'].includes(file) && !file.startsWith('dist/'))}`);
+assert(paths.every((file) => ['package.json', 'README.md', 'LICENSE', 'scripts/postinstall.mjs'].includes(file) || file.startsWith('dist/')),
+  `tarball includes an unexpected file: ${paths.find((file) => !['package.json', 'README.md', 'LICENSE', 'scripts/postinstall.mjs'].includes(file) && !file.startsWith('dist/'))}`);
+assert(Object.keys(manifest.exports).join(',') === '.,./mcp,./mcp/server,./readers/http' &&
+  manifest.bin['capability-graph'] === './dist/cli/main.js', 'public subpaths/bin drifted');
 assert(paths.every((file) => !file.startsWith('website/')), 'website files must not enter the public package');
 
 const packageTest = runNpm(['run', 'test:package']);

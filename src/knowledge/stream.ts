@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { throwIfReadAborted } from "./abort.js";
 import { CapabilityGraphError } from "../errors.js";
 import type { KnowledgeDocumentRef } from "../types.js";
 import { LocalFileReader } from "./local-file-reader.js";
@@ -26,14 +27,14 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
   consume: (bytes: Uint8Array, offset: number) => void | Promise<void>,
   options: { chunkBytes: number; fallbackMaxBytes: number; signal?: AbortSignal; reuseStableSnapshot?: boolean;
     range?: { startOffset: number; endOffset: number } }): Promise<KnowledgeScanResult> {
+  throwIfReadAborted(options.signal);
   const local = new LocalFileReader();
   let reader: KnowledgeReader | undefined;
   try { reader = local.canRead(ref) ? local : readers.find((item) => item.canRead(ref)); }
   catch { throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
   if (!reader) throw new CapabilityGraphError("CG_READER_UNCONFIGURED", { nextAction: "configure_backend" });
   if (!reader.stream) {
-    if (options.signal) throw new CapabilityGraphError("CG_READER_UNCONFIGURED", { nextAction: "configure_backend", details: { reason: "reader_cancellation_unsupported" } });
-    const body = await readDocument(ref, context, options.fallbackMaxBytes, readers);
+    const body = await readDocument(ref, context, options.fallbackMaxBytes, readers, options.signal);
     try { new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(body.bytes); }
     catch { throw new CapabilityGraphError("CG_SOURCE_UNREADABLE", { nextAction: "repair_source", details: { reason: "invalid_utf8" } }); }
     for (let offset = 0; offset < body.bytes.length; offset += options.chunkBytes) await consume(body.bytes.slice(offset, offset + options.chunkBytes), offset);
@@ -49,10 +50,10 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
       let current: boolean = false;
       if (previous.reader === reader) {
         try {
-          options.signal?.throwIfAborted();
+          throwIfReadAborted(options.signal);
           current = await reader.isContentCurrent(ref, context, previous.summary.contentId, options.signal ? { signal: options.signal } : {});
-          options.signal?.throwIfAborted();
-        } catch { cache.delete(key); throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
+          throwIfReadAborted(options.signal);
+        } catch { cache.delete(key); throwIfReadAborted(options.signal); throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" }); }
         if (typeof current !== "boolean") { cache.delete(key); throw new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source" }); }
       }
       cache.delete(key);
@@ -61,20 +62,20 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
           if (previous.bytes) {
             const end = Math.min(previous.bytes.length, options.range?.endOffset ?? previous.bytes.length);
             for (let offset = options.range?.startOffset ?? 0; offset < end; offset += options.chunkBytes) {
-              options.signal?.throwIfAborted();
+              throwIfReadAborted(options.signal);
               await consume(Uint8Array.from(previous.bytes.subarray(offset, Math.min(end, offset + options.chunkBytes))), offset);
             }
-            options.signal?.throwIfAborted(); rememberSnapshot(cache, key, previous); return previous.summary;
+            throwIfReadAborted(options.signal); rememberSnapshot(cache, key, previous); return previous.summary;
           }
           if (previous.hashes && reader.readRange && options.range) {
-            options.signal?.throwIfAborted();
+            throwIfReadAborted(options.signal);
             const end = Math.min(previous.summary.totalBytes, options.range.endOffset);
             if (options.range.startOffset > end) { rememberSnapshot(cache, key, previous); return previous.summary; }
             const startOffset = Math.floor(options.range.startOffset / proofBlockBytes) * proofBlockBytes;
             const endOffset = Math.min(previous.summary.totalBytes, Math.ceil(end / proofBlockBytes) * proofBlockBytes);
             const body = await reader.readRange(ref, context, { contentId: previous.summary.contentId, startOffset, endOffset,
               ...(options.signal ? { signal: options.signal } : {}) });
-            options.signal?.throwIfAborted();
+            throwIfReadAborted(options.signal);
             if (body !== undefined) {
               const invalid = (reason: string) => new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", { nextAction: "repair_source", details: { reason } });
               if (!body || !(body.bytes instanceof Uint8Array) || body.bytes.length !== endOffset - startOffset ||
@@ -88,13 +89,14 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
                 if (!actual.equals(expected)) throw invalid("reader_range_hash_mismatch");
               }
               for (let offset = options.range.startOffset; offset < end; offset += options.chunkBytes) {
-                options.signal?.throwIfAborted();
+                throwIfReadAborted(options.signal);
                 await consume(Uint8Array.from(bytes.subarray(offset - startOffset, Math.min(end, offset + options.chunkBytes) - startOffset)), offset);
               }
-              options.signal?.throwIfAborted(); rememberSnapshot(cache, key, previous); return previous.summary;
+              throwIfReadAborted(options.signal); rememberSnapshot(cache, key, previous); return previous.summary;
             }
           }
         } catch (error) {
+          throwIfReadAborted(options.signal);
           if (error instanceof CapabilityGraphError && error.code === "CG_ADAPTER_CONTRACT_INVALID") throw error;
           throw new CapabilityGraphError("CG_READER_UNAVAILABLE", { nextAction: "repair_source" });
         }
@@ -122,7 +124,7 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
   let contractFailure: CapabilityGraphError | undefined;
   try {
     for await (const raw of reader.stream(ref, context, { chunkBytes: options.chunkBytes, ...(options.signal ? { signal: options.signal } : {}) })) {
-      options.signal?.throwIfAborted();
+      throwIfReadAborted(options.signal);
       if (!raw || !(raw.bytes instanceof Uint8Array) || raw.bytes.length > options.chunkBytes ||
           raw.source !== locatorSource(ref) || typeof raw.contentType !== "string" || !raw.contentType.trim() ||
           (contentType !== undefined && raw.contentType !== contentType)) {
@@ -150,10 +152,11 @@ export async function scanDocument(ref: KnowledgeDocumentRef, context: Knowledge
       await consume(bytes, totalBytes); totalBytes += bytes.length;
       if (!Number.isSafeInteger(totalBytes)) throw new Error("Source size invalid");
     }
-    decoder.decode(); options.signal?.throwIfAborted();
+    decoder.decode(); throwIfReadAborted(options.signal);
     if (contentType === undefined) throw new Error("Missing stream metadata");
     if (proofUsed) finishProof();
   } catch (error) {
+    throwIfReadAborted(options.signal);
     if (error === contractFailure || (reader === local && error instanceof CapabilityGraphError)) throw error;
     throw new CapabilityGraphError(reader === local ? "CG_SOURCE_UNREADABLE" : "CG_READER_UNAVAILABLE", { nextAction: "repair_source" });
   }

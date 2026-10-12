@@ -63,7 +63,7 @@ npm run check:examples
 
 最终验收在 `website` 按 build → check:build → test:site → check:build/check:package 执行，记录最终 doc_build 全部文件 SHA；浏览器预览不得隐式重建。之后若页面/配置/生成输入或输出变化，必须重建并重验同一制品。Playwright 管理自己的 preview，结束确认端口释放，不复用或杀用户服务。自动检查不替代独立用户走读，未取得真实走读证据时仍为 UNVERIFIED。
 
-MCP 完整 Server/Client 由公开页面还原到仓库同级临时消费者，安装固定 SDK 和本次构建的主包 tarball，保留 Seed 相对路径，标准 stdio 测试核对主入口无首轮泄漏、修订/参数/文档错误和进程退出。Registry 验证另安装已发布包，两种证据分别记录。原 Seed 11 个查询工具/五能力平坦 Catalog 回归不可替换。新增验证消费者必须同步页面、状态数据、helper、安装链、生成输出和测试，不只改截图断言。
+MCP 完整 Server/Client 由公开页面还原到仓库同级临时消费者，安装固定 SDK 和本次构建的主包 tarball，保留 Seed 相对路径，标准 stdio 测试核对主入口无首轮泄漏、修订/参数/文档错误和进程退出。Registry 验证另安装已发布包，两种证据分别记录。Seed 复用共享层的 12 个查询工具，五能力平坦 Catalog 回归仍保留；五工具渐进宿主另行验证。新增接入页由 `check-mcp-integration.mjs` 直接执行页面代码，覆盖普通JSON、SDKv1/v2、HTTP和Reader。新增验证消费者必须同步页面、状态数据、helper、安装链、生成输出和测试，不只改截图断言。
 
 ## 仅文档部署
 
