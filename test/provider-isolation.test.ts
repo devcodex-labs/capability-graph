@@ -1,70 +1,46 @@
 import assert from "node:assert/strict";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
-import { CapabilityGraph, CapabilityGraphError } from "../src/index.js";
+import { CapabilityGraph } from "../src/index.js";
 import { seedProviderRoot } from "../examples/seed-api/main.js";
-import { FakeDatabase, record } from "./contract/fake-database.js";
-import { fakeKnowledgeRetriever } from "./contract/fake-knowledge-retriever.js";
+import { FileFixture, record } from "./contract/file-fixture.js";
 
-const local = { providerId: "seed.http", capabilityId: "route.http" };
-const remote = { providerId: "seed", capabilityId: "a" };
-const code = (value: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === value;
-
-test("R1: unrelated offline authority does not block local discovery or knowledge; mixed slots stay aligned", async () => {
-  const db = new FakeDatabase([record("a")]);
+test("unrelated failed file refresh leaves other Provider queries and mixed slots intact", async () => {
+  const fixture = new FileFixture([record("a")]);
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed.http", "seed"], integrationEnabledProviders: ["seed.http", "seed"],
     providers: [{ providerId: "seed.http", authority: { kind: "file", definitionLayout: "directory", rootDir: seedProviderRoot } },
-      { providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => db } } }],
-    knowledgeRetriever: fakeKnowledgeRetriever });
+      { providerId: "seed", authority: fixture.authority }] });
+  const local = { providerId: "seed.http", capabilityId: "route.http" }; const remote = { providerId: "seed", capabilityId: "a" };
   try {
-    const revision = (await graph.getProvider("seed")).staticRevision;
-    let failedReads = 0;
-    db.getCapability = async () => { failedReads++; throw new Error("private offline reason"); };
-    for (const result of [await graph.getCapabilities([local]), await graph.forProvider("seed.http").getCapabilities([local.capabilityId]),
-      await graph.readDocuments({ selected: [local] })]) assert.equal(result.results[0]?.ok, true);
-    assert.equal((await graph.queryKnowledge({ text: "find", selected: [local] })).items.length, 1);
-    assert.equal(failedReads, 0);
+    await writeFile(path.join(fixture.rootDir, "provider.json"), "invalid-json");
+    assert.equal((await graph.reload({ providerId: "seed" })).ok, false);
     const details = await graph.getCapabilities([local, remote, local]);
-    assert.deepEqual(details.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["ok", "CG_NO_ACTIVE_VIEW", "ok"]);
-    const reads = await graph.readDocuments({ selected: [local, remote, local] });
-    assert.deepEqual(reads.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["ok", "CG_NO_ACTIVE_VIEW"]);
-    assert.deepEqual(reads.results.map((slot) => slot.inputIndex), [0, 1]);
-    assert.equal(details.meta.completeness, "partial"); assert.equal(reads.meta.completeness, "partial");
-    const knowledge = await graph.queryKnowledge({ text: "find", selected: [local, remote] });
-    assert.equal(knowledge.items.length, 1); assert.equal(knowledge.meta.warnings[0]?.code, "CG_NO_ACTIVE_VIEW");
+    assert.deepEqual(details.results.map((slot) => slot.ok), [true, true, true]);
+    assert.deepEqual(details.results.map((slot) => slot.inputIndex), [0, 1, 2]);
+    assert.equal(details.meta.refreshFailed, true);
+    const localRead = await graph.forProvider("seed.http").readDocuments({ selected: ["route.http"] });
+    assert.equal(localRead.results[0]?.ok, true); assert.equal(localRead.meta.refreshFailed, undefined);
     const denied = await graph.getCapabilities([{ providerId: "outside", capabilityId: "a" }]);
     assert.ok(!denied.results[0]?.ok); assert.equal(denied.results[0]?.error.code, "CG_SCOPE_DENIED");
-    await assert.rejects(graph.listCatalog(), code("CG_NO_ACTIVE_VIEW"));
-    await assert.rejects(graph.listProviders(), code("CG_NO_ACTIVE_VIEW"));
-    await assert.rejects(graph.getCapabilities([remote], { requiredStaticRevision: revision }), code("CG_REVISION_MISMATCH"));
-    await assert.rejects(graph.readDocuments({ selected: [remote], requiredStaticRevision: revision }), code("CG_REVISION_MISMATCH"));
-    await assert.rejects(graph.queryKnowledge({ text: "find", selected: [remote], requiredStaticRevision: revision }), code("CG_REVISION_MISMATCH"));
   } finally { await graph.close(); }
 });
 
-test("R7: canonical and bound Provider results preserve current, failed refresh and previous metadata", async () => {
-  const old = new FakeDatabase([record("a")]); const current = new FakeDatabase([record("a", { name: "new" })]);
-  let source = old; let fail = false;
+test("bound and canonical Provider queries preserve current, previous and failed refresh provenance", async () => {
+  const fixture = new FileFixture([record("a")]);
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
-    providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => {
-      if (fail) throw new Error("private failure"); return source;
-    } } } }] });
+    providers: [{ providerId: "seed", authority: fixture.authority }] });
   try {
     const bound = graph.forProvider("seed"); const before = await graph.getProvider("seed");
-    assert.equal(before.meta.servedFrom, "current"); assert.equal(before.meta.staticRevision, before.staticRevision);
-    assert.equal(before.meta.refreshFailed, undefined); assert.deepEqual(before.meta.scope, ["seed"]);
-    source = current; await graph.reload(); fail = true; await graph.reload();
+    fixture.records = [record("a", { name: "new" })]; fixture.sync(); await graph.reload();
+    await writeFile(path.join(fixture.rootDir, "provider.json"), "invalid-json"); await graph.reload();
     for (const read of [() => graph.getProvider("seed"), () => bound.getProvider()]) {
-      const result = await read(); assert.equal(result.meta.refreshFailed, true); assert.equal(result.meta.servedFrom, "current");
+      const value = await read(); assert.equal(value.meta.refreshFailed, true); assert.equal(value.meta.servedFrom, "current");
     }
     for (const read of [() => graph.getProvider("seed", { requiredStaticRevision: before.staticRevision }),
       () => bound.getProvider({ requiredStaticRevision: before.staticRevision })]) {
-      const result = await read(); assert.equal(result.meta.servedFrom, "previous"); assert.equal(result.meta.refreshFailed, true);
-      assert.equal(result.staticRevision, before.staticRevision);
+      const value = await read(); assert.equal(value.meta.servedFrom, "previous"); assert.equal(value.meta.refreshFailed, true);
+      assert.equal(value.staticRevision, before.staticRevision);
     }
-    old.getCapability = async () => { throw new Error("expired"); };
-    await assert.rejects(bound.getProvider({ requiredStaticRevision: before.staticRevision }), code("CG_REVISION_MISMATCH"));
-    current.getCapability = async () => { throw new Error("offline"); };
-    await assert.rejects(graph.getProvider("seed"), code("CG_NO_ACTIVE_VIEW"));
-    await assert.rejects(bound.getProvider(), code("CG_NO_ACTIVE_VIEW"));
   } finally { await graph.close(); }
 });

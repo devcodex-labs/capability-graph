@@ -21,5 +21,5 @@ for (let i = 0; i < 5; i++) {
 console.log(JSON.stringify({ node: process.version, platform: process.platform, provider: "seed.http", providerVersion: "0.1.0",
   task: "Explicitly select validation, resolve required schema context, read routed knowledge and Specification", acceptance: "Exact expected IDs and zero omissions; configured budgets respected",
   conditions: "5 sequential local runs; duration includes open and close; deterministic selection, not an LLM evaluation",
-  retrievalComparison: "N/A: no real retriever configured", modelCalls: 0, monetaryCost: "N/A: no paid service invoked",
+  modelCalls: 0, monetaryCost: "N/A: no paid service invoked",
   samples }, null, 2));

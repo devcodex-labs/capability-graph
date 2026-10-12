@@ -412,5 +412,5 @@ node providers/acme-spec/discover.mjs
 
 - 面向 Agent 首轮只暴露主入口：[Provider 自有 API](../getting-started/provider-owned-api)或[自有 MCP](../integrations/provider-owned-mcp)。
 - 设计更多关系：[设计关系](./design-relations)；Knowledge Collection/远程来源见[知识接入](./add-local-knowledge)。
-- 项目实际实例与静态定义不同，按需接入[Runtime](./use-runtime)。
+- 项目实际实例由宿主自己的业务 API 查询。
 - 修订、配置、部分结果出现问题时按[故障排查](../troubleshooting/index)处理，不把失败改成“没有能力”。

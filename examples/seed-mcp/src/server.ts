@@ -61,17 +61,6 @@ export function createSeedServer(graph: CapabilityGraph, providerRoot: string): 
     providerId: z.string(), knowledgeIds: z.array(z.string()).optional(), locales: z.array(z.string()).optional(),
     requiredStaticRevision: z.string().optional(),
   } }, (query) => call(() => graph.readSpecification(query)));
-  server.registerTool("example_retrieve_capabilities", { description: "Explicitly invoke the configured capability retriever.", inputSchema: {
-    ...scope, text: z.string(), limit: z.number().int().positive().optional(),
-  } }, (query) => call(() => graph.retrieveCapabilities(query)));
-  server.registerTool("example_query_knowledge", { description: "Search only the selected capability knowledge with a configured backend.", inputSchema: {
-    ...scope, selected: z.array(id), text: z.string(), knowledgeIds: z.array(z.string()).optional(), roles: z.array(z.string()).optional(),
-    locales: z.array(z.string()).optional(), limit: z.number().int().positive().optional(),
-  } }, (query) => call(() => graph.queryKnowledge(query)));
-  server.registerTool("example_query_runtime", { description: "Query observed instances in one project, environment and Provider.", inputSchema: {
-    ...scope, project: z.string(), environment: z.string(), instanceOf: id.optional(), instanceId: z.string().optional(),
-    requiredRuntimeRevision: z.string().optional(), cursor: z.string().optional(), limit: z.number().int().positive().optional(),
-  } }, (query) => call(() => graph.queryRuntime(query)));
   server.registerResource("provider-specification", "seed://provider/specification", { mimeType: "text/markdown" }, async (uri) => {
     const batch = await graph.forProvider("seed.http").readSpecification({ knowledgeIds: ["SPEC-01"] });
     const slot = batch.results[0];

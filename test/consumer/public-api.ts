@@ -13,7 +13,7 @@ void [rangeReader, incompleteRangeReader];
 const id: CanonicalCapabilityId = { providerId: "seed.http", capabilityId: "route.http" };
 const encoded: string = formatQualifiedId(id);
 const decoded: CanonicalCapabilityId = parseQualifiedId(encoded);
-const override: BudgetOverrides = { catalog: { maxBytes: 8_192 }, neighbors: { maxBytes: 8_192, maxItemBytes: 1_024 }, runtime: { timeoutMs: 100 } };
+const override: BudgetOverrides = { catalog: { maxBytes: 8_192 }, neighbors: { maxBytes: 8_192, maxItemBytes: 1_024 } };
 const error: ErrorShape = new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
 const batch: BatchResult<string> = { results: [{ inputIndex: 0, ok: false, error }], meta: {
   completeness: "partial", compositeStaticRevision: "s:1", servedFrom: "current", scope: ["seed.http"], warnings: [],
@@ -55,13 +55,14 @@ import { computeStaticRevision } from "@devcodex/capability-graph";
 import { resolveBudgets } from "@devcodex/capability-graph";
 // @ts-expect-error No public MCP package subpath is provided.
 import {} from "@devcodex/capability-graph/mcp";
-// Raw records are intentionally public inputs to the database adapter contract.
+// Source definition records remain an internal implementation detail.
+// @ts-expect-error Raw records are no longer public database adapter inputs.
 import type { UnvalidatedCapabilityRecord } from "@devcodex/capability-graph";
 // @ts-expect-error Validated internal graph nodes are not the public bounded detail projection.
 import type { StaticCapability } from "@devcodex/capability-graph";
 import type { BoundProviderGraph, CapabilityDetail, KnowledgeDocumentRef, SelectionResult,
-  UnvalidatedProviderRecord } from "@devcodex/capability-graph";
-function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, raw: UnvalidatedCapabilityRecord, neighbors: NeighborPage) {
+  ProviderLoadSpec } from "@devcodex/capability-graph";
+function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, neighbors: NeighborPage) {
   const provider: Promise<ProviderResult> = bound.getProvider();
   void provider.then((value) => [value.staticRevision, value.meta.servedFrom, value.meta.refreshFailed]);
   const completeness: "complete" | "truncated" | "partial" = neighbors.groups.children.completeness;
@@ -79,7 +80,6 @@ function graphConsumer(bound: BoundProviderGraph, detail: CapabilityDetail, raw:
   void bound.listCatalog({ requestProviderScope: ["other"] });
   // @ts-expect-error Detail does not expose internal full adjacency lists.
   void detail.parents;
-  void raw.capabilityId;
 }
 void graphConsumer;
 const document: KnowledgeDocumentRef = { kind: "document", knowledgeId: "guide", role: "guide",
@@ -87,14 +87,25 @@ const document: KnowledgeDocumentRef = { kind: "document", knowledgeId: "guide",
 // @ts-expect-error v1.0.1 requires a role on every Document.
 const legacyDocument: KnowledgeDocumentRef = { kind: "document", knowledgeId: "guide",
   locator: { type: "http", url: "https://example.test/guide" } };
-const legacyProvider: UnvalidatedProviderRecord = { providerId: "seed.http", name: "Seed", version: "1", specification: {
-  specificationId: "rules", version: "1",
-  // @ts-expect-error Single entryRef was removed by the multi-document Specification contract.
-  entryRef: "PROVIDER.md",
-} };
-const legacyRecord: UnvalidatedCapabilityRecord = { capabilityId: "route", name: "Route", description: "Routing", whenToUse: "When routing",
-  // @ts-expect-error requiredBy is derived, never authored in a capability definition.
-  requiredBy: ["other"],
-};
-void [document, legacyDocument, legacyProvider, legacyRecord];
+void [document, legacyDocument];
 void [missingProvider, unknownBudget, badBudget, badBatch, computeStaticRevision, resolveBudgets];
+
+function removedApis(graph: import("@devcodex/capability-graph").CapabilityGraph, bound: BoundProviderGraph) {
+  // @ts-expect-error Capability recall moved outside the graph.
+  graph.retrieveCapabilities({ text: "route" });
+  // @ts-expect-error Knowledge search moved outside the graph.
+  bound.queryKnowledge({ text: "route", selected: [] });
+  // @ts-expect-error Running instance observation moved outside the graph.
+  graph.queryRuntime({ project: "app", environment: "local" });
+}
+// @ts-expect-error Database authorities are unsupported in 2.0.
+const databaseSource: ProviderLoadSpec = { providerId: "seed", authority: { kind: "database" } };
+// @ts-expect-error Runtime budgets are removed.
+const runtimeBudget: BudgetOverrides = { runtime: { timeoutMs: 100 } };
+void [removedApis, databaseSource, runtimeBudget];
+
+// @ts-expect-error The unused Runtime timeout code is removed.
+const removedTimeout: import("@devcodex/capability-graph").ErrorCode = "CG_TIMEOUT";
+// @ts-expect-error Collections now use member listing, not a retrieval recovery action.
+const removedRecovery: import("@devcodex/capability-graph").NextAction = "use_retrieval";
+void [removedTimeout, removedRecovery];

@@ -1,6 +1,5 @@
 [
   { "type": "file", "name": "open-and-configuration", "label": "配置与作用域" },
   { "type": "file", "name": "revision-and-reload", "label": "修订、预算与分页" },
-  { "type": "file", "name": "runtime-states", "label": "运行时与超时" },
   { "type": "file", "name": "knowledge-read", "label": "知识与 Adapter" }
 ]

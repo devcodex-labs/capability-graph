@@ -3,8 +3,7 @@
   { "type": "file", "name": "queries-and-results", "label": "查询接口" },
   { "type": "file", "name": "provider-definition", "label": "定义与身份" },
   { "type": "file", "name": "knowledge", "label": "知识接口" },
-  { "type": "file", "name": "runtime", "label": "运行时接口" },
-  { "type": "file", "name": "runtime-adapter", "label": "Adapter 接口" },
+  { "type": "file", "name": "reader", "label": "文档 Reader 合同" },
   { "type": "file", "name": "result-meta", "label": "结果与控制元数据" },
   { "type": "file", "name": "errors", "label": "错误与恢复动作" }
 ]

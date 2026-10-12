@@ -6,8 +6,8 @@ const pages = [
   ['installation', 'getting-started/installation'],
   ['progressive', 'guides/progressive-discovery'],
   ['mcp', 'integrations/provider-owned-mcp'],
-  ['adapter', 'integrations/runtime-adapter'],
-  ['runtime', 'guides/use-runtime'],
+  ['reader-integration', 'integrations/knowledge-reader'],
+  ['reader-contract', 'reference/reader'],
   ['reference', 'reference/capability-graph']
 ] as const;
 const viewports = [
@@ -63,7 +63,7 @@ test('wide desktop keeps the compact navigation controls visible', async ({ page
   await page.goto('./');
   await expect(page.locator('.rp-nav__title')).toContainText('Capability Graph');
   await expect(page.locator('.rp-search-button')).toBeVisible();
-  await expect(page.locator('.rp-nav-menu--right > li > a')).toHaveText(['v1', 'GitHub']);
+  await expect(page.locator('.rp-nav-menu--right > li > a')).toHaveText(['v2', 'GitHub']);
   await expect(page.locator('.rp-nav__others > .rp-switch-appearance')).toBeVisible();
   await expect(page.locator('.rp-nav-hamburger__md')).toBeHidden();
   await page.screenshot({

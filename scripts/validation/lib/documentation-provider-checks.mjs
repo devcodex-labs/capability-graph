@@ -2,10 +2,9 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { sha256 } from '../../../examples/vextjs/source-provenance.mjs';
-import { assertKnowledgeEvidence } from './retrieval-assertions.mjs';
 
 /** Inspect the exported layout, every original chapter and actual Core pages, with independent task expectations. */
-export async function verifyDocumentationProvider({ graph, recall, exported, sourceRoot }) {
+export async function verifyDocumentationProvider({ graph, exported, sourceRoot }) {
   async function files(directory) {
     const found = [];
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -50,35 +49,17 @@ export async function verifyDocumentationProvider({ graph, recall, exported, sou
       readVerification: capabilityId ? 'Core pages reconstruct original bytes' : 'reference-only; original/copy hash verified; no task query',
       frameworkBehavior: 'not-established-by-document-reading' });
   }
-  await recall.rebuild(graph);
-  const tasks = JSON.parse(await readFile(new URL('../../../test/fixtures/vextjs/documentation-retrieval-tasks.json', import.meta.url), 'utf8'));
-  assert.deepEqual([...new Set(tasks.flatMap((task) => task.expected))].sort(),
-    exported.manifest.capabilities.map((item) => item.capabilityId).sort(), 'Independent tasks must cover every official topic');
-  const retrieval = [];
-  for (const task of tasks) {
-    const candidates = await graph.retrieveCapabilities({ text: task.query, limit: 5 });
-    const ids = candidates.items.map((item) => item.id.capabilityId);
-    assert(task.expected.every((id) => ids.includes(id)), `${task.id}: expected documentation task omitted`);
-    assert(task.expected.every((id) => ids.indexOf(id) < task.maxRank), `${task.id}: relevant capability ranked too low`);
-    assert((task.excluded ?? []).every((id) => !ids.includes(id)), `${task.id}: explicitly excluded capability recalled`);
-    if (!task.expected.length) assert.equal(ids.length, 0, `${task.id}: unsupported request recommended`);
-    else if (task.chapter) {
-      const document = exported.manifest.documents.find((item) => item.chapter === task.chapter);
-      for (const id of task.expected) assert(document.capabilityIds.includes(id), `${task.id}: required official chapter unbound`);
-      const evidence = await bound.queryKnowledge({ selected: task.expected.map((capabilityId) => ({ capabilityId })),
-        knowledgeIds: [document.knowledgeId], text: task.text ?? document.title, limit: 3 });
-      assertKnowledgeEvidence(evidence, task.id);
-      const bytes = await readFile(path.join(sourceRoot, document.originalPath));
-      for (const hit of evidence.items) assert.equal(bytes.subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
-    }
-    retrieval.push({ id: task.id, candidateIds: ids, expected: task.expected, officialChapter: task.chapter, status: 'passed' });
+  const catalog = []; let cursor;
+  do { const page = await bound.listCatalog({ limit: 20, ...(cursor ? { cursor } : {}) });
+    assert.equal(page.meta.warnings.length, 0); catalog.push(...page.items.map((item) => item.id.capabilityId)); cursor = page.nextCursor;
+  } while (cursor);
+  assert.deepEqual(catalog.sort(), exported.manifest.capabilities.map((item) => item.capabilityId).sort());
+  for (const capabilityId of catalog) {
+    const details = await bound.getCapabilities([capabilityId]); assert(details.results[0]?.ok);
+    const selection = await bound.resolveSelection({ selected: [capabilityId] });
+    assert.deepEqual(selection.resolved.map((id) => id.capabilityId), [capabilityId]); assert.equal(selection.added.length, 0);
+    const neighbors = await bound.getNeighbors(capabilityId); assert.equal(neighbors.meta.completeness, 'complete');
   }
-  const positive = retrieval.filter((item) => item.expected.length);
-  return { capabilities: exported.count, documents: results, retrieval, modelCalls: 0,
-    retrievalMetrics: { taskCount: tasks.length, coveredTopics: new Set(tasks.flatMap((task) => task.expected)).size,
-      recallAt5: positive.reduce((sum, item) => sum + item.expected.filter((id) => item.candidateIds.includes(id)).length / item.expected.length, 0) / positive.length,
-      top1Rate: positive.filter((item) => item.expected.includes(item.candidateIds[0])).length / positive.length,
-      meanPrecisionAt5: positive.reduce((sum, item) => sum + item.expected.filter((id) => item.candidateIds.includes(id)).length / item.candidateIds.length, 0) / positive.length,
-      unknownFalsePositives: retrieval.filter((item) => !item.expected.length).reduce((sum, item) => sum + item.candidateIds.length, 0) },
-    limitation: 'Complete document inventory and original-byte reading; implementation/Agent coverage is separate' };
+  return { capabilities: exported.count, documents: results, catalogCoverage: catalog.length, selectionCoverage: catalog.length,
+    limitation: 'Complete document inventory, static queries and original-byte reading; document associations do not establish framework execution or Agent success' };
 }

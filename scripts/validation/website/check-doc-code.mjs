@@ -13,7 +13,7 @@ import { websiteRoot, websiteFixtureRoot } from '../../lib/website-paths.mjs';
 import { verifyTutorialSuite } from './lib/tutorial.mjs';
 import { verifyLifecycleExample } from './lib/lifecycle.mjs';
 import { installLocalConsumer } from './lib/consumer.mjs';
-import { verifyDocumentedReaderFactory } from './lib/adapter-contracts.mjs';
+import { verifyDocumentedReaderFactory } from './lib/reader-contracts.mjs';
 
 const docsRoot = path.join(websiteRoot, 'docs');
 const readPage = (name) => readFile(path.join(docsRoot, `${name}.mdx`), 'utf8');
@@ -48,7 +48,6 @@ try {
     ['guides/add-local-knowledge', bound],
     ['guides/errors-and-partial-results', bound],
     ['guides/multiple-providers', ''],
-    ['guides/use-runtime', "import { CapabilityGraph, type RuntimeAdapter } from '@devcodex/capability-graph';\ndeclare const runtimeAdapter: RuntimeAdapter;\n"],
     ['integrations/node-api', '']
   ]);
   const sources = [];
@@ -59,7 +58,7 @@ try {
     await writeFile(file, `${preamble}${blocks.map((block) => block[2]).join('\n')}\n`, 'utf8');
     sources.push(file);
   }
-  for (const page of ['runtime-adapter', 'knowledge-reader', 'database-authority-adapter', 'capability-retriever']) {
+  for (const page of ['knowledge-reader']) {
     const skeletons = fences(await readPage(`integrations/${page}`), 'ts').filter(([, title]) => title);
     assert(skeletons.length, `${page} must include a typed implementation boundary`);
     for (const [, title, body] of skeletons) {

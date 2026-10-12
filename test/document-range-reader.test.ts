@@ -5,15 +5,15 @@ import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph, type KnowledgeReader } from "../src/index.js";
 import { contentId } from "../src/knowledge/local-file-reader.js";
-import { FakeDatabase, record } from "./contract/fake-database.js";
+import { FileFixture, record } from "./contract/file-fixture.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
-import { HttpKnowledgeReader } from "../examples/seed-runtime/knowledge-reader.js";
+import { HttpKnowledgeReader } from "../examples/http-reader/knowledge-reader.js";
 
 const source = "https://range.invalid/document";
 const open = (reader: KnowledgeReader) => CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"], readers: [reader],
-  providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "range-source", openView: async () => new FakeDatabase([record("a", {
+  providers: [{ providerId: "seed", authority: (new FileFixture([record("a", {
     knowledge: [{ kind: "document", knowledgeId: "DOC", role: "guide", locator: { type: "http", url: source } }],
-  })]) } } }] });
+  })])).authority }] });
 const query = { capabilityId: "a", knowledgeId: "DOC" };
 
 test("large-source ranges are independently verified; invalid metadata or forged bytes cannot reuse a source hash", async () => {
@@ -67,9 +67,9 @@ test("five MiB HTTP pagination scans once and retains bounded disk bytes; drift,
     isContentCurrent: (...args) => transport.isContentCurrent(...args),
     readRange: async (...args) => { const range = await transport.readRange!(...args); rangeBytes += range?.bytes.length ?? 0; return range; } };
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"], readers: [reader],
-    providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "http", openView: async () => new FakeDatabase([record("a", {
+    providers: [{ providerId: "seed", authority: (new FileFixture([record("a", {
       knowledge: [{ kind: "document", knowledgeId: "DOC", role: "guide", locator: { type: "http", url: origin + "/guide" } }],
-    })]) } } }] });
+    })])).authority }] });
   const bound = graph.forProvider("seed");
   try {
     const expectedContentId = contentId(bytes);
@@ -141,8 +141,8 @@ test("large source proof entries obey LRU capacity and re-scan an evicted source
         totalBytes: bytes.length, contentType: "text/plain", source: ref.locator.type === "http" ? ref.locator.url : "" };
     } };
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"], readers: [reader],
-    providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "lru", openView: async () => new FakeDatabase(Array.from({ length: 17 }, (_, i) =>
-      record(capabilityId(i), { knowledge: [{ kind: "document", knowledgeId: `D${i}`, role: "guide", locator: { type: "http", url: `${source}/${i}` } }] }))) } } }] });
+    providers: [{ providerId: "seed", authority: (new FileFixture(Array.from({ length: 17 }, (_, i) =>
+      record(capabilityId(i), { knowledge: [{ kind: "document", knowledgeId: `D${i}`, role: "guide", locator: { type: "http", url: `${source}/${i}` } }] })))).authority }] });
   try {
     const bound = graph.forProvider("seed");
     for (let i = 0; i < 17; i++) await bound.readDocumentPage({ capabilityId: capabilityId(i), knowledgeId: `D${i}` });

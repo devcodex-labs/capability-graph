@@ -36,7 +36,7 @@
   },
   {
     "code": "CG_NOT_FOUND",
-    "meaning": "请求的 Provider、Capability、Knowledge 或 Runtime 修订不存在。",
+    "meaning": "请求的 Provider、Capability 或 Knowledge 不存在。",
     "trigger": "完整身份在当前可读视图中没有匹配项。",
     "action": "fix_input",
     "handling": "校正身份，或先调用列表/发现接口获取当前可用项。"
@@ -65,9 +65,9 @@
   {
     "code": "CG_LOAD_FAILED",
     "meaning": "Provider 权威来源加载失败。",
-    "trigger": "文件、数据库扫描或视图清理无法完成。",
+    "trigger": "文件扫描、校验或视图清理无法完成。",
     "action": "repair_source",
-    "handling": "检查来源可读性与后端状态；恢复后重新加载。"
+    "handling": "检查来源可读性；恢复后重新加载。"
   },
   {
     "code": "CG_NO_ACTIVE_VIEW",
@@ -79,16 +79,9 @@
   {
     "code": "CG_REVISION_MISMATCH",
     "meaning": "请求的修订或游标不再对应当前可读视图。",
-    "trigger": "分页、检索或 Runtime 的指定修订不匹配，或知识检索证据中的 Static Revision 不匹配。",
+    "trigger": "指定的静态修订不再可读，或正文变更使分页游标失效。",
     "action": "refresh",
     "handling": "放弃旧游标，从首个请求重新获取当前修订。"
-  },
-  {
-    "code": "CG_INDEX_STALE",
-    "meaning": "检索索引与当前来源身份不一致。",
-    "trigger": "能力召回的来源已过期，或知识索引的 mapping/config/content 身份、freshness 或证据结构无效。",
-    "action": "refresh",
-    "handling": "刷新或重建索引，再从新的发现请求开始。"
   },
   {
     "code": "CG_INPUT_INVALID",
@@ -96,34 +89,6 @@
     "trigger": "必需字段缺失、游标非法或互斥参数同时出现。",
     "action": "fix_input",
     "handling": "修正输入；以错误实例携带的 nextAction 为最终准则。"
-  },
-  {
-    "code": "CG_RUNTIME_CONTEXT_REQUIRED",
-    "meaning": "Runtime 查询缺少项目或环境上下文。",
-    "trigger": "未提供非空 project 与 environment。",
-    "action": "fix_input",
-    "handling": "同时补充项目和环境，再发起 Runtime 查询。"
-  },
-  {
-    "code": "CG_RUNTIME_DISABLED",
-    "meaning": "Provider 未启用 Runtime Adapter。",
-    "trigger": "对只有静态能力的 Provider 发起 Runtime 查询。",
-    "action": "configure_backend",
-    "handling": "配置 Runtime Adapter，或停止对该 Provider 请求运行态。"
-  },
-  {
-    "code": "CG_RUNTIME_UNAVAILABLE",
-    "meaning": "Runtime 来源当前不可用。",
-    "trigger": "Adapter 抛错、超时或无法取得运行态快照。",
-    "action": "repair_source",
-    "handling": "检查运行态服务与 Adapter；恢复后按策略重试。"
-  },
-  {
-    "code": "CG_RUNTIME_RESULT_MISMATCH",
-    "meaning": "Runtime 结果与请求上下文不匹配。",
-    "trigger": "实例的 project、environment 或关联身份不符合请求。",
-    "action": "fix_input",
-    "handling": "先核对请求上下文；若输入正确则修复 Adapter 映射。"
   },
   {
     "code": "CG_ADAPTER_CONTRACT_INVALID",
@@ -143,8 +108,8 @@
     "code": "CG_KNOWLEDGE_TYPE_UNSUPPORTED",
     "meaning": "该知识类型不支持直接读取。",
     "trigger": "例如对 collection 类型调用 readDocuments。",
-    "action": "use_retrieval",
-    "handling": "切换到知识检索接口，再按返回目标读取具体文档。"
+    "action": "fix_input",
+    "handling": "用 listKnowledgeMembers 枚举 Collection 成员，再读取具体 Document。"
   },
   {
     "code": "CG_READER_UNCONFIGURED",
@@ -159,20 +124,6 @@
     "trigger": "Reader 抛错、返回不可读结果或后端暂时故障。",
     "action": "repair_source",
     "handling": "检查 Reader 与后端健康状态，恢复后重试读取。"
-  },
-  {
-    "code": "CG_RETRIEVER_UNCONFIGURED",
-    "meaning": "当前检索操作没有配置 Retriever。",
-    "trigger": "调用能力或知识检索，但未注入相应 Retriever。",
-    "action": "configure_backend",
-    "handling": "配置对应 Retriever，或改用静态列表与详情查询。"
-  },
-  {
-    "code": "CG_RETRIEVER_UNAVAILABLE",
-    "meaning": "已配置的 Retriever 当前不可用。",
-    "trigger": "Retriever 抛错或其索引服务无法访问。",
-    "action": "repair_source",
-    "handling": "恢复 Retriever/索引服务，再重新检索。"
   },
   {
     "code": "CG_SOURCE_UNREADABLE",
@@ -191,16 +142,9 @@
   {
     "code": "CG_BUDGET_EXCEEDED",
     "meaning": "操作超过响应、条目、分页或文档预算。",
-    "trigger": "结果数量、序列化字节或单文档大小超过配置上限。",
+    "trigger": "结果数量、序列化字节、全文返回或单页大小超过对应预算。",
     "action": "page_or_filter",
-    "handling": "按错误实例的 nextAction 分页、过滤或缩小文档；来源记录超限时修复来源。"
-  },
-  {
-    "code": "CG_TIMEOUT",
-    "meaning": "受限操作超过允许时间。",
-    "trigger": "通用超时合同；当前 Runtime Adapter 异常与超时会投影为 CG_RUNTIME_UNAVAILABLE。",
-    "action": "repair_source",
-    "handling": "检查后端任务状态后再重试，避免假定原操作已取消。"
+    "handling": "按错误实例的 nextAction 分页或过滤；大文档改用正文分页，来源记录超限时修复来源。"
   },
   {
     "code": "CG_PARTIAL_ITEM",

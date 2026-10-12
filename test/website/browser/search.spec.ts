@@ -3,8 +3,8 @@ import { expect, test } from './fixtures';
 const queries = [
   ['Provider', /Provider 与 Specification|建模 Provider|创建第一个 Provider/],
   ['能力关系', /设计关系|关系模型|身份与关系/],
-  ['Runtime', /运行时模型|使用运行时|运行时状态|运行时接口/],
-  ['Knowledge', /知识模型|知识读取|KnowledgeReader 接入|KnowledgeRetriever 接入/],
+  ['KnowledgeReader', /文档 Reader 合同|KnowledgeReader 接入/],
+  ['Knowledge', /知识模型|知识读取|KnowledgeReader 接入/],
   ['CG_REVISION_MISMATCH', /错误与恢复动作|修订、预算与分页/],
   ['MCP', /Provider 自有 MCP|Seed MCP 示例/],
   ['必要上下文', /渐进发现与按需读取|查询接口|身份与关系/],
@@ -80,7 +80,7 @@ test('clear cancels visible stale results even while a query is debouncing', asy
   const input = page.getByRole('textbox', { name: '搜索文档' });
   await input.fill('MCP');
   await expect(page.locator('.rp-search-panel__results a').first()).toBeVisible();
-  await input.fill('Runtime');
+  await input.fill('KnowledgeReader');
   await page.getByRole('button', { name: '清空搜索' }).click();
   await expect(input).toHaveValue('');
   await expect(page.locator('.rp-search-panel__results')).toContainText('输入关键词');

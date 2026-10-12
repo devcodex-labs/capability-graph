@@ -10,17 +10,17 @@ description: 用少量 Provider-owned MCP 工具实现主能力、意图收窄�
 Capability Graph 不导出统一 MCP Server。Provider 在自己的 MCP 进程中使用 Core，并把工具设计成渐进发现链：
 
 1. **列出主能力**：Provider 显式选择主入口并返回摘要和修订；也可以用 `listCatalog()` 暴露有界平坦目录，但它不会自动只返回根节点。
-2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`；可选 Retriever 只能召回已有身份。
+2. **根据意图收窄**：宿主或 Agent 选择相关 `capabilityId`。
 3. **进入能力详情**：调用 getCapabilities() 获取有界详情，不把关系/知识摘要当未裁剪全量定义。
 4. **展开子能力或关联**：按需调用 `getNeighbors()`，不在首轮暴露整图。
 5. **解析 Selection**：把明确选中的能力交给 `resolveSelection()`，仅沿 `requires` 补齐必要上下文并展示原因。
-6. **读取知识或 Runtime**：可先分页发现文档元数据，再按需读取正文；Runtime 需要项目和环境，可选用 `instanceOf` 收窄，不要求先选择知识。
+6. **读取文档**：可先分页发现文档元数据，再按需读取正文，或枚举 Collection 成员后读取具体文档。
 
 工具名称、数量、输入 Schema、认证和规范投递由 Provider 决定。参考示例使用私有 MCP 包，避免把 SDK 变成主包运行时依赖。
 
 ## Seed 调用示例
 
-本节是**独立的主入口示例**，使用真实 seed.http 定义，只注册五个查询工具。原 examples/seed-mcp Server 保持 14 个查询工具，example_list_catalog 仍返回五个能力的平坦目录。Core 不自动选择主入口，也不把每个能力注册成一个 MCP 工具。
+本节是**独立的主入口示例**，使用真实 seed.http 定义，只注册五个查询工具。原 examples/seed-mcp Server 保持 11 个查询工具，example_list_catalog 仍返回五个能力的平坦目录。Core 不自动选择主入口，也不把每个能力注册成一个 MCP 工具。
 
 ### 运行前提与文件
 
@@ -123,7 +123,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 ```
 
-mainEntries 是 Provider 显式策略，默认只有 route。首轮保留用途摘要、真实 Static Revision、meta 和逐项错误，不带邻居、知识或 Runtime；主入口缺失时保留失败槽位，不过滤成成功空列表。
+mainEntries 是 Provider 显式策略，默认只有 route。首轮保留用途摘要、真实 Static Revision、meta 和逐项错误，不带邻居或文档正文；主入口缺失时保留失败槽位，不过滤成成功空列表。
 
 详情是**有界详情**，关系组/知识摘要仍可能截断。邻居保留八组固定键与各组游标，未请求的关系不递归展开。Selection 接收完整二元身份与逐 Provider 修订映射，读取接收完整 resolved。主入口策略与工具名不是 Core 的统一约定。
 
@@ -214,9 +214,9 @@ node examples/seed-mcp/docs-main-entry/client.mjs
 | Selection | selected、requiredStaticRevisionByProvider | requires 补齐 schema.request，返回加入原因 |
 | 文档 | 完整 resolved、knowledgeIds、roles、locales、R | 按需读 D-02/D-03，逐项保留结果 |
 
-Server stdout 只用于 JSON-RPC，日志写 stderr。Client finally 关闭 transport；Server 停机关闭自己的 graph。示例不实现生产认证、租户策略、部署或 Agent 自动意图判断。Runtime/检索不是本链前置。
+Server stdout 只用于 JSON-RPC，日志写 stderr。Client finally 关闭 transport；Server 停机关闭自己的 graph。示例不实现生产认证、租户策略、部署或 Agent 自动意图判断。业务状态与正文搜索由宿主独立处理。
 
-原 Seed 的 Specification Resource 与 14 个查询工具仍见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。五工具 Server 没有宣称提供该 Resource。
+原 Seed 的 Specification Resource 与 11 个查询工具仍见[Seed 示例](../examples/seed-provider#provider-owned-mcp)。五工具 Server 没有宣称提供该 Resource。
 
 ## 错误映射
 

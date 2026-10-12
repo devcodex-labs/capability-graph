@@ -1,15 +1,13 @@
+import { CapabilityGraph, type KnowledgeReadContext, type KnowledgeDocumentRef } from "@devcodex/capability-graph";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import path from "node:path";
 import test from "node:test";
-import { CapabilityGraph, type KnowledgeReadContext, type KnowledgeDocumentRef, type SourceChange } from "@devcodex/capability-graph";
-import { FakeDatabase, record } from './contract/fake-database.js';
-import { HttpKnowledgeReader } from "../examples/seed-runtime/knowledge-reader.js";
-import { createHttpRetrievalExample, runHttpRetrievalDemo } from "../examples/seed-runtime/retrieval-demo.js";
-import { TextKnowledgeRetriever } from "../examples/seed-runtime/text-retrieval.js";
-import { assertPortReleased } from "./contract/http-service-process.js";
+import { FileFixture, record } from './contract/file-fixture.js';
+import { HttpKnowledgeReader } from "../examples/http-reader/knowledge-reader.js";
+import { assertPortReleased } from "./contract/port-released.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 const context: KnowledgeReadContext = { providerId: 'seed.http', staticRevision: 's:test',
@@ -22,10 +20,10 @@ test('HTTP full-read budgets preserve actionable errors and leave oversized sour
   const source = await httpSource((_url, response) => { response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); response.end(body); });
   const reader = new HttpKnowledgeReader({ allowedOrigins: [source.origin] });
   const document = ref(source.origin + '/guide');
-  const db = new FakeDatabase([record('a', { knowledge: [document] })]);
+  const db = new FileFixture([record('a', { knowledge: [document] })]);
   Object.assign(db.provider, { specification: { specificationId: 'spec', version: '1', documents: [{ ...document, knowledgeId: 'SPEC', role: 'specification' }] } });
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'], readers: [reader],
-    providers: [{ providerId: 'seed', authority: { kind: 'database', adapter: { id: 'metadata', openView: async () => db } } }] });
+    providers: [{ providerId: 'seed', authority: db.authority }] });
   try {
     for (const size of [32768, 32769]) {
       body = Buffer.alloc(size, 120);
@@ -57,9 +55,9 @@ test('strong ETag snapshot downloads a long source once, revalidates each page a
   const reader = new HttpKnowledgeReader({ allowedOrigins: [origin], snapshot: { directory, maxBytes: 1_000_000 } });
   let scans = 0; let scannedBytes = 0; const stream = reader.stream.bind(reader);
   reader.stream = async function* (...args) { scans++; for await (const chunk of stream(...args)) { scannedBytes += chunk.bytes.length; yield chunk; } };
-  const db = new FakeDatabase([record('a', { knowledge: [ref(origin + '/guide')] })]);
+  const db = new FileFixture([record('a', { knowledge: [ref(origin + '/guide')] })]);
   const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'], readers: [reader],
-    providers: [{ providerId: 'seed', authority: { kind: 'database', adapter: { id: 'metadata', openView: async () => db } } }] });
+    providers: [{ providerId: 'seed', authority: db.authority }] });
   try {
     const query = { capabilityId: 'a', knowledgeId: 'HTTP' }; const bound = graph.forProvider('seed');
     let cursor: string | undefined; let text = ''; let firstCursor: string | undefined; let pages = 0;
@@ -149,53 +147,6 @@ test('cached snapshots are content-verified and recovery/capacity work while str
   }
 });
 
-for (const finishOlderFirst of [true, false]) test(`HTTP invalidation blocks old cache publication; older query finishes first=${finishOlderFirst}`, async () => {
-  const example = await createHttpRetrievalExample();
-  const retriever = new TextKnowledgeRetriever();
-  let captured!: () => void, captureFailed!: (error: unknown) => void, release!: () => void;
-  const ready = new Promise<void>((resolve, reject) => { captured = resolve; captureFailed = reject; });
-  const resume = new Promise<void>((resolve) => { release = resolve; });
-  let reads = 0, graph: CapabilityGraph | undefined, pending: Promise<unknown> | undefined;
-  try {
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed.http'], integrationEnabledProviders: ['seed.http'],
-      providers: [{ providerId: 'seed.http', authority: { kind: 'file', definitionLayout: 'directory', rootDir: example.root } }],
-      knowledgeRetriever: retriever, readers: [{ id: 'held-real-http', canRead: (ref) => example.reader.canRead(ref),
-        read: async (...args) => {
-          try {
-            const body = await example.reader.read(...args);
-            if (++reads === 1) { captured(); await resume; }
-            return body;
-          } catch (error) { captureFailed(error); throw error; }
-        } }],
-    });
-    const provider = graph.forProvider('seed.http');
-    const query = { selected: [{ capabilityId: 'route.validation' }], knowledgeIds: ['HTTP-GUIDE'], text: '请求校验' };
-    const oldContentId = contentId(Buffer.from(example.body()));
-    const older = provider.queryKnowledge(query);
-    pending = older;
-    older.catch(captureFailed);
-    await ready;
-    example.updateBody('请求校验新正文：先检查必填字段。\n');
-    await retriever.invalidate({ providerId: 'seed.http', staticRevision: example.staticRevision, reason: 'knowledge_body' });
-    assert.equal(retriever.cachedSelections, 0);
-    if (finishOlderFirst) {
-      release();
-      const page = await older;
-      assert(page.items.length > 0 && page.items.every((hit) => hit.contentId === oldContentId));
-      assert.equal(retriever.cachedSelections, 0, 'invalidated request must not repopulate an empty cache');
-    }
-    const newer = await provider.queryKnowledge(query);
-    assert(newer.items.length > 0 && newer.items.every((hit) => hit.contentId === contentId(Buffer.from(example.body()))));
-    if (!finishOlderFirst) { release(); await older; }
-    assert.equal(retriever.cachedSelections, 1);
-    assert((await provider.queryKnowledge(query)).items.length > 0, 'old completion must not replace the new cache');
-  } finally {
-    release(); await Promise.allSettled(pending ? [pending] : []);
-    await graph?.close(); await example.close();
-    await assertPortReleased(example.sourcePort); await assertPortReleased(example.servicePort);
-  }
-});
-
 async function httpSource(handler: (url: string, response: ServerResponse) => void) {
   const server = createServer((request, response) => handler(request.url!, response));
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
@@ -233,9 +184,9 @@ test('HTTP Reader returns exact Chinese UTF-8 bytes/hash and rejects actual fail
     await assert.rejects(reader.read(ref('http://127.0.0.1:1/denied'), context, { maxBytes: 32 }));
     assert.equal(calls, before, 'denied origins must not reach the source');
     assert.equal(calls, 7, 'redirect must not be followed');
-    const db = new FakeDatabase([record('a', { knowledge: [ref(`${source.origin}/bad-utf8`)] })]);
+    const db = new FileFixture([record('a', { knowledge: [ref(`${source.origin}/bad-utf8`)] })]);
     const graph = await CapabilityGraph.open({ hostAllowedProviders: ['seed'], integrationEnabledProviders: ['seed'],
-      providers: [{ providerId: 'seed', authority: { kind: 'database', adapter: { id: 'metadata-only', openView: async () => db } } }], readers: [reader] });
+      providers: [{ providerId: 'seed', authority: db.authority }], readers: [reader] });
     try {
       const result = await graph.forProvider('seed').readDocuments({ selected: ['a'] });
       assert.equal(result.results[0]?.ok, false);
@@ -263,76 +214,4 @@ test('HTTP deadlines, connection cap and host close actually terminate requests'
     assert.equal(closingReader.activeRequests, 0);
     await assert.rejects(closingReader.read(ref(`${source.origin}/after-close`), context, { maxBytes: 32 }));
   } finally { await reader.close(); await closingReader.close(); await source.close(); await assertPortReleased(source.port); }
-});
-
-test('real HTTP task recalls, explicitly selects, reads, searches, rejects stale body and recovers', async () => {
-  const result = await runHttpRetrievalDemo();
-  assert(result.candidates.includes('route.validation'));
-  assert.deepEqual(result.selected, ['route.validation', 'schema.request']);
-  assert(result.knowledgeHits > 0 && result.recoveredHits > 0 && result.httpReads >= 4);
-  assert.equal(result.zeroHits, 0); assert.equal(result.businessStatus, 201); assert.equal(result.modelCalls, 0);
-});
-
-test('lexical indexes keep UTF-8 offsets, evidence on zero hits and explicit config/revision invalidation', async () => {
-  const example = await createHttpRetrievalExample();
-  const provider = example.graph.forProvider('seed.http');
-  const query = { selected: [{ capabilityId: 'route.validation' }], knowledgeIds: ['HTTP-GUIDE'], text: '请求校验' };
-  const change = (reason: SourceChange['reason']): SourceChange => ({ providerId: 'seed.http', staticRevision: example.staticRevision, reason });
-  try {
-    example.knowledge.configure({ chunkBytes: 12 });
-    const page = await provider.queryKnowledge(query);
-    assert(page.items.length > 0); assert.equal(page.meta.completeness, 'complete');
-    const bytes = Buffer.from(example.body());
-    for (const hit of page.items) {
-      assert.equal(bytes.subarray(hit.startOffset, hit.endOffset).toString('utf8'), hit.snippet);
-      assert.equal(hit.contentId, contentId(bytes)); assert(hit.endOffset - hit.startOffset <= 12);
-      assert.equal(hit.id.capabilityId, 'route.validation'); assert.equal(hit.knowledgeId, 'HTTP-GUIDE');
-    }
-    const reads = example.reads();
-    const zero = await provider.queryKnowledge({ ...query, text: 'absentxyz' });
-    assert.equal(zero.items.length, 0); assert.equal(zero.knowledgeState, 'searched');
-    assert(example.reads() > reads, 'zero results still recheck source evidence');
-    example.knowledge.configure({ chunkBytes: 16 });
-    await assert.rejects(provider.queryKnowledge({ ...query, text: 'absentxyz' }), { code: 'CG_INDEX_STALE' });
-    await example.knowledge.invalidate(change('configuration'));
-    assert((await provider.queryKnowledge(query)).items.length > 0);
-    const file = path.join(example.root, 'capabilities/route-validation.json');
-    const definition = JSON.parse(await readFile(file, 'utf8')); definition.name = 'Updated validation';
-    await writeFile(file, JSON.stringify(definition));
-    await example.graph.reload({ providerId: 'seed.http' });
-    await assert.rejects(provider.retrieveCapabilities({ text: 'validation' }), { code: 'CG_INDEX_STALE' });
-    await assert.rejects(provider.queryKnowledge(query), { code: 'CG_REVISION_MISMATCH' });
-    await example.capabilities.rebuild(example.graph); await example.knowledge.invalidate(change('metadata'));
-    assert((await provider.retrieveCapabilities({ text: 'validation' })).items.length > 0);
-    assert((await provider.queryKnowledge(query)).items.length > 0);
-  } finally {
-    await example.close(); assert.equal(example.reader.activeRequests, 0);
-    await assertPortReleased(example.sourcePort); await assertPortReleased(example.servicePort);
-    await assert.rejects(readFile(path.join(example.root, 'provider.json')), { code: 'ENOENT' });
-  }
-});
-
-test('UTF-8 BOM and supplementary characters preserve exact HTTP snippet byte offsets', async () => {
-  const example = await createHttpRetrievalExample();
-  try {
-    example.updateBody('\uFEFF请求🙂校验\n第二行请求验证\n');
-    example.knowledge.configure({ chunkBytes: 12 });
-    const page = await example.graph.forProvider('seed.http').queryKnowledge({
-      selected: [{ capabilityId: 'route.validation' }], knowledgeIds: ['HTTP-GUIDE'], text: '请求校验',
-    });
-    assert.equal(page.meta.completeness, 'complete');
-    assert.deepEqual(page.meta.warnings, []);
-    assert(page.items.length > 0);
-    const bytes = Buffer.from(example.body());
-    for (const hit of page.items) {
-      assert.equal(bytes.subarray(hit.startOffset, hit.endOffset).toString('utf8'), hit.snippet);
-      assert.equal(hit.contentId, contentId(bytes));
-      assert(hit.endOffset - hit.startOffset <= 12);
-    }
-    assert(page.items.some((hit) => hit.startOffset === 0 && hit.snippet.startsWith('\uFEFF')));
-  } finally {
-    await example.close();
-    assert.equal(example.reader.activeRequests, 0);
-    await assertPortReleased(example.sourcePort); await assertPortReleased(example.servicePort);
-  }
 });

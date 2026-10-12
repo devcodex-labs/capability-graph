@@ -26,16 +26,7 @@ export interface BudgetConfig {
     /** Complete Core response serialized as UTF-8 JSON, including failures and meta. */
     readonly maxResponseBytes?: number;
   };
-  readonly retrieveCapabilities: { readonly maxCandidates: number; readonly maxCandidateBytes: number };
-  readonly queryKnowledge: { readonly maxHits: number; readonly maxSnippetBytes: number; readonly maxSelected: number;
-    readonly maxFilterValuesPerDimension: number; readonly maxTargets: number; readonly maxTargetBytes: number };
-  readonly runtime: {
-    readonly defaultPageSize: number;
-    readonly maxPageSize: number;
-    readonly timeoutMs: number;
-    readonly maxFactsBytes: number;
-    readonly maxAssociationBytes: number;
-  };
+
 }
 
 /** Configuration has one grouping level, not an arbitrary recursive schema. */
@@ -53,11 +44,7 @@ export const DEFAULT_BUDGETS: ResolvedBudgetConfig = Object.freeze({
   selection: Object.freeze({ maxSelected: 32, maxNodes: 128, maxEdges: 256 }),
   read: Object.freeze({ maxBytes: 32_768, maxPageBytes: 32_768, maxDocumentsPerCall: 8, maxSelected: 32,
     maxFilterValuesPerDimension: 128, maxResponseBytes: 4_194_304 }),
-  retrieveCapabilities: Object.freeze({ maxCandidates: 20, maxCandidateBytes: 512 }),
-  queryKnowledge: Object.freeze({ maxHits: 8, maxSnippetBytes: 2_048, maxSelected: 32,
-    maxFilterValuesPerDimension: 128, maxTargets: 128, maxTargetBytes: 131_072 }),
-  runtime: Object.freeze({ defaultPageSize: 50, maxPageSize: 100, timeoutMs: 5_000,
-    maxFactsBytes: 4_096, maxAssociationBytes: 2_048 }),
+
 });
 
 function invalid(field: string): never {
@@ -105,7 +92,6 @@ export function resolveBudgets(overrides: BudgetOverrides = {}): ResolvedBudgetC
     ["neighbors", "defaultPageSize", "maxPageSize"],
     ["detail", "defaultKnowledgePageSize", "maxKnowledgePageSize"],
     ["specification", "defaultPageSize", "maxPageSize"],
-    ["runtime", "defaultPageSize", "maxPageSize"],
   ] as const) {
     if (output[group][initial]! > output[group][maximum]!) invalid(`budgets.${group}.${initial}`);
   }

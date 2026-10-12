@@ -4,17 +4,15 @@ import { resolveBudgets, type ResolvedBudgetConfig, type BudgetOverrides } from 
 import { CapabilityGraphError, type ErrorShape } from "./errors.js";
 import { isId } from "./identity.js";
 import { computeEffectiveScope } from "./scope.js";
-import { authorityError, databaseAuthorityStore } from "./store/database-authority-store.js";
 import { FileAuthorityStore } from "./store/file-authority-store.js";
 import { memoryGraphStore } from "./store/memory-graph-store.js";
 import { ProviderViewStore, FrozenGraph, type PinnedStore } from "./store/provider-view-store.js";
-import type { DatabaseAuthorityAdapter, ValidatedProviderView } from "./store/types.js";
+import type { ValidatedProviderView } from "./store/types.js";
 import type { ResultMeta, StaticRevision } from "./types.js";
 import { validateSnapshot } from "./validate/index.js";
 
 /** One source per enabled provider. File roots are resolved at open, independent of subsequent cwd changes. */
-export type AuthoritySpec = { readonly kind: "file"; readonly rootDir: string; readonly definitionLayout?: "directory" | "legacy" } |
-  { readonly kind: "database"; readonly adapter: DatabaseAuthorityAdapter };
+export type AuthoritySpec = { readonly kind: "file"; readonly rootDir: string; readonly definitionLayout?: "directory" | "legacy" };
 export interface ProviderLoadSpec { readonly providerId: string; readonly authority: AuthoritySpec;
   readonly knowledgeRoots?: Readonly<Record<string, KnowledgeRootSpec>> }
 export interface StaticOpenConfig {
@@ -77,10 +75,8 @@ export class CoreHost {
           roots[alias] = Object.freeze(root.kind === "directory" ? { ...root, rootDir: path.resolve(cwd, root.rootDir) } : { ...root, resolveFrom: path.resolve(cwd, root.resolveFrom) });
         }
       }
-      if ((authority.kind === "file" && typeof authority.rootDir === "string" && authority.rootDir.length && !("adapter" in authority)) ||
-          (authority.kind === "database" && authority.adapter && typeof authority.adapter.openView === "function" && !("rootDir" in authority))) {
-        return Object.freeze({ providerId: spec.providerId, knowledgeRoots: Object.freeze(roots), authority: Object.freeze(authority.kind === "file"
-          ? { ...authority, rootDir: path.resolve(cwd, authority.rootDir) } : { ...authority }) });
+      if (authority.kind === "file" && typeof authority.rootDir === "string" && authority.rootDir.length && !("adapter" in authority)) {
+        return Object.freeze({ providerId: spec.providerId, knowledgeRoots: Object.freeze(roots), authority: Object.freeze({ ...authority, rootDir: path.resolve(cwd, authority.rootDir) }) });
       }
       throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" });
     });
@@ -93,12 +89,6 @@ export class CoreHost {
   private async load(spec: ProviderLoadSpec): Promise<ValidatedProviderView> {
     try {
       const roots = await bindKnowledgeRoots(spec.knowledgeRoots);
-      if (spec.authority.kind === "database") {
-        let view;
-        try { view = await spec.authority.adapter.openView(spec.providerId); }
-        catch (error) { throw authorityError(error); }
-        return await databaseAuthorityStore(view, spec.providerId, roots);
-      }
       const source = await new FileAuthorityStore().load(spec.authority.rootDir, spec.authority.definitionLayout);
       const snapshot = await validateSnapshot({ ...source, knowledgeRoots: roots });
       if (snapshot.provider.providerId !== spec.providerId) throw new CapabilityGraphError("CG_VALIDATION_FAILED", { nextAction: "repair_source" });
@@ -171,7 +161,7 @@ export class CoreHost {
           listCapabilities: (page) => fromView(() => source.listCapabilities(page)),
           neighbors: (key, kind, page) => fromView(() => source.neighbors(key, kind, page)) });
       }
-      // Explicit revision is a query-level promise, even when a retriever later returns no candidates.
+      // Explicit revision is a query-level promise, including queries returning no items.
       // Point reads still pass through read() so failures after this probe retain revision-mismatch semantics.
       if (revision !== undefined) await views.get(ids[0]!)?.assertReadable?.();
       return await run({ graph: new FrozenGraph(views), scope, meta });

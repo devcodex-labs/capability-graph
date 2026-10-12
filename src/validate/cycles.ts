@@ -10,9 +10,9 @@ export function validateEndpoints(record: CapabilityRecord, ids: ReadonlySet<str
 }
 
 /**
- * Iterative DFS avoids call-stack overflow and retaining database definitions along the stack.
+ * Iterative DFS avoids call-stack overflow and retaining definitions along the stack.
  * Gray (1) is on the current path; black (2) is fully explored. Relation kinds use independent colors.
- * Each frame owns an edge iterator, so database traversal can retain one bounded relation page.
+ * Each frame owns an edge iterator, so graph traversal can retain one bounded relation page.
  * File records are already retained by the memory store. Related cycles are intentionally allowed.
  */
 export async function validateCycles(ids: ReadonlySet<string>, read: (id: string) => Promise<CapabilityRecord>,

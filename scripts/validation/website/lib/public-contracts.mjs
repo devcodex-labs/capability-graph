@@ -106,7 +106,7 @@ export async function verifyGeneratedContracts(contracts, coverage, docsRoot, re
   // Compile the emitted declarations as one namespace; snippets are reference
   // shapes, not standalone programs. Reader-only sourceContext is not exported.
   const proofName = path.join(repositoryRoot, 'documentation-contract-proof.d.ts');
-  const proof = 'declare namespace Documentation {\ninterface ProviderSourceContext { readonly providerId: string; readonly authorityKind: "file" | "database"; readonly sourceRevision: string; readonly knowledgeRootDir?: string; }\n'
+  const proof = 'declare namespace Documentation {\ninterface ProviderSourceContext { readonly providerId: string; readonly authorityKind: "file"; readonly sourceRevision: string; readonly knowledgeRootDir?: string; }\n'
     + contracts.symbols.map((item) => item.signature.replace(/\bdeclare (?=(?:class|function|const)\b)/g, '')).join('\n') + '\n}';
   const host = ts.createCompilerHost({ target: ts.ScriptTarget.ES2022, types: [], skipLibCheck: false });
   const originalSource = host.getSourceFile.bind(host);

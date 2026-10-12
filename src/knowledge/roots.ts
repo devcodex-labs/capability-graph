@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { CapabilityGraphError } from "../errors.js";
 import { resolveProviderRelative } from "./path-guard.js";
 
-/** Host declarations, never taken from document locators or sent to a retriever. */
+/** Host declarations, never taken from document locators. */
 export type KnowledgeRootSpec = { readonly kind: "directory"; readonly rootDir: string } |
   { readonly kind: "package"; readonly packageName: string; readonly resolveFrom: string };
 export interface BoundKnowledgeRoot { readonly rootDir: string; readonly identity: string }

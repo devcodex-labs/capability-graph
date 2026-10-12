@@ -1,6 +1,6 @@
 {
   "name": "@devcodex/capability-graph",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Framework-agnostic capability graph engine for AI coding systems and developer tooling.",
   "license": "Apache-2.0",
   "type": "module",
@@ -29,7 +29,7 @@
     "test:docs": "node --test test/website/unit/*.test.mjs",
     "test:docs:vextjs": "node scripts/validation/website/check-vextjs-tutorial.mjs",
     "test:site": "playwright test --config test/website/playwright.config.ts",
-    "demo:http": "npm run build && npm run build:tests && node dist-test/examples/seed-runtime/retrieval-demo.js",
+    "demo:http": "npm run build && npm run build:tests && node dist-test/examples/http-reader/main.js",
     "pretest:docs": "npm run build",
     "test:site:cross": "playwright test --config test/website/playwright.smoke.config.ts"
   },

@@ -2,7 +2,6 @@ import { mkdir, writeFile, symlink, rm, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 import { validateVextjs } from './vextjs.mjs';
-import { validateVextSession } from './vextjs-session.mjs';
 import { validateProviderSources } from './provider-sources.mjs';
 import { validateVextDocumentation } from './vextjs-documentation.mjs';
 
@@ -19,7 +18,6 @@ try {
   await symlink(path.join(frameworkRoot, 'node_modules/monsqlize'), path.join(projectRoot, 'node_modules/monsqlize'), process.platform === 'win32' ? 'junction' : 'dir');
   const native = await validateVextjs({ frameworkRoot, projectRoot, sourceIdentity });
   const documents = await validateProviderSources({ sourceRoot: frameworkRoot, installedProject: projectRoot, sourceIdentity });
-  const session = await validateVextSession(frameworkRoot);
   const documentation = await validateVextDocumentation({ frameworkRoot, sourceIdentity });
-  console.log(JSON.stringify({ native, documents, session, documentation }, null, 2));
+  console.log(JSON.stringify({ native, documents, documentation }, null, 2));
 } finally { await rm(projectRoot, { recursive: true, force: true }); }

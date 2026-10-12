@@ -15,7 +15,6 @@ description: 诊断修订不匹配、刷新失败、预算不足、部分结果�
 
 Core 只保留 current 和 previous。更旧修订无法恢复。使用单个 `requiredStaticRevision` 的查询要求有效范围恰好一个 Provider；多 Provider 配合单 revision 会被拒绝。`resolveSelection` 是例外：多 Provider 闭包使用 `requiredStaticRevisionByProvider` 逐来源指定修订，不把一个 hash 复用于所有来源，见[Selection 解析](../reference/queries-and-results#selection)。
 
-不要在 reload 期间修改已打开数据库 read view 的记录；这会违反稳定快照合同。
 
 ## 预算与分页
 
@@ -24,7 +23,7 @@ Core 只保留 current 和 previous。更旧修订无法恢复。使用单个 `r
 1. 缩小 Provider scope、ID 列表、关系 kinds 或 knowledgeIds；
 2. 降低单页 `limit` 并使用 `nextCursor`；
 3. 只在业务确实需要时调整 `budgets`，不要无限放大；
-4. 检查单项 description、facts、association 或 cursor 是否异常过大。
+4. 检查单项 description、文档元数据或 cursor 是否异常过大。
 
 `truncated` 使用游标续页；`partial` 同时检查 warnings 和逐项失败。邻居各关系组独立续页，只重试仍有游标的组。
 

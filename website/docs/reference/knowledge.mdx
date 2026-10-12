@@ -1,13 +1,13 @@
 ---
 title: 知识接口
-description: 文档路由、显式读取、Specification 与检索目标合同参考。
+description: 文档路由、显式读取、Specification 与原文访问合同参考。
 ---
 
 import Contracts from '@generated/snippets/contracts-knowledge.mdx';
 
 # 知识接口
 
-<span className="cg-status">本地读取可用；远程与检索后端需配置</span>
+<span className="cg-status">本地读取可用；URL 需配置 Reader</span>
 
 ## KnowledgeRef
 
@@ -58,9 +58,9 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 }
 ```
 
-这里的 `path` 相对 Provider 知识根，不相对脚本或终端目录。文件来源的知识根即 Authority 根；数据库来源使用该只读视图的 `knowledgeRootDir`。缺失正文可通过定义加载，实际读取时返回失败；已经存在但越界的符号链接会在加载阶段被拒绝。完整创建文件和读取正文的步骤见[进阶 G2](../guides/progressive-discovery#g2-local-knowledge)。
+这里的 `path` 相对 Provider 知识根，不相对脚本或终端目录。文件来源的知识根即 Authority 根。缺失正文可通过定义加载，实际读取时返回失败；已经存在但越界的符号链接会在加载阶段被拒绝。完整创建文件和读取正文的步骤见[进阶 G2](../guides/progressive-discovery#g2-local-knowledge)。
 
-1.1.0 支持在 `providers[]` 每项配置 `knowledgeRoots.docs = { kind: 'directory', rootDir: '/approved/docs' }` 或 `knowledgeRoots.installed = { kind: 'package', packageName: '@scope/library', resolveFrom: '/consumer/project' }`。locator 例如 `{ type: 'relative-file', root: 'installed', path: 'README.md' }`，公开 source 为 `root:installed/README.md`。根、包版本和 manifest 指纹在私有 view 中捕获；不执行包入口，不发给 Retriever。安装包未包含的文档需另绑定官方目录或 URL。
+2.0.0 支持在 `providers[]` 每项配置 `knowledgeRoots.docs = { kind: 'directory', rootDir: '/approved/docs' }` 或 `knowledgeRoots.installed = { kind: 'package', packageName: '@scope/library', resolveFrom: '/consumer/project' }`。locator 例如 `{ type: 'relative-file', root: 'installed', path: 'README.md' }`，公开 source 为 `root:installed/README.md`。根、包版本和 manifest 指纹在私有 view 中捕获；不执行包入口，不出现在公共响应。安装包未包含的文档需另绑定官方目录或 URL。
 
 根别名必须匹配 `^[A-Za-z][A-Za-z0-9_-]{0,63}$`：首字符是英文字母，总长 1–64 字符，其余允许英文字母、数字、下划线和连字符。`installed`、`vextjs-docs` 合法，`vextjs.docs`、中文别名和空字符串会使 open 返回 `CG_CONFIG_INCOMPLETE`。这限制别名格式；实际目录路径仍支持中文和空格。完整配置与分页调用见[添加知识：三类来源](../guides/add-local-knowledge#三类来源与同一分页调用)。
 
@@ -78,13 +78,13 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 | `graph.forProvider(id).readDocuments({ selected })` | 每项是该 Provider 的本地 ID 字符串，不能再传 `requestProviderScope` |
 | 省略 `knowledgeIds` | 读取匹配的直接 Document；Collection 成员必须显式选择 |
 | 省略 `roles/locales` | 不限制对应维度；locale 规范化后精确匹配，无父语言回退 |
-| `knowledgeIds/roles/locales: []` | 合法但匹配为空；不要与 `queryKnowledge` 不允许空 `knowledgeIds` 的规则混淆 |
+| `knowledgeIds/roles/locales: []` | 合法但匹配为空 |
 | 正文预算 | 每次最多 8 篇；`read.maxBytes` 限制全文单篇返回，默认 32768 字节，完整 JSON 另受响应预算保护，文档总大小不设准入门槛；大文档使用下方分页接口 |
 | 原始输入预算 | selected 默认最多 32 项；knowledgeIds/roles/locales 每维默认最多 128 项，重复值也计数，超限在点读前失败 |
 | 完整响应预算 | 默认 4 MiB JSON UTF-8 字节，包含正文转义、失败槽位和元数据；超限为查询级 `CG_BUDGET_EXCEEDED`，需要拆批或过滤 |
 | 单篇失败 | 缺失文件、无匹配 Reader、非法 UTF-8、Reader 合同错误或全文超过单篇返回预算产生失败槽位；改用分页可继续读取大文档 |
 
-具体 Reader 选择、来源身份和错误码见[Reader 与 Adapter](./runtime-adapter#knowledgereader)。这里的默认值可以通过 `budgets.read` 调整，不能绕过所选修订和 Provider 范围。
+具体 Reader 选择、来源身份和错误码见[Reader 与 Adapter](./reader)。这里的默认值可以通过 `budgets.read` 调整，不能绕过所选修订和 Provider 范围。
 
 ## readSpecification
 
@@ -94,11 +94,6 @@ Document 最小映射示例，可合并到能力定义的 `knowledge` 数组：
 
 顶层 `graph.readSpecification({ providerId, ... })` 必须传 `providerId`；绑定后的 `graph.forProvider(id).readSpecification()` 可省略整个参数，并且不能另传 `providerId`。省略 `knowledgeIds/locales` 表示不限制对应维度，空数组表示筛空。默认正文与篇数预算同 `readDocuments`，单篇读取失败仍保留其他结果；但来源视图不可读、修订不匹配或篇数超限会使本次查询失败，而不是返回部分正文。
 
-## queryKnowledge
-
-`KnowledgeSearchTarget` 只含最终过滤后的公开文档映射，不含绝对知识根或 `readContext`。原始数组、最终目标数与目标 JSON 字节数均有预算，超限时 Retriever 不会被调用。后端的 `KnowledgeHit` 使用 UTF-8 字节偏移，`endOffset` 为开区间；Core 核验后生成带正式路由元数据的 `KnowledgeResultHit`。`KnowledgeIndexEvidence` 必须证明映射、配置和内容身份与当前请求一致，即使零命中也不能省略。
-
-每个最终文档都需实际来源核验。外部索引不调用 access.read/scan 时，Core 通过 Reader 独立核验正文哈希与命中范围；相同的自报哈希不是来源证明。正确零命中也需可读来源，缺 Reader 或来源失败不能返回 current。
 
 ## 正文分段读取
 
@@ -129,6 +124,6 @@ do {
 
 旧 Reader 仅实现 `read` 时采用有界全文回退；超过回退容量或需要真实取消时应实现 `stream`。失败后已启动的读取与资源清理完成才结束查询。
 
-HTTP 源码参考支持注入宿主 Agent 兼容代理，在仓库外保存受容量、条目及期限约束的完整快照。首次全文哈希绑定强 ETag，续页条件 HEAD 的 304 可证明来源版本仍有效；较大正文通过 `readRange` 读取磁盘快照的所需块，由 Core 再验证分块哈希，无需来源服务器支持 HTTP Range。不支持 HEAD、无验证器、弱 ETag 或超磁盘快照预算时回退全文核验。ETag 不替代首次内容哈希，200 新正文拒绝旧 cursor，未经完整来源证明的 206 被拒绝。全文、Specification、分页和检索保留原始 BOM/CRLF；MD/MDX 的 MIME 一致。
+HTTP 源码参考支持注入宿主 Agent 兼容代理，在仓库外保存受容量、条目及期限约束的完整快照。首次全文哈希绑定强 ETag，续页条件 HEAD 的 304 可证明来源版本仍有效；较大正文通过 `readRange` 读取磁盘快照的所需块，由 Core 再验证分块哈希，无需来源服务器支持 HTTP Range。不支持 HEAD、无验证器、弱 ETag 或超磁盘快照预算时回退全文核验。ETag 不替代首次内容哈希，200 新正文拒绝旧 cursor，未经完整来源证明的 206 被拒绝。全文、Specification 和分页保留原始 BOM/CRLF；MD/MDX 的 MIME 一致。
 
 <Contracts />

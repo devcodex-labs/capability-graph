@@ -4,12 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph } from "@devcodex/capability-graph";
 import { runSeedTask, seedProviderRoot } from "../examples/seed-api/main.js";
-import { seedRuntimeFixture } from "./contract/fixture-runtime-adapter.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 test("Seed: real definitions and public API select only the two required documents", async () => {
   const result = await runSeedTask();
-  assert.equal(result.catalog.items.length, 5); assert.equal(result.runtime, undefined);
   assert.equal(result.providers.items[0]?.specification?.documentCount, 1);
   assert.deepEqual(result.neighbors.groups.parents.items.map((entry) => entry.id.capabilityId), ["request", "route"]);
   assert.equal(result.neighbors.groups.specializes.items[0]?.id.capabilityId, "route.http");
@@ -19,13 +17,6 @@ test("Seed: real definitions and public API select only the two required documen
   assert.deepEqual(result.selection.added.map((entry) => entry.capabilityId), ["schema.request"]);
   assert.equal(result.specification.results[0]?.ok, true);
   assert.equal(JSON.stringify(result).includes(seedProviderRoot), false);
-});
-
-test("Seed non-F-18: contract Runtime step uses a test-only fixture, not a claimed real source", async () => {
-  const result = await runSeedTask({ runtime: { adapter: seedRuntimeFixture(), project: "project-a", environment: "test" } });
-  assert.equal(result.runtime?.items[0]?.facts.path, "/users");
-  assert.equal(result.runtime?.observation.source, "fixture://seed");
-  assert.equal(result.catalog.items.length, 5);
 });
 
 test("Seed: second provider isolation and failed update recovery on actual author files", async () => {

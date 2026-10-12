@@ -59,17 +59,16 @@ Core 会校验相对路径仍位于 Provider 根的真实路径中，并按条�
 
 成功项的 `value.knowledgeId` 为 `routing-guide`，`value.text` 与 knowledge/routing.md 一致，`contentId` 标识实际字节。空 selected 无效；拼错知识 ID、文件缺失或越界应检查逐项错误，不能解释成“没有知识”。只改正文无需重建能力身份；改关联需重新加载静态定义。接口 Promise 成功不代表每项 ok。
 
-下一步需要全文检索时再考虑[检索 Adapter](../integrations/capability-retriever)，不要把 Collection 当作可直接拼接的文档。
 
 ## 当前边界
 
-- Collection 不能整读；可以先列成员再按成员 ID 精确读取，全文检索需要 `KnowledgeRetriever`。
+- Collection 不能整读；可以先列成员再按成员 ID 精确读取，按成员 ID 读取原文。
 - HTTP/HTTPS 引用需要 `KnowledgeReader`；没有 Reader 会返回明确未配置错误。
 - 知识只从非空已选能力集合展开；需要依赖闭包时先调用 `resolveSelection()`，仅 `requires` 被展开。
 
 ## 三类来源与同一分页调用
 
-正文不必都复制进 `knowledge/`。下面是一个独立消费项目的完整配置，覆盖本地目录（含 Provider 外目录）、已安装包和 URL；选择文档后使用相同的 `readDocumentPage()`。先按[安装页](../getting-started/installation)取得 1.1.0，并安装示例包 `npm install bcp-47@2.1.1`。
+正文不必都复制进 `knowledge/`。下面是一个独立消费项目的完整配置，覆盖本地目录（含 Provider 外目录）、已安装包和 URL；选择文档后使用相同的 `readDocumentPage()`。先按[安装页](../getting-started/installation)取得 2.0.0，并安装示例包 `npm install bcp-47@2.1.1`。
 
 | 来源 | locator | 宿主配置及正文来源 |
 |---|---|---|

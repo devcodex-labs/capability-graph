@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -60,7 +61,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
   const root = await createTemporaryDirectory('capacity-source-');
   const manifest = (providerId, version) => ({ providerId, name: providerId, version,
     specification: { specificationId: `${providerId}.conventions`, version: '1', documents: [
-      { kind: 'document', knowledgeId: 'SPEC', role: 'specification', locator: { type: 'relative-file', path: 'guide.md' } },
+      { kind: 'document', knowledgeId: 'SPEC', role: 'specification', locator: { type: 'http', url: 'https://capacity.invalid/guide' } },
     ] } });
   const sources = Array.from({ length: config.providers }, (_, index) => ({ providerId: `bench.p${index}`,
     root: path.join(root, `p${index}`), nodes: Math.floor(config.nodes / config.providers) + (index < config.nodes % config.providers ? 1 : 0),
@@ -94,7 +95,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
           return writeFile(path.join(source.root, `${id(index)}.capability.json`), JSON.stringify({
             capabilityId: id(index), name: `Capability ${index}`, description: 'Capacity validation', whenToUse: 'Controlled local load',
             ...(index ? { parents: [id(0)], specializes: [id(0)], related: [id(0)], requires: [id(0)] } : {}),
-            knowledge: [{ kind: 'document', knowledgeId: 'GUIDE', role: 'guide', locator: { type: 'relative-file', path: 'guide.md' } }],
+            knowledge: [{ kind: 'document', knowledgeId: 'GUIDE', role: 'guide', locator: { type: 'http', url: 'https://capacity.invalid/guide' } }],
           }));
         }));
       }
@@ -106,21 +107,12 @@ export async function runCapacity(options = {}, progress = () => {}) {
     graph = await CapabilityGraph.open({ hostAllowedProviders: sources.map((source) => source.providerId),
       integrationEnabledProviders: sources.map((source) => source.providerId),
       providers: sources.map((source) => ({ providerId: source.providerId, authority: { kind: 'file', rootDir: source.root } })),
-      knowledgeRetriever: { id: 'capacity-pin', retrieve: async (input, access) => {
-        assert(pinBarrier, 'only retirement probes use the controlled retriever');
-        pinBarrier.entered.resolve();
-        await pinBarrier.resume.promise;
-        const documents = [];
-        for (const target of input.targets) {
-          const body = await access.read({ id: target.id, knowledgeId: target.knowledgeId }, { maxBytes: 32768 });
-          assert.equal(new TextDecoder().decode(body.bytes), 'Capacity guide 正文\n');
-          documents.push({ id: target.id, knowledgeId: target.knowledgeId,
-            sourceContentId: body.contentId, indexedContentId: body.contentId });
-        }
-        return { hits: [], evidence: { staticRevisionByProvider: input.staticRevisionByProvider,
-          mappingRevision: input.mappingRevision, observedAt: new Date().toISOString(), freshness: 'current',
-          sourceConfigRevision: 'capacity-pin:1', indexedConfigRevision: 'capacity-pin:1', documents } };
-      } } });
+      readers: [{ id: 'capacity-reader', canRead: () => true, async read(ref) {
+        if (pinBarrier) { const barrier = pinBarrier; barrier.entered.resolve(); await barrier.resume.promise; }
+        const bytes = Buffer.from('Capacity guide 正文\n');
+        return { bytes, contentType: 'text/plain', source: ref.locator.url,
+          contentId: `k:${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}` };
+      } }] });
     openMs = performance.now() - opening;
     sample(); progress({ phase: 'open', openMs });
     const correctnessStart = performance.now();
@@ -152,8 +144,8 @@ export async function runCapacity(options = {}, progress = () => {}) {
       const before = (await graph.getProvider(source.providerId)).staticRevision;
       const expired = source.previousRevision;
       source.version = String(++source.reloads + 1);
+      const overlap = inFlight; // work in progress when the refresh (including source preparation) begins
       await writeFile(path.join(source.root, 'provider.json'), JSON.stringify(manifest(source.providerId, source.version)));
-      const overlap = inFlight;
       const started = performance.now();
       const result = await graph.reload({ providerId: source.providerId });
       assert(result.ok, 'reload must publish a validated file view');
@@ -179,8 +171,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
       const pinnedRevision = (await graph.getProvider(source.providerId)).staticRevision;
       const barrier = { entered: deferred(), resume: deferred() };
       pinBarrier = barrier;
-      const pending = graph.forProvider(source.providerId).queryKnowledge({ selected: [{ capabilityId: id(1) }],
-        knowledgeIds: ['GUIDE'], text: 'no-match' });
+      const pending = graph.forProvider(source.providerId).readDocuments({ selected: [id(1)], knowledgeIds: ['GUIDE'] });
       pending.then(() => barrier.entered.reject(new Error('Query did not reach the pin barrier')),
         (error) => barrier.entered.reject(error));
       try {
@@ -297,7 +288,7 @@ export async function runCapacity(options = {}, progress = () => {}) {
   }
   await assert.rejects(stat(root), { code: 'ENOENT' });
   return { ...config, node: process.version, platform: process.platform, topology: 'per-provider star with all four forward/reverse relations',
-    authority: 'real file definitions and local document I/O', setupMs, openMs, correctnessMs, workloadMs, closeMs,
+    authority: 'real file definitions; controlled Reader bytes for deterministic pin barriers', setupMs, openMs, correctnessMs, workloadMs, closeMs,
     operationsCompleted: Object.values(latencies).reduce((sum, state) => sum + state.count, 0), peakInFlight,
     queries: Object.fromEntries(kinds.map((kind) => [kind, summary(latencies[kind])])), providerQueries,
     catalogCoverage, retirementChecks, reloads, cursorRestarts,

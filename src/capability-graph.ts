@@ -2,50 +2,34 @@ import { CoreHost, type StaticOpenConfig } from "./core-host.js";
 import { CapabilityGraphError } from "./errors.js";
 import { documents, readSpecification, validateDocumentFilters, validateSelection, validateReadBudgetInput,
   type ReadDocumentsQuery, type ReadSpecificationQuery } from "./knowledge/read.js";
-import type { KnowledgeReader, KnowledgeRetriever, CapabilityRetriever } from "./knowledge/types.js";
+import type { KnowledgeReader } from "./knowledge/types.js";
 import { documentBody, specificationBody, validateBodyQuery, type DocumentBodyQuery, type SpecificationBodyQuery } from "./knowledge/pages.js";
 import { clearDocumentSnapshots } from "./knowledge/stream.js";
-import { retrieveCapabilities } from "./retrieval/capabilities.js";
-import { queryKnowledge, validateKnowledgeBudgetInput } from "./retrieval/knowledge.js";
-import type { QueryKnowledgeQuery, RetrieveCapabilitiesQuery } from "./retrieval/types.js";
-import type { RuntimeAdapter, QueryRuntimeQuery } from "./runtime/types.js";
-import { queryRuntime, validateRuntimeQuery } from "./runtime/query.js";
 import { arrayBudget, inputInvalid, identity } from "./query/common.js";
-import { isId } from "./identity.js";
 import { catalog, details, knowledgeMembers, neighbors, provider, providerResult, refScope, specificationDocuments } from "./query/static.js";
 import { resolveSelection, selectionInput } from "./query/selection.js";
 import type { CapabilityDetailQuery, CapabilityRef, CatalogQuery, DocumentPageQuery, KnowledgeMembersQuery,
   NeighborQuery, ProviderListQuery, ProviderResult, ResolveSelectionQuery } from "./query/types.js";
 
-/** One authority per provider; optional adapters do not change the offline static-query contract. */
+/** File-defined graph with optional document readers. */
 export interface OpenConfig extends StaticOpenConfig {
-  readonly runtimeAdapters?: readonly RuntimeAdapter[];
   readonly readers?: readonly KnowledgeReader[];
-  readonly knowledgeRetriever?: KnowledgeRetriever;
-  readonly capabilityRetriever?: CapabilityRetriever;
 }
 interface Extensions {
-  readonly runtimeAdapters: ReadonlyMap<string, RuntimeAdapter>;
   readonly readers: readonly KnowledgeReader[];
-  readonly knowledgeRetriever?: KnowledgeRetriever;
-  readonly capabilityRetriever?: CapabilityRetriever;
 }
 function extensions(config: OpenConfig): Extensions {
-  const invalid = () => { throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", { nextAction: "configure_backend" }); };
+  const invalid = (field?: string) => { throw new CapabilityGraphError("CG_CONFIG_INCOMPLETE", {
+    nextAction: "configure_backend", ...(field ? { message: `Unsupported configuration field: ${field}. See the 2.0 migration guide.`, details: { field } } : {}) }); };
   if (!config || typeof config !== "object" || (config.readers !== undefined && !Array.isArray(config.readers))) invalid();
+  for (const field of ["runtimeAdapters", "knowledgeRetriever", "capabilityRetriever"]) {
+    if (field in config) invalid(field);
+  }
   for (const reader of config.readers ?? []) if (!reader || typeof reader.id !== "string" || !reader.id || typeof reader.canRead !== "function" || typeof reader.read !== "function" ||
     (reader.stream !== undefined && typeof reader.stream !== "function") ||
     (reader.readRange !== undefined && typeof reader.readRange !== "function") ||
     (reader.isContentCurrent !== undefined && typeof reader.isContentCurrent !== "function")) invalid();
-  for (const retriever of [config.knowledgeRetriever, config.capabilityRetriever]) if (retriever !== undefined &&
-    (!retriever || typeof retriever.id !== "string" || !retriever.id || typeof retriever.retrieve !== "function")) invalid();
-  if (config.runtimeAdapters !== undefined && !Array.isArray(config.runtimeAdapters)) invalid();
-  const runtimeAdapters = new Map<string, RuntimeAdapter>();
-  for (const adapter of config.runtimeAdapters ?? []) {
-    if (!adapter || typeof adapter.id !== "string" || !adapter.id || !isId(adapter.providerId) || typeof adapter.query !== "function" || runtimeAdapters.has(adapter.providerId)) invalid();
-    runtimeAdapters.set(adapter.providerId, adapter);
-  }
-  return Object.freeze({ runtimeAdapters, readers: Object.freeze([...(config.readers ?? [])]), knowledgeRetriever: config.knowledgeRetriever, capabilityRetriever: config.capabilityRetriever });
+  return Object.freeze({ readers: Object.freeze([...(config.readers ?? [])]) });
 }
 
 function queryObject<T extends object>(query: T): T {
@@ -77,7 +61,7 @@ export class CapabilityGraph {
   reload(options: { providerId?: string } = {}) { return this.host.reload(queryObject(options)); }
   /**
    * Reject new work and release owned views after queued refreshes. Existing query pins may outlive this call.
-   * A later close can report delayed cleanup failures; adapter-owned work is not cancelled.
+   * A later close can report delayed cleanup failures; Reader-owned work is not cancelled.
    */
   close() { clearDocumentSnapshots(this.extensions.readers); return this.host.close(); }
   /** Bind identity/scope, not a static revision. The facade shares this graph's lifecycle and reloads. */
@@ -139,7 +123,7 @@ export class CapabilityGraph {
     validateReadBudgetInput(query, this.host.budgets);
     validateSelection(query);
     return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
-      (ctx) => documents(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
+      (ctx) => documents(ctx, query, this.host.budgets, this.extensions.readers));
   }
   /** Read a selected document range; continue with its version-bound cursor. Total document size is unlimited. */
   readDocumentPage(query: DocumentBodyQuery) {
@@ -161,28 +145,7 @@ export class CapabilityGraph {
     return this.host.query([query.providerId], query.requiredStaticRevision,
       (ctx) => readSpecification(ctx, query, this.host.budgets, this.extensions.readers));
   }
-  /** Optional candidate recall, verified against authority with original ranks; never silently substitutes for catalog. */
-  retrieveCapabilities(query: RetrieveCapabilitiesQuery) {
-    queryObject(query);
-    return this.host.query(query.requestProviderScope, query.requiredStaticRevision,
-      (ctx) => retrieveCapabilities(ctx, query, this.host.budgets, this.extensions.capabilityRetriever));
-  }
-  /** Search only selected knowledge and return traceable evidence snippets, not a generated answer. */
-  queryKnowledge(query: QueryKnowledgeQuery) {
-    queryObject(query);
-    try { validateKnowledgeBudgetInput(query, this.host.budgets); }
-    catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
-    validateSelection(query);
-    return this.host.query(query.requestProviderScope ?? (query.requiredStaticRevision === undefined ? undefined : refScope(query.selected)), query.requiredStaticRevision,
-      (ctx) => queryKnowledge(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever));
-  }
-  /** Explicitly query one provider/project/environment; disabled, unavailable and observed-empty are distinct states. */
-  queryRuntime(query: QueryRuntimeQuery) {
-    queryObject(query);
-    validateRuntimeQuery(query);
-    const scope = query.requestProviderScope ?? (query.instanceOf === undefined ? undefined : [identity(query.instanceOf).providerId]);
-    return this.host.query(scope, query.requiredStaticRevision, (ctx) => queryRuntime(ctx, query, this.host.budgets, this.extensions.runtimeAdapters));
-  }
+
 }
 
 /** Reject even JavaScript attempts to replace a bound provider's scope. */
@@ -251,7 +214,7 @@ export class BoundProviderGraph {
     const normalized = { ...query, selected: query.selected.map((capabilityId) => ({ capabilityId })) };
     validateSelection(normalized);
     return this.host.query([this.providerId], query.requiredStaticRevision,
-      (ctx) => documents(ctx, normalized, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever, this.providerId));
+      (ctx) => documents(ctx, normalized, this.host.budgets, this.extensions.readers, this.providerId));
   }
   /** Read a provider-local document page with the same source/version checks as the graph API. */
   readDocumentPage(query: Omit<DocumentBodyQuery, "capability"> & { readonly capabilityId: string }) {
@@ -271,25 +234,5 @@ export class BoundProviderGraph {
     return this.host.query([this.providerId], query.requiredStaticRevision,
       (ctx) => readSpecification(ctx, { ...query, providerId: this.providerId }, this.host.budgets, this.extensions.readers));
   }
-  /** Recall candidates only within this provider; candidate failures remain warnings. */
-  retrieveCapabilities(query: Omit<RetrieveCapabilitiesQuery, "requestProviderScope">) {
-    boundQuery(query);
-    return this.host.query([this.providerId], query.requiredStaticRevision,
-      (ctx) => retrieveCapabilities(ctx, query, this.host.budgets, this.extensions.capabilityRetriever));
-  }
-  /** Search selected CapabilityRef objects; omitted providerId is filled from this binding. */
-  queryKnowledge(query: Omit<QueryKnowledgeQuery, "requestProviderScope">) {
-    boundQuery(query);
-    try { validateKnowledgeBudgetInput(query, this.host.budgets); }
-    catch (error) { if (error instanceof CapabilityGraphError && error.code === "CG_BUDGET_EXCEEDED") return Promise.reject(error); throw error; }
-    validateSelection(query);
-    return this.host.query([this.providerId], query.requiredStaticRevision,
-      (ctx) => queryKnowledge(ctx, query, this.host.budgets, this.extensions.readers, this.extensions.knowledgeRetriever, this.providerId));
-  }
-  /** Query this provider's runtime source; project and environment remain mandatory. */
-  queryRuntime(query: Omit<QueryRuntimeQuery, "requestProviderScope">) {
-    boundQuery(query); validateRuntimeQuery(query);
-    return this.host.query([this.providerId], query.requiredStaticRevision,
-      (ctx) => queryRuntime(ctx, query, this.host.budgets, this.extensions.runtimeAdapters, this.providerId));
-  }
+
 }

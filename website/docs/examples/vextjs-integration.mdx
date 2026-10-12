@@ -1,17 +1,17 @@
 ---
 title: VextJS 集成
-description: 官方文档主题 Provider、原生 MCP 独立审计、分层运行证据和真实验证入口。
+description: 官方文档主题 Provider、原生 MCP 独立审计、图谱与文档证据和真实验证入口。
 ---
 
 # VextJS 集成
 
 <span className="cg-status">有前置条件的可运行源码示例；固定来源实测</span>
 
-仓库提供 examples/vextjs/ 的官方文档导出器、原生 MCP 审计工具、stdio 客户端和运行快照适配器。默认回归验证接入合同；真实验证需要固定的 VextJS 安装快照及仓库外实际项目。它们是源码示例，不属于 Core 的 npm 导出。Core 继续保持框架无关。
+仓库提供 examples/vextjs/ 的官方文档导出器、原生 MCP 审计工具、stdio 客户端。默认回归验证接入合同；真实验证需要固定的 VextJS 安装快照及仓库外验证项目。它们是源码示例，不属于 Core 的 npm 导出。Core 继续保持框架无关。
 
 ## 首次接入：官方文档 Provider
 
-这条路径只需要 Git、Node.js 和 npm，不需要 MCP、Redis 或 MongoDB。先按[安装页](../getting-started/installation)将 Core **1.1.0** 安装到独立的 `capability-graph-demo/`，并保留本仓库源码 `source/`；两者位于同一工作目录。以下脚本依赖仓库中的导出器，不能只安装 Core 就导出 VextJS 文档。
+这条路径只需要 Git、Node.js 和 npm，不需要 MCP、Redis 或 MongoDB。先按[安装页](../getting-started/installation)将 Core **2.0.0** 安装到独立的 `capability-graph-demo/`，并保留本仓库源码 `source/`；两者位于同一工作目录。以下脚本依赖仓库中的导出器，不能只安装 Core 就导出 VextJS 文档。
 
 本例固定 VextJS 提交为 `ef926649926e17543562b8169982fa1786285ecf`。它的版本文本为 2.0.0，但与 npm `vextjs@2.0.0` 不同：发布包没有原生 `mcp` 命令，也不含完整官网目录。先用这个确切源码验证，之后再单独验证你选择的版本。框架构建推荐 Node 20.19.0 或 24.19.0；Windows Node 22 使用 22.23.3，该框架在 Windows 22.12.0 的文件身份检查失败，具体证据见页末。
 
@@ -95,7 +95,7 @@ node discover-vextjs.mjs
 
 第一条应输出 46 个能力、91 篇文档和上述完整提交；第二条应输出 `routing`、`knowledge/guide/routing.md`、连续分页后的总字节和哈希。Catalog 这里只查第一页，有续页不等于全部能力。示例循环为验证原文完整性而续读全文；Agent 可按需要停止或选择范围。仓库目录名称不同，只需调整第一条的 Core 源码参数。
 
-这个导出结果可交给你自己的 API/MCP；要搜索正文，再按[Reader 与 Retriever 接入](../integrations/knowledge-reader)配置后端。下面的矩阵与业务命令用于进一步验收。
+这个导出结果可交给你自己的 API/MCP；远程正文按 [KnowledgeReader 接入](../integrations/knowledge-reader)配置读取器。下面的来源矩阵用于核验原文和图谱，正文搜索由独立模块负责。
 
 ## 来源与角色
 
@@ -103,13 +103,13 @@ node discover-vextjs.mjs
 
 固定快照共 91 篇文档，关联到 46 个主题能力；5 篇导航或资源材料明确列为 reference-only。清单记录每篇文档的归属、哈希和验证范围。新增未分类章节或必需章节缺失会阻止导出。原文可读取不代表其中全部功能已经执行验证。
 
-官方文档的独立入口是 `node scripts/validation/vextjs-documentation.mjs <已构建的固定框架目录> <完整 commit>`。它核对全部原文字节、正文分页还原和覆盖 46 个主题的 63 条独立任务，包含中文未知需求、否定与组合任务。CI 自动执行该入口；全新安装项目的 HTTP/MongoDB/Session 业务与 HTTPS 来源验收由另一个 CI 作业执行。词项检索结果不代表模型或 Agent 的成功率。
+官方文档入口核对全部原文字节、正文分页还原和全部主题的静态图谱查询。安装消费者验证本地、安装包及 HTTPS 的真实来源。
 
 原生 MCP 的 capability、rule、recipe、knowledge、workflow 在独立审计中保留 ID、status、正文、catalog digest 和来源身份。该验证目录的 native.c03 等 ID 不进入公开文档 Provider；正文按原字节保存为 Markdown，机器目录与来源信息存入 metadata/。vext:// 仅是原生来源引用，不是内核支持的 URI Reader。
 
 原生 MCP 缺少分页枚举全部 knowledge 的资源。本例从固定安装快照的目录模块获取发现材料，再核对原生 MCP 的身份、摘要与正文。这个边界只对已核验的 schema 2 成立。`relatedIds` 是可选上下文，不据此推导 requires；原生 Recipe 的 available 也不表示 Core 会执行任务。
 
-同来源重新导出内容稳定；来源更新后重新导出并 reload，宿主按 Provider 失效/重建检索器。不能只用 package.version 固定来源：VextJS main 的固定提交与 npm 2.0.0 虽然版本文本相同，目录与依赖可能不同。
+同来源重新导出内容稳定；来源更新后重新导出并 reload，重新查询目录及文档引用。不能只用 package.version 固定来源：VextJS main 的固定提交与 npm 2.0.0 虽然版本文本相同，目录与依赖可能不同。
 
 ## 多来源与正文出处
 
@@ -129,71 +129,17 @@ knowledge/ 只存文档正文；JSON 用于能力定义和来源元数据。原�
 
 VextJS 与 MonSQLize 分别注册独立 Provider，即使本地 capabilityId、knowledgeId 相同，也按 Provider 隔离。只有启用 directory 布局时，定义才从 `capabilities/**/*.json` 收集；知识来源不因此受限于某个目录名称。
 
-## 可选：原生 MCP 与多来源验收
+## 保留范围的验证
 
-克隆本仓库并在根运行 `npm test`，在仓库外安装固定 VextJS 快照、准备实际项目，再将占位路径替换为真实目录：
+先构建根包和测试示例，再运行固定来源文档校验：
 
-```bash
-node scripts/validation/vextjs.mjs /external/fixed-vextjs /external/project SOURCE_ID
-node scripts/validation/vextjs-session.mjs /external/fixed-vextjs
-node scripts/validation/provider-sources.mjs /external/fixed-vextjs-source /external/installed-project SOURCE_ID --https
+```sh
+npm run build
+npm run build:tests
+node scripts/validation/vextjs-documentation.mjs ../vextjs-fixed ef926649926e17543562b8169982fa1786285ecf
+node scripts/validation/vextjs-consumer.mjs ../vextjs-fixed ef926649926e17543562b8169982fa1786285ecf --https
 ```
 
-第一项回读原生 MCP，在独立审计目录运行检索任务并核验片段偏移和运行证据；第二项通过实际 TCP HTTP 验证 Session、CSRF、失效/退出和 Store 关闭。临时应用、Provider、日志和报告放在项目同级专用目录；正式入口在根 scripts/，固定任务及回归在根 test/。外部框架与数据库不加入 website。
+第二条验证入口创建全新的仓库外消费者，实际安装当前 Core 与固定 VextJS tarball，并安装锁定的 MonSQLize 包。验证 46 个主题的图谱查询、91 篇原始文档、目录/node_modules/HTTPS 来源矩阵、跨 Provider 隔离、正文分页与 reload。原生 MCP 仅用于声明与来源审计。
 
-第三项要求消费项目实际安装对应固定 VextJS 快照与 MonSQLize；固定源码目录须与安装构建匹配。它读取 19 篇官方章节、两个安装包各三篇文档、一个显式绑定的安装目录，以及两篇公开 HTTPS 长/短文。每页核对连续字节偏移、全文/本页哈希、续读标记，完整拼接须等于原始字节；检索必须命中独立期望文本并核对片段偏移。报告保留路径/URL、提交或包身份、原文与读取哈希及转换方式。`--https` 还核验 MonSQLize 注册包的 lockfile integrity；不带此参数的本地矩阵不能证明公网读取。
-
-如果第一项使用实际 tarball 安装根，而不是源码 checkout 的构建目录，第四个参数须传入对应固定源码目录。安装包不包含完整 `website/`，官网章节不能凭空从包中读取。
-
-## 独立实装业务验证
-
-需要已构建的固定 VextJS 源码、Linux/Docker，以及预先安装的 `mongo:8.0` 镜像。在仓库根目录构建 Core 和示例后运行：
-
-```bash
-npm run build && npm run build:tests
-docker pull mongo:8.0
-node scripts/validation/vextjs-consumer.mjs /external/built-fixed-vextjs-source ef926649926e17543562b8169982fa1786285ecf --https
-```
-
-入口创建新的仓库外消费者，实际安装当前 Core 构建包、固定 VextJS 包和 MonSQLize，通过消费者安装包的公开入口执行。app/providers/vextjs 是官方主题 Provider；全部 91 篇文档核对复制字节，86 篇任务关联文档通过 Core 分页完整还原，5 篇参考资料单列。独立主题检索任务还必须命中指定官方章节。
-
-app/providers/notes-example 是集成作者定义的业务 Provider，requires 描述业务内的路由、校验、服务、插件、持久化和会话保护步骤；宿主显式选择 VextJS 的 routing、validation、services、plugins、database、cookies-session。关系限于同一 Provider，跨 Provider 组合通过宿主选择。能力召回、Selection/requires 和官方正文读取后，验证真实 TCP 笔记业务：schema 校验、插件加载与关闭、数据库写入/分页、Session、CSRF 和 logout。原生审计、文档漂移与受控 HTTP 测试均放在独立 verification/，不加入框架能力目录。
-
-入口另验证停库后的失败与新实例恢复、文档漂移/旧游标、旧索引/重建、HTTP 缓存回退、取消/超时和资源释放。结果按阶段记录在仓库同级专用目录，保留应用、Provider、依赖锁、打包文件、日志及报告；结束时移除自建 MongoDB 容器及匿名卷。`--https` 证明真实公网来源，省略则只有本地来源证据。它是需要外部前置条件的独立验收，不属于默认合同回归；不证明模型/Agent 成功、Jobs、SSR、热重载或生产负载。
-
-## 验证覆盖与运行证据
-
-| 阶段 | 本例固定来源的证明 | 不据此推断 |
-|---|---|---|
-| 原文核验 | 91 篇与上游逐字节一致；86 篇任务关联正文经 Core 完整分页，5 篇只作参考 | 全部文档涉及的功能已执行 |
-| 独立检索任务 | 63 条覆盖 46 个主题，核验期望章节与片段；无模型调用 | Agent 成功率、任意自然语言的语义搜索质量 |
-| 原生 MCP 审计 | 73 条原生记录回读、身份和正文一致 | 官方主题 Provider 使用原生编号，或 Core 执行原生 Recipe |
-| 独立实装业务 | HTTP、MongoDB 写入/分页、Session/CSRF/logout、生命周期与故障恢复；另验 HTTPS 来源 | Jobs 调度、SSR、热重载、生产负载全部通过 |
-| 扩展验证 | Redis/Jobs、cluster、浏览器入口各自保留独立前置与报告 | 当前文档/Session CI 矩阵自动覆盖扩展场景 |
-
-运行快照本身还需按证据来源解释：
-
-| 来源 | 能证明什么 | 需要额外核验什么 |
-|---|---|---|
-| OpenAPI | 公开 HTTP 契约 | 隐藏路由、实际业务副作用、Job worker 与进程存活 |
-| project inspect | 固定项目身份、源码/构建观察 | 不能把当前源码修订当旧部署来源 |
-| runtime inspect | 启动实例、状态、worker/reload/event 快照 | stopped 快照仍可存在；liveness=unverified 不等于进程在线 |
-| 实际 HTTP/Redis/MongoDB/浏览器 | 对应请求、记录与交互 | 只证明执行过的场景与固定来源 |
-
-`VextNativeRuntimeAdapter` 保留 partial/unknown/unverified。可信部署来源缺失时不会复制查询 Static Revision；运行游标拒绝快照变化。目录实例与 Snapshot 可用不代表完整运行图。
-
-## 分段与检索
-
-大文档通过 [正文分段接口](../reference/knowledge#正文分段读取)读取，模型决定范围和是否继续。每页分别返回全文和本页哈希；总大小不作为不可读门槛。参考检索器通过 scan 消费大正文，不要求人工拆文档。
-
-URL 使用相同的分页 API、游标与原始 UTF-8 字节偏移规则，无需按来源另设一套分段算法。传输由 HTTP Reader 实现：流式读取、来源限制、完整传输时限及 AbortSignal 均须生效。无 Range 的服务器也可读取；当前参考 Reader 通过完整 GET 校验全文身份，再保留所选页面，不请求或接受任意 206 部分正文冒充完整来源。
-
-强 ETag 可复核已完整保存的本地快照；普通 stream/read 在 304 后仍核对快照长度与全文哈希。分页在强来源复核后复用 Core 私有副本；较大正文可通过 readRange 读取磁盘所需块，再由 Core 独立验证首次扫描留下的分块哈希。正文与证明共用 4 MiB、16 条私有缓存；磁盘快照另有宿主预算。弱/无验证器、证明不可用或超磁盘预算时继续全文流式扫描，每次续读可能重新传输整篇正文。正文变化会拒绝旧游标；超时或取消会终止真实 I/O。分页范围和缓存预算是不同约束，不能用缓存容量拒绝大文档。
-
-固定任务来自根 `test/fixtures/vextjs/retrieval-tasks.json`，期望身份独立于排名。验证比较原生 MCP 和 CG 的召回、未知需求、知识片段、响应量及 P50/P95，模型调用为零。词法召回对否定、同义表达与中文单字容易产生误推荐，不能把这组基线称为 Agent 任务成功率。
-
-真实 Redis Jobs、MongoDB 业务、热重载/cluster、浏览器 SSR/水合与纯 HTML、Cookie/Session 的验证须使用对应固定框架及服务，执行记录另存仓库外。默认 `npm test` 中的受控合同测试不能替代这些实际执行，也不能据此宣称支持任意版本或平台。
-
-已单独核验 npm `vextjs@2.0.0`：其 CLI 不包含 `mcp`，因此不能使用原生 schema 2 Provider/Runtime 接入；该发布包的实际 TCP Session/CSRF 场景可另行验证。此原生接入当前适用于固定 main 快照 `ef926649926e17543562b8169982fa1786285ecf`，不把同版本号的发布包视为等价来源。
-
-该固定快照在 Windows Node 22.12.0 会因 `lstat.dev` 与 `fstat.dev` 的平台差异拒绝源码构建，不能据 Core 的兼容结果宣称框架也支持。Windows 已核验 20.19.0/24.19.0；框架 CI 的 Node 22 使用固定补丁 22.23.3，并保留旧补丁的失败诊断。验证不修改框架源码或绕过身份检查。
+能力主题及文档关联由集成作者维护；knowledge 保存逐篇 Git blob 核验的官方原始 Markdown/MDX，来源与 SHA-256 记录在 metadata。文档读取证明原文与映射，不代表框架所有功能执行通过或 Agent 成功率。2.0 不维护检索任务、运行快照、MongoDB 应用或 Session 业务验收门禁。

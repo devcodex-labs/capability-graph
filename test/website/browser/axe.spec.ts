@@ -3,7 +3,7 @@ import { expect, test } from './fixtures';
 
 const require = createRequire(import.meta.url);
 for (const width of [390, 1280]) for (const mode of ['light', 'dark'] as const) {
-  for (const route of ['./', 'getting-started/installation', 'examples/vextjs-integration', 'reference/knowledge', 'reference/runtime-adapter']) {
+  for (const route of ['./', 'getting-started/installation', 'examples/vextjs-integration', 'reference/knowledge', 'reference/reader']) {
     test(`axe WCAG and landmarks: ${route} at ${width}px in ${mode}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript((dark) => { localStorage.setItem('rspress-theme-appearance', dark ? 'dark' : 'light'); }, mode === 'dark');
@@ -38,7 +38,7 @@ test('document options are a keyboard disclosure with separate actionable contro
 
 test('an overflowing API table scrolls with the keyboard and keeps its table semantics', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('reference/runtime-adapter');
+  await page.goto('reference/reader');
   const tables = page.locator('.rp-table-scroll-container[tabindex="0"]');
   await expect(tables.first()).toBeVisible();
   const table = tables.first();

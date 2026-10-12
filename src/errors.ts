@@ -5,9 +5,7 @@ export type NextAction =
   | "configure_backend"
   | "repair_source"
   | "refresh"
-  | "select_capabilities"
-  | "use_retrieval"
-  | "reduce_document";
+  | "select_capabilities";
 
 export type ErrorCode =
   | "CG_CONFIG_INCOMPLETE"
@@ -22,23 +20,15 @@ export type ErrorCode =
   | "CG_LOAD_FAILED"
   | "CG_NO_ACTIVE_VIEW"
   | "CG_REVISION_MISMATCH"
-  | "CG_INDEX_STALE"
   | "CG_INPUT_INVALID"
-  | "CG_RUNTIME_CONTEXT_REQUIRED"
-  | "CG_RUNTIME_DISABLED"
-  | "CG_RUNTIME_UNAVAILABLE"
-  | "CG_RUNTIME_RESULT_MISMATCH"
   | "CG_ADAPTER_CONTRACT_INVALID"
   | "CG_KNOWLEDGE_NOT_ASSOCIATED"
   | "CG_KNOWLEDGE_TYPE_UNSUPPORTED"
   | "CG_READER_UNCONFIGURED"
   | "CG_READER_UNAVAILABLE"
-  | "CG_RETRIEVER_UNCONFIGURED"
-  | "CG_RETRIEVER_UNAVAILABLE"
   | "CG_SOURCE_UNREADABLE"
   | "CG_PATH_TRAVERSAL"
   | "CG_BUDGET_EXCEEDED"
-  | "CG_TIMEOUT"
   | "CG_PARTIAL_ITEM";
 
 export interface ErrorShape {
@@ -61,23 +51,15 @@ const messages: Readonly<Record<ErrorCode, string>> = {
   CG_LOAD_FAILED: "The provider source could not be loaded.",
   CG_NO_ACTIVE_VIEW: "No validated readable view is available.",
   CG_REVISION_MISMATCH: "The requested revision or cursor is no longer readable.",
-  CG_INDEX_STALE: "The index does not match its current source identities.",
   CG_INPUT_INVALID: "The query input is invalid.",
-  CG_RUNTIME_CONTEXT_REQUIRED: "Runtime queries require project and environment.",
-  CG_RUNTIME_DISABLED: "No runtime adapter is enabled for this provider.",
-  CG_RUNTIME_UNAVAILABLE: "The runtime source is unavailable.",
-  CG_RUNTIME_RESULT_MISMATCH: "A runtime item does not match the requested context.",
   CG_ADAPTER_CONTRACT_INVALID: "The adapter result violates its contract.",
   CG_KNOWLEDGE_NOT_ASSOCIATED: "No knowledge is associated with the selected capability.",
   CG_KNOWLEDGE_TYPE_UNSUPPORTED: "This knowledge type does not support direct reading.",
   CG_READER_UNCONFIGURED: "No reader is configured for this knowledge source.",
   CG_READER_UNAVAILABLE: "The configured knowledge reader is unavailable.",
-  CG_RETRIEVER_UNCONFIGURED: "No retriever is configured for this operation.",
-  CG_RETRIEVER_UNAVAILABLE: "The configured retriever is unavailable.",
   CG_SOURCE_UNREADABLE: "The requested source cannot be read.",
   CG_PATH_TRAVERSAL: "The source path is outside its allowed boundary.",
   CG_BUDGET_EXCEEDED: "The operation exceeds its configured budget.",
-  CG_TIMEOUT: "The operation timed out.",
   CG_PARTIAL_ITEM: "This item could not be returned.",
 };
 

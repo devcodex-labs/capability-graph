@@ -24,7 +24,7 @@ description: 诊断 open、Authority、定义校验、Provider scope、身份与
 3. 文件根存在且进程可读，`provider.json` 的 ID 与配置一致。
 4. 单个定义文件不超过 262,144 UTF-8 字节，JSON 可解析。
 5. 所有必填字段、关系端点和知识 locator 合法。
-6. `parents`、`specializes`、`requires` 分别无环；数据库 Authority 的反向关系流还必须与正向记录一致。
+6. `parents`、`specializes`、`requires` 分别无环。
 
 首次加载失败没有旧视图可回退。修复来源后重新 open，不要把缺 Authority 改成空目录成功。
 
@@ -34,6 +34,6 @@ description: 诊断 open、Authority、定义校验、Provider scope、身份与
 
 `CG_IDENTITY_AMBIGUOUS` 表示未绑定调用只提供了 `{ capabilityId }`。改用完整 `{ providerId, capabilityId }`，或先 `forProvider(providerId)`。
 
-知识读取和检索要求非空 `selected`。Agent 没有选择能力时，应继续目录/详情流程，而不是用空选择探测全部知识。
+知识读取要求非空 `selected`。Agent 没有选择能力时，应继续目录/详情流程，而不是用空选择探测全部知识。
 
 绑定 facade 禁止 `requestProviderScope`。如果 JavaScript 对象意外带入该字段，会得到 `CG_INPUT_INVALID`；请在协议层分别定义绑定和非绑定输入。

@@ -5,7 +5,7 @@ description: 面向 Provider 的能力建模、发现与知识导航基础设施
 
 # Capability Graph
 
-本页与后续教程对应 **1.1.0**。请按[安装步骤](./getting-started/installation)核对并安装确切版本；版本未发布时可从固定源码构建，避免旧版返回空目录或缺少分页接口。
+本页与后续教程对应 **2.0.0**。请按[安装步骤](./getting-started/installation)核对并安装确切版本；版本未发布时可从固定源码构建，避免旧版返回空目录或缺少分页接口。
 
 Capability Graph 帮助框架、SDK 或平台把能力整理成 Agent 可以逐步查询的目录。维护这组定义和接入规则的一方称为 Provider；它使用 Core 加载和查询定义，通过自己的 API 或 MCP 提供发现入口。
 
@@ -17,14 +17,13 @@ Capability Graph 帮助框架、SDK 或平台把能力整理成 Agent 可以逐�
 
 1. 从路由目录发现 `route.validation`，按任务意图选择它。
 2. 显式选择它，沿作者声明的 `requires` 补齐 `schema.request` 等必要上下文；这不是业务执行顺序。
-3. 通过已配置的 Runtime Adapter 确认项目中的 `POST /users` 实例。
-4. 读取已选能力关联的知识，再由宿主完成代码修改和验证。
+3. 读取已选能力关联的知识，再由宿主完成代码修改和验证。
 
 Core 提供发现和查询结果，不执行能力，也不代替 Agent 判断意图。这个完整场景见示例分区；下方最小代码只演示静态目录。
 
 ## 定义来源与查询方向
 
-定义来源：Provider 提供能力文件、知识引用和可选 Adapter，Core 按配置加载并校验。查询则由 Agent 发起，方向如下：
+定义来源：Provider 提供能力文件和文档引用，Core 按配置加载并校验。查询则由 Agent 发起，方向如下：
 
 <div className="cg-flow" role="img" aria-label="Agent 调用 Provider 自有 API 或 MCP，接入层查询 Core，Core 读取 Provider 权威来源并沿原调用链返回结果。">
   <div><strong>Agent</strong><br />根据任务选择下一次查询</div>
@@ -33,22 +32,22 @@ Core 提供发现和查询结果，不执行能力，也不代替 Agent 判断�
   <span aria-hidden="true" />
   <div><strong>Capability Graph Core</strong><br />校验来源并执行有界查询</div>
   <span aria-hidden="true" />
-  <div><strong>Provider 权威来源</strong><br />提供静态定义；按需读取知识或调用 Adapter</div>
+  <div><strong>Provider 权威来源</strong><br />提供静态定义；按需读取文档</div>
 </div>
 
-结构化结果沿调用链返回。目录不携带知识正文或 Runtime 实例；需要这些信息时再发起对应查询。
+结构化结果沿调用链返回。目录不携带文档正文，需要原文时再显式读取。
 
 ## 何时使用
 
-适合能力较多、需要区分静态定义与项目实际实例、希望按所选能力读取知识的框架或平台。多个 Provider 也可以联合发现，但仍保留各自的身份和修订。
+适合能力较多、需要查询能力关系、希望按所选能力读取文档的框架或平台。多个 Provider 也可以联合发现，但仍保留各自的身份和修订。
 
 如果只有几个固定工具，Agent 不需要发现、选择或查询能力关系，直接提供 API/MCP 通常就够了。
 
 ## 从这里开始
 
 - [快速开始](./getting-started/index)：从安装到第一个 Provider 和第一次查询。
-- [使用指南](./guides/index)：按当前任务添加子能力、知识、API/MCP 或 Runtime。
-- [核心概念](./concepts/index)：需要时查身份、关系、范围、修订、知识和 Runtime。
+- [使用指南](./guides/index)：按当前任务添加子能力、知识、API/MCP。
+- [核心概念](./concepts/index)：需要时查身份、关系、范围、修订、文档。
 - [GitHub](https://github.com/devcodex-labs/capability-graph)：查看源码、测试和真实 Seed。
 
 ## 文档目录
@@ -96,7 +95,7 @@ try {
 | `providers` | 每个有效启用 Provider 的唯一权威来源配置 |
 | `authority.kind` / `rootDir` | 本例从指定文件根读取 `provider.json` 和能力文件 |
 | `forProvider()` | 将查询绑定到 `acme.http`，后续可以使用 Provider 内的能力 ID |
-| `listCatalog()` | 返回平坦能力摘要，不是根节点专用接口，也不展开详情、知识和 Runtime |
+| `listCatalog()` | 返回平坦能力摘要，不是根节点专用接口，也不展开详情、文档 |
 | `close()` | 释放 Core 持有的权威视图句柄 |
 
 最小教程只定义 `route`，所以 `catalog.items` 恰有一项。精简投影如下，省略修订等字段：

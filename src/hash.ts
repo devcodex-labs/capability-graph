@@ -45,7 +45,7 @@ export function canonicalJson(value: unknown, ancestors = new Set<object>()): st
 /**
  * Hash a prevalidated, strictly ordered record stream with constant cross-record state.
  * This yields a candidate revision only; graph/source validation must finish before publication.
- * File and database authorities share these exact normalized JSON bytes and defaults.
+ * File definitions use these normalized JSON bytes and defaults.
  */
 export async function computeStaticRevision(
   provider: UnvalidatedProviderRecord,

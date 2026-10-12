@@ -8,9 +8,7 @@ export interface CanonicalCapabilityId {
 
 export type QualifiedCapabilityId = string;
 export type StaticRevision = string;
-export type RuntimeRevision = string;
 export type KnowledgeContentId = string;
-export type RuntimeCompatibility = "compatible" | "unknown" | "refresh_required";
 
 export type KnowledgeLocator =
   | { readonly type: "relative-file"; readonly path: string; readonly root?: string }
@@ -47,7 +45,7 @@ export interface ProviderRecord {
   readonly name: string;
   readonly version: string;
   readonly specification?: SpecificationMetadata;
-  readonly authorityKind: "file" | "database";
+  readonly authorityKind: "file";
 }
 export type NeighborKind = "parents" | "children" | "specializes" | "specializedBy" | "related" | "relatedBy" | "requires" | "requiredBy";
 export interface StaticCapability {
@@ -71,12 +69,6 @@ export interface CurrentCapabilityView {
     readonly id: CanonicalCapabilityId;
     readonly staticRevision: StaticRevision;
   }[];
-  readonly runtime?: {
-    readonly runtimeRevision: RuntimeRevision;
-    readonly observedAgainstStaticRevision: StaticRevision;
-    readonly queriedStaticRevision: StaticRevision;
-    readonly compatibility: RuntimeCompatibility;
-  };
   readonly knowledge?: readonly {
     readonly id: CanonicalCapabilityId;
     readonly knowledgeId: string;

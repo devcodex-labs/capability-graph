@@ -60,25 +60,6 @@
     ]
   },
   {
-    "id": "seed-runtime",
-    "status": "Runnable",
-    "source": "../examples/seed-runtime",
-    "verify": "npm test",
-    "runDir": ".",
-    "prerequisites": [
-      "root: npm ci"
-    ],
-    "entry": "npm test",
-    "proof": "自动路径的公开行为，不证明生产集成",
-    "userResponsibilities": [
-      "按页面创建文件和安装依赖",
-      "接入方负责认证、部署和进程管理"
-    ],
-    "claims": [
-      "real HTTP runtime observation"
-    ]
-  },
-  {
     "id": "first-provider-tutorial",
     "status": "Runnable",
     "source": "../test/fixtures/website/minimal-provider",
@@ -147,100 +128,38 @@
     "prerequisites": [
       "构建后的固定 VextJS 来源及完整 commit",
       "源码仓库 npm ci、npm run build、npm run build:tests",
-      "业务验收另需 Docker、MongoDB 与仓库外全新项目"
+      "真实安装消费者需 npm 网络访问；HTTPS 来源需显式开启"
     ],
     "entry": "scripts/validation/vextjs-documentation.mjs",
-    "proof": "固定源码实测：91 篇官方原文、46 个主题、63 条独立检索任务；另有全新安装项目的 HTTP/MongoDB/Session 业务及 HTTPS 来源验证。默认 npm test 仅合同回归；原生 MCP 独立审计，不代表任意版本、全部框架功能、生产认证或 Agent 成功率",
+    "proof": "固定提交的官方原文、全部主题图谱查询及真实安装消费者的目录/node_modules/HTTPS 来源；原生 MCP 仅声明审计",
     "userResponsibilities": [
-      "固定来源并准备实际项目及外部服务；区分公开 HTTP 契约、启动快照与存活证据"
+      "准备固定来源及独立消费者；文档读取不证明业务功能执行"
     ],
     "claims": [
       "byte-exact official documentation from a verified fixed source",
       "conditional runnable source example",
-      "selected HTTP/MongoDB/Session business and HTTPS verification"
-    ]
-  },
-  {
-    "id": "database-authority",
-    "status": "Contract-only",
-    "source": "../src/store/types.ts",
-    "verify": "npm test",
-    "runDir": ".",
-    "prerequisites": [
-      "root: npm ci"
-    ],
-    "entry": "npm test",
-    "proof": "公开类型与正负合同，不证明真实后端",
-    "userResponsibilities": [
-      "实现实际后端",
-      "配置访问与生命周期"
-    ],
-    "claims": [
-      "adapter contract",
-      "contract tests"
-    ]
-  },
-  {
-    "id": "capability-retrieval",
-    "status": "Runnable",
-    "source": "../examples/seed-runtime",
-    "verify": "npm test",
-    "runDir": ".",
-    "prerequisites": [
-      "root: npm ci"
-    ],
-    "entry": "npm run demo:http",
-    "proof": "真实本机 HTTP 与有限词项索引，包含中文偏移、零命中和过期恢复；不证明语义搜索质量、Agent 成功率或生产容量",
-    "userResponsibilities": [
-      "实现实际后端",
-      "配置访问与生命周期"
-    ],
-    "claims": [
-      "real local HTTP transport",
-      "bounded lexical index",
-      "explicit stale rejection and recovery"
-    ]
-  },
-  {
-    "id": "knowledge-retrieval",
-    "status": "Runnable",
-    "source": "../examples/seed-runtime",
-    "verify": "npm test",
-    "runDir": ".",
-    "prerequisites": [
-      "root: npm ci"
-    ],
-    "entry": "npm run demo:http",
-    "proof": "真实本机 HTTP 与有限词项索引，包含中文偏移、零命中和过期恢复；不证明语义搜索质量、Agent 成功率或生产容量",
-    "userResponsibilities": [
-      "实现实际后端",
-      "配置访问与生命周期"
-    ],
-    "claims": [
-      "real local HTTP transport",
-      "bounded lexical index",
-      "explicit stale rejection and recovery"
+      "installed graph and document consumer"
     ]
   },
   {
     "id": "remote-reader",
     "status": "Runnable",
-    "source": "../examples/seed-runtime",
+    "source": "../examples/http-reader",
     "verify": "npm test",
     "runDir": ".",
     "prerequisites": [
       "root: npm ci"
     ],
     "entry": "npm run demo:http",
-    "proof": "真实本机 HTTP 与有限词项索引，包含中文偏移、零命中和过期恢复；不证明语义搜索质量、Agent 成功率或生产容量",
+    "proof": "真实 HTTP 原字节分页、来源变化、ETag、取消与清理",
     "userResponsibilities": [
       "实现实际后端",
       "配置访问与生命周期"
     ],
     "claims": [
       "real local HTTP transport",
-      "bounded lexical index",
-      "explicit stale rejection and recovery"
+      "exact original document bytes",
+      "host-owned Reader lifecycle"
     ]
   }
 ]

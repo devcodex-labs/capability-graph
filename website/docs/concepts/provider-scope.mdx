@@ -1,6 +1,6 @@
 ---
 title: 作用域、修订与完整性
-description: 理解 Effective Provider Scope、静态与运行时修订，以及完整、截断和部分结果。
+description: 理解 Effective Provider Scope、静态与正文修订，以及完整、截断和部分结果。
 ---
 
 # 作用域、修订与完整性
@@ -15,11 +15,11 @@ hostAllowedProviders
 ∩ requestProviderScope（若提供）
 ```
 
-请求只能收窄，不能扩大宿主或集成配置。V1 的授权粒度是 Provider 集合；ID 前缀、父节点和分类是查询过滤，不是节点级授权。
+请求只能收窄，不能扩大宿主或集成配置。当前授权粒度是 Provider 集合；ID 前缀、父节点和分类是查询过滤，不是节点级授权。
 
-“未被 Agent 选择”也不等于“被 scope 拒绝”。能力仍可在目录中被发现，Runtime `instanceOf` 也可引用它；只有知识查询必须限制在非空已选能力集合内。
+“未被 Agent 选择”也不等于“被 scope 拒绝”。能力仍可在目录中被发现，只有知识查询必须限制在非空已选能力集合内。
 
-Adapter 与 Core 在同一进程中运行，Provider scope 不是进程沙箱。接入层仍需负责用户、租户和项目授权。
+Reader 与 Core 在同一进程中运行，Provider scope 不是进程沙箱。接入层仍需负责用户、租户和项目授权。
 
 例如宿主允许 `acme.http` 和 `acme.database`，集成只启用前者，那么请求加入后者不能扩大范围，会被拒绝。只选择 `acme.http` 中的 `route.validation` 是知识选择；同 Provider 的 `schema.request` 仍可被发现，它不是因此被禁止访问。
 
@@ -27,9 +27,9 @@ Adapter 与 Core 在同一进程中运行，Provider scope 不是进程沙箱。
 
 ## 修订模型
 
-Static Revision 是经过完整校验的 Provider 静态快照身份。Runtime Revision 是 Adapter 对运行观察的身份，两者不能互换。
+Static Revision 是经过完整校验的 Provider 静态快照身份。知识正文另有 contentId，二者不能互换。
 
-单 Provider 目录查询返回 `meta.staticRevision`；多 Provider 查询使用 `meta.staticRevisionByProvider`。后续绑定同一 Provider 的详情、关系、知识或 Runtime 查询可以传 `requiredStaticRevision`，保证一次任务继续使用同一静态视图。
+单 Provider 目录查询返回 `meta.staticRevision`；多 Provider 查询使用 `meta.staticRevisionByProvider`。后续绑定同一 Provider 的详情、关系、文档查询可以传 `requiredStaticRevision`，保证一次任务继续使用同一静态视图。
 
 例如 Acme 的目录返回修订 S1，Agent 选择验证能力后继续用 S1 读取知识。此时作者发布 S2，仍可读取的 previous 允许任务继续用 S1；若 S1 已退休，调用失败并要求重新发现，不能以 `provider.version = '0.1.0'` 替代 S1。
 
@@ -40,7 +40,6 @@ Static Revision 是经过完整校验的 Provider 静态快照身份。Runtime R
 - 更旧或已不可读的指定修订返回 `CG_REVISION_MISMATCH`；
 - 首次加载失败没有旧视图可回退。
 
-Runtime 观察会记录依据的静态修订。仅身份相同但修订变化，不自动等于兼容。
 
 ## 结果完整性
 
@@ -54,6 +53,6 @@ Runtime 观察会记录依据的静态修订。仅身份相同但修订变化，
 
 `getCapabilities(ids)` 保留原始输入槽位，包括重复 ID 和失败项；每个 `BatchItem` 都要检查 `ok`。`readDocuments` 会展开、过滤和去重文档，`readSpecification` 也不保证与 `knowledgeIds` 输入顺序对应；两者的 `inputIndex` 是生成结果槽位，不能用它回查原选择数组。成功项按 `id`/`knowledgeId` 关联，详见[批量结果](../reference/result-meta#批量结果)。
 
-来源故障的边界取决于操作：批量详情和文档点读可保留正常项并逐项报错；Retriever 可剔除失效候选并报告 `partial`；联合 `listCatalog`/`listProviders` 遇到不可读来源会查询级失败。显式指定的权威修订不可读也会使整次查询失败，不能用旧视图或空结果冒充成功。
+文件定义载入后保存在内存，reload 失败不会删除可读 current；联合 `listCatalog`/`listProviders` 可继续查询并标记 refreshFailed。正文文件或 Reader 故障只影响实际读取，不使静态目录失效。批量详情中的未知身份及文档失败可保留正常槽位；实例已关闭、范围被拒绝或指定修订已退休时查询级失败，不能用其他修订或空结果冒充成功。
 
 预算不会通过静默删除 `whenToUse` 或 `distinction` 制造“成功”。无法取得任何进展时返回 `CG_BUDGET_EXCEEDED`。实践见 [处理错误与部分结果](../guides/errors-and-partial-results)。

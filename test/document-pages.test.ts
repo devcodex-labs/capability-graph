@@ -4,11 +4,10 @@ import path from "node:path";
 import test from "node:test";
 import { createServer } from "node:http";
 import { CapabilityGraph, type KnowledgeReader } from "../src/index.js";
-import { FakeDatabase, record } from "./contract/fake-database.js";
+import { FileFixture, record } from "./contract/file-fixture.js";
 import { contentId } from "../src/knowledge/local-file-reader.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
-import { HttpKnowledgeReader } from "../examples/seed-runtime/knowledge-reader.js";
-import { TextKnowledgeRetriever } from "../examples/seed-runtime/text-retrieval.js";
+import { HttpKnowledgeReader } from "../examples/http-reader/knowledge-reader.js";
 
 test("stable source reuse is private, graph-scoped and bounded; invalid proof and source drift still fail", async () => {
   let body = Buffer.from("x".repeat(1_048_576)); let streams = 0; let proofs = 0; let proof: unknown = true;
@@ -23,7 +22,7 @@ test("stable source reuse is private, graph-scoped and bounded; invalid proof an
   };
   const document = { kind: "document" as const, knowledgeId: "DOC", role: "guide", locator: { type: "http" as const, url: "https://source.invalid/guide" } };
   const openGraph = () => CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"], readers: [reader],
-    providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "source", openView: async () => new FakeDatabase([record("a", { knowledge: [document] })]) } } }] });
+    providers: [{ providerId: "seed", authority: (new FileFixture([record("a", { knowledge: [document] })])).authority }] });
   const graph = await openGraph(); const bound = graph.forProvider("seed"); const query = { capabilityId: "a", knowledgeId: "DOC" };
   try {
     let cursor: string | undefined; let text = ""; let firstCursor: string | undefined; let pages = 0;
@@ -54,7 +53,7 @@ async function fixture(run: (graph: CapabilityGraph, root: string, text: string)
     for (const capabilityId of ["a", "b"]) await writeFile(path.join(root, `${capabilityId}.capability.json`), JSON.stringify({ capabilityId, name: capabilityId, description: "pages", whenToUse: "Read pages",
       knowledge: [{ kind: "document", knowledgeId: "DOC", role: "guide", locator: { type: "relative-file", path: "doc.md" } }] }));
     graph = await CapabilityGraph.open({ hostAllowedProviders: ["pages"], integrationEnabledProviders: ["pages"],
-      providers: [{ providerId: "pages", authority: { kind: "file", rootDir: root } }], knowledgeRetriever: new TextKnowledgeRetriever() });
+      providers: [{ providerId: "pages", authority: { kind: "file", rootDir: root } }] });
     await run(graph, root, text);
   } finally { await graph?.close(); await removeTestDirectory(root); }
 }
@@ -75,9 +74,7 @@ test("UTF-8 pages reconstruct large documents and overlong fences exactly, with 
   const full = await graph.readDocuments({ selected: [{ providerId: "pages", capabilityId: "a" }] });
   assert.equal(full.results[0]?.ok, false);
   if (!full.results[0]!.ok) assert.equal(full.results[0]!.error.code, "CG_BUDGET_EXCEEDED");
-  const found = await bound.queryKnowledge({ text: "paragraph", selected: [{ capabilityId: "a" }], limit: 2 });
-  assert.equal(found.items.length, 2); assert.equal(found.meta.completeness, "complete");
-  for (const hit of found.items) assert.equal(Buffer.from(text).subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
+
 }));
 
 test("LF and CRLF paragraph/fence boundaries preserve original UTF-8 byte ranges", async () => fixture(async (graph, root) => {
@@ -147,14 +144,9 @@ test("HTTP pages work without Range and abort closes real I/O before returning",
     await writeFile(path.join(root, "provider.json"), JSON.stringify({ providerId: "http", name: "HTTP", version: "1" }));
     await writeFile(path.join(root, "a.capability.json"), JSON.stringify({ capabilityId: "a", name: "a", description: "HTTP", whenToUse: "read",
       knowledge: ["doc", "slow"].map((knowledgeId) => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "http", url: `${origin}/${knowledgeId}` } })) }));
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ["http"], integrationEnabledProviders: ["http"], providers: [{ providerId: "http", authority: { kind: "file", rootDir: root } }], readers: [reader], knowledgeRetriever: new TextKnowledgeRetriever(), budgets: { read: { maxPageBytes: 1024 } } });
+    graph = await CapabilityGraph.open({ hostAllowedProviders: ["http"], integrationEnabledProviders: ["http"], providers: [{ providerId: "http", authority: { kind: "file", rootDir: root } }], readers: [reader], budgets: { read: { maxPageBytes: 1024 } } });
     const bound = graph.forProvider("http"); const first = await bound.readDocumentPage({ capabilityId: "a", knowledgeId: "doc", maxBytes: 1024 });
     assert.equal(first.totalBytes, Buffer.byteLength(text)); assert.equal(first.contentId, contentId(Buffer.from(text)));
-    const before = requests;
-    const hits = await bound.queryKnowledge({ selected: [{ capabilityId: "a" }], knowledgeIds: ["doc"], text: "中文", limit: 3 });
-    assert.equal(hits.items.length, 3); assert.equal(hits.meta.completeness, "complete");
-    assert.equal(requests - before, 2, "one index scan and one shared verification scan for three snippets");
-    for (const hit of hits.items) assert.equal(Buffer.from(text).subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
     const controller = new AbortController(); const pending = bound.readDocumentPage({ capabilityId: "a", knowledgeId: "slow", signal: controller.signal });
     const timer = setTimeout(() => controller.abort(), 30);
     try { await assert.rejects(pending, { code: "CG_READER_UNAVAILABLE" }); } finally { clearTimeout(timer); }

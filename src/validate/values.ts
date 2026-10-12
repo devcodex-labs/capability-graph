@@ -3,7 +3,7 @@ import { canonicalJson } from "../hash.js";
 
 export const RECORD_MAX_BYTES = 262_144;
 
-/** Shared field validation for JSON files and database records. */
+/** Shared field validation for JSON definitions. */
 export function invalid(details: Record<string, unknown> = {}): never {
   throw new CapabilityGraphError("CG_VALIDATION_FAILED", { nextAction: "repair_source", details });
 }

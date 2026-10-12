@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { CapabilityGraph } from '@devcodex/capability-graph';
-import { HttpKnowledgeReader } from '../../dist-test/examples/seed-runtime/knowledge-reader.js';
+import { HttpKnowledgeReader } from '../../dist-test/examples/http-reader/knowledge-reader.js';
 import { createTemporaryDirectory } from '../lib/artifact-paths.mjs';
 
 const inputArgs = process.argv.slice(2);

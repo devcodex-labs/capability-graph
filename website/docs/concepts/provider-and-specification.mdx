@@ -7,7 +7,7 @@ description: 理解 Provider 身份、定义权威、Specification 边界和静�
 
 <span className="cg-status">可用</span>
 
-Provider 是一组能力及其接入规则的所有者。每个 Provider 在有效启用范围内必须恰有一个权威来源，文件或数据库二选一。
+Provider 是一组能力及其接入规则的所有者。每个 Provider 在有效启用范围内必须恰有一个权威来源，必须使用文件定义。
 
 Provider Specification 描述如何正确使用该 Provider；正文归 Provider 所有，Core 只提供显式读取。`provider.json` 声明：
 
@@ -32,20 +32,19 @@ Provider Specification 描述如何正确使用该 Provider；正文归 Provider
 | `route.validation` | 路由请求校验 | 在 handler 前验证输入 |
 | `schema.request` | 请求结构声明 | 描述必填字段和输入类型 |
 
-后两项可按独立 G3 定义，但该检查点没有绑定 Knowledge；不要据此假设能读验证指南。G4 的 PROVIDER.md 放跨能力规则，具体 POST /users 留给 Runtime，避免把业务路由实例建成静态能力。Specification 可独立于子能力和知识读取接入。
+后两项可按独立 G3 定义，但该检查点没有绑定 Knowledge；不要据此假设能读验证指南。G4 的 PROVIDER.md 放跨能力规则，具体 POST /users 留给宿主业务状态查询，避免把业务路由实例建成静态能力。Specification 可独立于子能力和知识读取接入。
 
 ## 版本与内容身份
 
 | 值 | 说明 |
 |---|---|
-| npm 包版本（本教程为 1.1.0） | 使用哪一版 Core API，安装可用性以确切版本查询为准 |
+| npm 包版本（本教程为 2.0.0） | 使用哪一版 Core API，安装可用性以确切版本查询为准 |
 | provider.version | 作者对定义的版本标签，本例0.1.0，不属于能力身份 |
 | specification.version | 规范自身的版本，独立于 Provider 版本 |
 | Static Revision | 实际静态定义快照身份，查询必须使用响应中的真实值 |
-| Runtime Revision | Adapter 观察的实例快照，不替代静态修订 |
 | contentId | 实际知识字节身份；只改正文不会改变 Static Revision |
 
-不要将这些值互相填入 requiredStaticRevision 或 requiredRuntimeRevision。
+不要将这些值互相填入 requiredStaticRevision。
 
 ## 能力建模
 
@@ -57,7 +56,7 @@ Static Capability 描述“Provider 能做什么以及何时应考虑它”，�
 - `distinction`：它与相邻能力的关键区别；
 - 关系、知识和示例：按需补充，不把所有细节塞进目录。
 
-粒度应稳定到可以独立选择，又不能细碎到每个函数或配置字段都是一个能力。静态图描述作者声明的领域结构，不从代码命名、目录或 Runtime 自动生成关系。
+粒度应稳定到可以独立选择，又不能细碎到每个函数或配置字段都是一个能力。静态图描述作者声明的领域结构，不从代码命名、目录或业务运行状态自动生成关系。
 
 Core 校验 Schema、值、关系端点和环，不判断业务语义是否优秀。概念质量由 Provider 作者和评审流程负责，实践步骤见 [建模 Provider](../guides/model-a-provider#选择能力粒度)。
 

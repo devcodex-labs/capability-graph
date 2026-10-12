@@ -182,66 +182,10 @@ export async function verifyReferenceContracts(docsRoot) {
     await assert.rejects(withGraph(provider, [], () => {}, { budgets }), { code: 'CG_CONFIG_INCOMPLETE' });
   }
 
-  let response;
-  const inputs = [];
-  const validObservation = { source: 'contract', observedAt: '2026-10-09T00:00:00Z', runtimeRevision: 'r1',
-    observedAgainstStaticRevision: 's1', compatibility: 'unknown', availability: 'empty', freshness: 'current' };
-  const runtime = { id: 'reference-contract', providerId: provider.providerId, query: async (input) => {
-    inputs.push(input); return response;
-  } };
-  await withGraph(provider, [capability], async (bound) => {
-    response = { instances: [], observation: validObservation };
-    assert.equal((await bound.queryRuntime({ project: 'demo', environment: 'test' })).items.length, 0);
-    assert.equal(inputs.at(-1).limit, defaults['runtime.defaultPageSize']);
-    await bound.queryRuntime({ project: 'demo', environment: 'test', limit: 99999 });
-    assert.equal(inputs.at(-1).limit, defaults['runtime.maxPageSize']);
-    for (const field of Object.keys(validObservation)) {
-      response = { instances: [], observation: { ...validObservation } };
-      delete response.observation[field];
-      await assert.rejects(bound.queryRuntime({ project: 'demo', environment: 'test' }), { code: 'CG_ADAPTER_CONTRACT_INVALID' }, `${field} is mandatory`);
-    }
-    for (const [field, value] of [['compatibility', 'compatible-ish'], ['availability', 'offline'], ['freshness', 'unknown'], ['observedAt', 'yesterday']]) {
-      response = { instances: [], observation: { ...validObservation, [field]: value } };
-      await assert.rejects(bound.queryRuntime({ project: 'demo', environment: 'test' }), { code: 'CG_ADAPTER_CONTRACT_INVALID' });
-    }
-    response = { instances: [], observation: { ...validObservation, availability: 'available' } };
-    await assert.rejects(bound.queryRuntime({ project: 'demo', environment: 'test' }), { code: 'CG_ADAPTER_CONTRACT_INVALID' });
-    for (const query of [{ project: 'demo' }, { environment: 'test' }, { project: ' ', environment: 'test' }]) {
-      await assert.rejects(async () => bound.queryRuntime(query), { code: 'CG_RUNTIME_CONTEXT_REQUIRED' });
-    }
-    response = { instances: [], observation: validObservation };
-    await assert.rejects(bound.queryRuntime({ project: 'demo', environment: 'test', requiredRuntimeRevision: 'r2' }), { code: 'CG_REVISION_MISMATCH' });
-    await assert.rejects(async () => bound.listCatalog({ requestProviderScope: [provider.providerId] }), { code: 'CG_INPUT_INVALID' });
-  }, { runtimeAdapters: [runtime] });
-
-  let offline = false;
-  const databaseRecord = { ...capability, capabilityId: 'query' };
-  const view = { provider: { providerId: 'acme.database', name: 'Database contract double', version: '1' },
-    sourceRevision: 'db:1', getCapability: async (id) => {
-      if (offline) throw new Error('injected unreadable source');
-      return id === 'query' ? databaseRecord : undefined;
-    }, scanCapabilities: async () => ({ items: [databaseRecord] }), neighbors: async () => ({ items: [] }), close: async () => {} };
-  await withGraph(provider, [{ ...capability, knowledge: [ref] }], async (bound, graph) => {
-    const revision = (await graph.getProvider('acme.database')).staticRevision;
-    offline = true;
-    const local = { providerId: provider.providerId, capabilityId: 'route' };
-    const remote = { providerId: 'acme.database', capabilityId: 'query' };
-    for (const batch of [await graph.getCapabilities([local, remote]), await graph.readDocuments({ selected: [local, remote] })]) {
-      assert.deepEqual(batch.results.map((item) => item.ok ? 'ok' : item.error.code), ['ok', 'CG_NO_ACTIVE_VIEW']);
-      assert.equal(batch.meta.completeness, 'partial');
-    }
-    await assert.rejects(graph.listCatalog(), { code: 'CG_NO_ACTIVE_VIEW' });
-    await assert.rejects(graph.listProviders(), { code: 'CG_NO_ACTIVE_VIEW' });
-    await assert.rejects(graph.getCapabilities([remote], { requiredStaticRevision: revision }), { code: 'CG_REVISION_MISMATCH' });
-    await assert.rejects(graph.queryRuntime({ project: 'demo', environment: 'test' }), { code: 'CG_INPUT_INVALID' });
-  }, (root) => ({ hostAllowedProviders: [provider.providerId, 'acme.database'], integrationEnabledProviders: [provider.providerId, 'acme.database'],
-    providers: [{ providerId: provider.providerId, authority: { kind: 'file', rootDir: root } },
-      { providerId: 'acme.database', authority: { kind: 'database', adapter: { id: 'reference-double', openView: async () => view } } }] }));
-
   for (const page of ['concepts/provider-scope.mdx', 'guides/multiple-providers.mdx', 'examples/multi-provider.mdx']) {
     const authored = await readFile(path.join(docsRoot, page), 'utf8');
     assert(!authored.includes('批量查询保留输入槽位'), `${page}: do not generalize input-slot alignment to document reads`);
     assert(/listCatalog/.test(authored) && /(?:查询级失败|整体失败|整次失败|联合目录则明确失败)/.test(authored), `${page}: explain joint catalog failure explicitly`);
   }
-  console.log(`reference contracts passed: ID/${boundaryCases} field boundaries, ${budgetRows.length} budget defaults, paging clamps, Runtime values, migration, batch/Selection/scope semantics`);
+  console.log(`reference contracts passed: ID/${boundaryCases} field boundaries, ${budgetRows.length} budget defaults, paging clamps, migration, batch/Selection/scope semantics`);
 }

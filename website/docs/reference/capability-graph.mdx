@@ -28,11 +28,8 @@ import Contracts from '@generated/snippets/contracts-capability-graph.mdx';
 | `readSpecification(query)` | 显式读取 Provider 规范文档 | 不由其他查询自动触发 |
 | `readDocumentPage(query)` | 按能力与文档读取 UTF-8 范围 | 内容版本绑定的游标；模型决定续读 |
 | `readSpecificationPage(query)` | 分段读取指定规范文档 | 不把本页当全文 |
-| `retrieveCapabilities(query)` | 可选候选召回 | 不替代目录，需配置 Retriever |
-| `queryKnowledge(query)` | 检索已选知识 | 返回证据片段，不生成答案 |
-| `queryRuntime(query)` | 查询运行实例 | 需要 Provider、项目和环境 |
 | `reload(options?)` | 串行刷新一个或全部 Provider | 每个 Provider 独立发布结果 |
-| `close()` | 停止新工作并释放 Core 资源 | 不取消 Adapter 自有任务 |
+| `close()` | 停止新工作并释放 Core 资源 | 不取消 Reader 自有任务 |
 
 准确方法签名与配置字段在本页末尾由公开声明生成；下列符号索引用于查找，不替代类型与语义。
 
@@ -53,9 +50,8 @@ import Contracts from '@generated/snippets/contracts-capability-graph.mdx';
 | `resolveSelection({ selected })` | `selected` 是本地能力 ID 数组 |
 | `readDocuments({ selected })` | `selected` 是字符串数组 |
 | `readSpecification()` | 规范来源固定为绑定 Provider |
-| `retrieveCapabilities()` | 召回限制在绑定 Provider |
-| `queryKnowledge()` | 缺省 Provider 身份由绑定补全 |
-| `queryRuntime()` | Runtime 来源固定为绑定 Provider |
+| `readDocumentPage({ capabilityId, knowledgeId, ... })` | 用 Provider 内能力 ID 读取文档页 |
+| `readSpecificationPage({ knowledgeId, ... })` | 规范来源固定为绑定 Provider |
 
 绑定查询禁止传 `requestProviderScope`，即使 JavaScript 调用方绕过 TypeScript 也会得到 `CG_INPUT_INVALID`。Facade 不拥有 Authority 句柄，也没有独立 `close()`；生命周期仍由原 `CapabilityGraph` 管理。
 
@@ -67,15 +63,11 @@ interface OpenConfig {
   integrationEnabledProviders: readonly string[];
   providers: readonly ProviderLoadSpec[];
   budgets?: BudgetOverrides;
-  runtimeAdapters?: readonly RuntimeAdapter[];
   readers?: readonly KnowledgeReader[];
-  knowledgeRetriever?: KnowledgeRetriever;
-  capabilityRetriever?: CapabilityRetriever;
 }
 
 type AuthoritySpec =
-  | { kind: 'file'; rootDir: string; definitionLayout?: 'directory' | 'legacy' }
-  | { kind: 'database'; adapter: DatabaseAuthorityAdapter };
+  { kind: 'file'; rootDir: string; definitionLayout?: 'directory' | 'legacy' };
 
 interface ProviderLoadSpec {
   providerId: string;
@@ -87,9 +79,9 @@ type KnowledgeRootSpec =
   | { kind: 'package'; packageName: string; resolveFrom: string };
 ```
 
-1.1.0 新示例显式启用 directory：只读取 capabilities/**/*.json（后缀不必为 .capability）。目录必须存在，可为空；所有 JSON 候选经过完整 Schema 校验。目录外旧定义混用、嵌套 Provider、链接定义、大小写冲突及重复 capabilityId 明确失败。legacy 缺省保持旧递归 *.capability.json，provider.json-only 空 Provider 继续合法。同记录同 locator 在两模式中逻辑身份与静态修订一致。新增选项需匹配版本，旧 Registry 不支持。
+2.0.0 新示例显式启用 directory：只读取 capabilities/**/*.json（后缀不必为 .capability）。目录必须存在，可为空；所有 JSON 候选经过完整 Schema 校验。目录外旧定义混用、嵌套 Provider、链接定义、大小写冲突及重复 capabilityId 明确失败。legacy 缺省保持旧递归 *.capability.json，provider.json-only 空 Provider 继续合法。同记录同 locator 在两模式中逻辑身份与静态修订一致。新增选项需匹配版本，旧 Registry 不支持。
 
-每个有效启用 Provider 必须恰有一个 Authority。文件根在 `open()` 时解析并固定；数据库 read view 在交给 Core 后成为稳定逻辑快照。
+每个有效启用 Provider 必须恰有一个 Authority。文件根在 `open()` 时解析并固定，查询使用完整校验的内存视图。
 
 `reload({ providerId? })` 返回每个 Provider 的 `servedFrom`、修订、刷新状态和可选错误。一个刷新失败不回滚其他 Provider 已成功发布的新视图，也不删除仍可读取的旧 current。
 
@@ -97,8 +89,8 @@ type KnowledgeRootSpec =
 
 hostAllowedProviders、integrationEnabledProviders、providers 都必填，可以显式为空但不能省略。每个有效启用 Provider 恰好一个 Authority，providerId 是[合法稳定 ID](./provider-definition#id-格式与值约束)。重复来源为 CG_DUAL_AUTHORITY，缺来源/无效配置为 CG_CONFIG_INCOMPLETE；任一首次加载失败拒绝 open。
 
-budgets 省略使用[默认预算](./result-meta#预算字段与默认值)，允许一层分组内覆盖。runtimeAdapters/readers 省略为无自定义实现；Runtime 每 Provider 最多一个；本地 Reader 内置。两个 Retriever 各可选一个，不会自动补目录或网络后端。
+budgets 省略使用[默认预算](./result-meta#预算字段与默认值)，允许一层分组内覆盖。readers 省略时仍可使用内置本地 Reader；URL 需要匹配的自定义 Reader。2.0 已移除的配置字段明确失败，见[迁移清单](../getting-started/installation#从-110-升级到-200)。
 
-reload 省略 providerId 刷新所有启用来源，只在新候选完整通过后发布；没有自动监听/定时刷新。close 返回 Promise&lt;void&gt;，停止新查询并释放 Core 拥有的视图；已持有 pin 的查询可延迟清理，不取消 Adapter 自有任务。完整演练见[生命周期指南](../guides/lifecycle-and-reload)。
+reload 省略 providerId 刷新所有启用来源，只在新候选完整通过后发布；没有自动监听/定时刷新。close 返回 Promise&lt;void&gt;，停止新查询并释放 Core 拥有的视图；已持有 pin 的查询可延迟清理，不取消 Reader 自有任务。完整演练见[生命周期指南](../guides/lifecycle-and-reload)。
 
 <Contracts />

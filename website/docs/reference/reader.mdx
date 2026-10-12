@@ -1,0 +1,42 @@
+---
+title: 文档 Reader 合同
+description: 自定义 URL 文档读取、流式原文访问、来源身份、范围证明与资源归属。
+---
+
+import Contracts from '@generated/snippets/contracts-reader.mdx';
+
+# 文档 Reader 合同
+
+<span className="cg-status">可用</span>
+
+`KnowledgeReader` 为已声明的非本地 Document 精确读取正文；内置 Reader 优先处理 `relative-file`。配置 `OpenConfig.readers` 后，Core 选择首个同步 `canRead(ref)` 匹配的 Reader。
+
+## 读取与流式访问
+
+`read(ref, context, { maxBytes })` 返回 `bytes/contentType/contentId/source`。字节为原始 UTF-8，不能先去 BOM 或转换换行。正文身份的表达式是 `k:` 加以下结果：
+
+```ts
+createHash('sha256').update(bytes).digest('hex').slice(0, 16)
+```
+
+Core 独立重新核验；`source` 必须等于声明 URL。返回伪造哈希、错误来源或无效 MIME 产生 `CG_ADAPTER_CONTRACT_INVALID`；全文返回超过 maxBytes 产生 `CG_BUDGET_EXCEEDED`。合法预算异常投影为 `CG_BUDGET_EXCEEDED / page_or_filter`；其他 Reader 异常投影为 `CG_READER_UNAVAILABLE`，移除私有消息和详情。
+
+`stream(ref, context, { chunkBytes, signal })` 可选，每块不得超过字节预算。Core 扫描完整来源取得全文内容身份，再返回所需页；来源总大小没有准入上限。空正文仍需输出带 MIME/source 的空块。取消必须停止实际 I/O；迭代器 `return` 必须释放资源。
+
+仅实现 `read` 的旧 Reader 使用有界全文回退，不能据此承诺超出回退容量的来源可分页。大型 URL 文档应实现 `stream`。
+
+## 来源验证与范围读取
+
+`isContentCurrent(ref, context, contentId, { signal })` 可选。只有强验证器或不可变来源身份可证明当前正文等于已完整核验的 `contentId` 时返回 `true`；不能只比较时间或自报哈希。`false` 请求完整扫描，超时/故障/取消必须抛错。
+
+`readRange` 可选，返回指定 UTF-8 字节范围、全文 `contentId`、`totalBytes`、MIME 和声明来源；末偏移不包含。Core 先验证来源，再独立核对范围的分块哈希。范围不存在返回 `undefined` 并回退完整扫描；I/O 故障抛错。未证明的范围不能冒充完整来源。
+
+Core 每实例最多保留 4 MiB、16 条私有正文副本或证明。缓存不足只影响优化，不能拒绝大文档。全文单篇预算、分页预算、JSON 响应预算和私有缓存含义见[结果与预算](./result-meta)。
+
+## 资源与安全边界
+
+`KnowledgeReadContext.sourceContext` 是 Reader 使用的私有来源上下文，不得进入公共响应。Reader 是宿主的受信任代码；Core 的 Provider scope 不隔离进程。访问策略、认证、重定向、超时、连接池和关闭归宿主及 Reader 管理。`graph.close()` 释放图谱资源，不代替关闭 Reader 或 Agent。
+
+实现步骤及完整可编译骨架见 [KnowledgeReader 接入](../integrations/knowledge-reader)。真实 HTTP 实现位于源码 `examples/http-reader`，支持显式 origin、取消、强 ETag 快照与范围读取。
+
+<Contracts />

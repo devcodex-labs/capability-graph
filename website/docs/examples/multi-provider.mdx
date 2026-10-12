@@ -13,12 +13,12 @@ Multi Provider 场景同时打开多个 Authority，通过 `graph.listCatalog()`
 
 ## 运行与预期结果
 
-本页展示仓库测试场景，不是安装主包后会附带的双后端服务。在仓库根 `npm ci` 后执行下方 `npm test`。`test/provider-isolation.test.ts` 使用真实 Seed 文件源与合同数据库假实现；后者仅用于故障注入，不是已交付数据库驱动。
+本页展示仓库测试场景，不是安装主包后会附带的双后端服务。在仓库根 `npm ci` 后执行下方 `npm test`。`test/provider-isolation.test.ts` 使用真实 Seed 文件来源与第二个文件 Provider；通过无效定义注入刷新失败。
 
 ```text
 examples/seed-provider/            真实文件 Authority
 test/provider-isolation.test.ts   混合来源读取和失败隔离
-test/contract/fake-database.ts     可控合同假实现
+test/contract/file-fixture.ts     真实 JSON 文件验证材料
 ```
 
 关键查询片段，`graph` 由测试先打开两个来源：
@@ -31,13 +31,13 @@ const mixed = await graph.getCapabilities([
 console.log(mixed.results.map((item) => item.ok ? 'ok' : item.error.code));
 ```
 
-当合同数据库被设为不可读时，预期两个槽位分别为 `ok`、`CG_NO_ACTIVE_VIEW`。这证明批量点读能隔离来源失败；不代表所有 API 都能部分成功，联合 `listCatalog()` 在该故障场景会整体失败。具体接入配置见[使用多个 Provider](../guides/multiple-providers)。
+第二个 Provider 的刷新定义无效时，reload 明确失败，但已校验的旧视图仍可查询。两项详情均成功，联合结果标记 refreshFailed；单独查询未失败的 Provider 不带该标记。未知或越界身份仍保留各自错误槽位。联合 `listCatalog()` 也使用保留的内存视图；实例关闭或要求的修订已退休时整体失败。配置见[使用多个 Provider](../guides/multiple-providers)。
 
 根测试覆盖：
 
 - 相同 `capabilityId` 在不同 Provider 中保持不同二元身份；
 - 请求范围只能收窄；
-- 批量点读中一个来源故障保留其他正常槽位，联合目录则明确失败；
+- 失败刷新保留 current 并标记 refreshFailed；批量详情保留未知/越界身份的错误槽位；
 - 正式关系不能跨 Provider；
 - 每个 Provider 的 Static Revision 独立。
 
@@ -45,6 +45,6 @@ console.log(mixed.results.map((item) => item.ok ? 'ok' : item.error.code));
 npm test
 ```
 
-跨 Provider 的业务组合属于 Agent 或上层工作流，不写入 V1 静态边。
+跨 Provider 的业务组合属于 Agent 或上层工作流，不写入 静态图边。
 
 预期测试全部通过，失败时以测试命名和断言定位身份/修订/范围问题。[查看测试源码](https://github.com/devcodex-labs/capability-graph/blob/main/test/provider-isolation.test.ts)。

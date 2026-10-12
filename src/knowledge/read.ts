@@ -8,7 +8,7 @@ import type { CapabilityRef } from "../query/types.js";
 import type { BatchItem, BatchResult, CanonicalCapabilityId, KnowledgeDocumentRef, KnowledgeRef, StaticCapability } from "../types.js";
 import { freeze } from "../validate/values.js";
 import { contentId, LocalFileReader } from "./local-file-reader.js";
-import type { KnowledgeReadContext, KnowledgeReader, KnowledgeRetriever } from "./types.js";
+import type { KnowledgeReadContext, KnowledgeReader } from "./types.js";
 
 /** Explicit nonempty selection. No relation traversal; Collection bodies are not concatenated for direct reading. */
 export interface ReadDocumentsQuery {
@@ -132,7 +132,7 @@ async function readSlot(ref: KnowledgeDocumentRef, id: CanonicalCapabilityId, co
   return { id, ...await readValue(ref, id.providerId, context, budgets, readers) };
 }
 
-export async function documents(context: QueryContext, query: ReadDocumentsQuery, budgets: ResolvedBudgetConfig, readers: readonly KnowledgeReader[], retriever?: KnowledgeRetriever, bound?: string): Promise<DocumentReadBatch> {
+export async function documents(context: QueryContext, query: ReadDocumentsQuery, budgets: ResolvedBudgetConfig, readers: readonly KnowledgeReader[], bound?: string): Promise<DocumentReadBatch> {
   validateReadBudgetInput(query, budgets);
   validateSelection(query);
   const filters = validateDocumentFilters(query);
@@ -173,7 +173,7 @@ export async function documents(context: QueryContext, query: ReadDocumentsQuery
   }
   for (const id of selectedIds ?? []) {
     if (collections.has(id)) slots.push({ error: errorShape(new CapabilityGraphError("CG_KNOWLEDGE_TYPE_UNSUPPORTED", {
-      nextAction: "fix_input", details: { knowledgeId: id, retrieval: retriever ? "configured" : "CG_RETRIEVER_UNCONFIGURED" } })) });
+      nextAction: "fix_input", details: { knowledgeId: id, memberAction: "listKnowledgeMembers" } })) });
     else if (!declared.has(id)) slots.push({ error: errorShape(new CapabilityGraphError("CG_NOT_FOUND", { nextAction: "fix_input", details: { knowledgeId: id } })) });
   }
   const results: BatchItem<DocumentRead>[] = [];

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { CapabilityGraphError, type BatchItem, type ErrorShape } from "@devcodex/capability-graph";
 
 test("public errors retain code, action, message and projected details", () => {
-  const input = { reason: "all_runtime_items_rejected" };
+  const input = { reason: "invalid_document_source" };
   const error = new CapabilityGraphError("CG_ADAPTER_CONTRACT_INVALID", {
     nextAction: "repair_source", details: input,
   });
@@ -11,7 +11,7 @@ test("public errors retain code, action, message and projected details", () => {
   assert.equal(error.name, "CapabilityGraphError");
   assert.match(error.message, /contract/);
   input.reason = "changed";
-  assert.equal(error.details?.reason, "all_runtime_items_rejected");
+  assert.equal(error.details?.reason, "invalid_document_source");
   const publicError: ErrorShape = { code: error.code, message: error.message,
     nextAction: error.nextAction, details: error.details };
   assert.equal(JSON.parse(JSON.stringify(publicError)).code, error.code);

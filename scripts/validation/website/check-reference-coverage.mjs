@@ -5,7 +5,7 @@ import { repositoryRoot, createTemporaryDirectory } from '../../lib/artifact-pat
 import { websiteRoot, generatedRoot, websiteFixtureRoot } from '../../lib/website-paths.mjs';
 import { verifyReferenceContracts } from './lib/reference-contracts.mjs';
 import { verifyGeneratedContracts } from './lib/public-contracts.mjs';
-import { verifyAdapterContracts } from './lib/adapter-contracts.mjs';
+import { verifyReaderContracts } from './lib/reader-contracts.mjs';
 
 const readJson = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const contracts = await readJson(path.join(generatedRoot, 'contracts', 'public-api.json'));
@@ -44,7 +44,7 @@ for (const entry of coverage.entries) {
   assert(page.includes(`>${statusLabel}<`), `${entry.page} must display ${statusLabel} for ${entry.symbol}`);
 }
 
-for (const name of ['ErrorCode', 'NextAction', 'KnowledgeKind', 'NeighborKind', 'RuntimeCompatibility']) {
+for (const name of ['ErrorCode', 'NextAction', 'KnowledgeKind', 'NeighborKind']) {
   assert(Array.isArray(unions[name]) && unions[name].length > 0, `${name} literal union was not extracted`);
   assert(new Set(unions[name]).size === unions[name].length, `${name} contains duplicate literals`);
 }
@@ -158,5 +158,5 @@ for (const testCase of definitionCases.cases) {
 
 await verifyGeneratedContracts(contracts, coverage, docsRoot);
 await verifyReferenceContracts(docsRoot);
-await verifyAdapterContracts(docsRoot);
+await verifyReaderContracts(docsRoot);
 console.log(`reference check passed: ${publicSymbols.length} symbols, ${definitionCases.cases.length} definition cases`);

@@ -38,9 +38,9 @@ description: 从职责边界、身份、能力目录、关系、知识和验证�
 
 只声明能解释的 `parents`、`specializes`、`related` 和 `requires`。端点必须存在于同一 Provider；不要从名称或文件夹推导边。`requires` 表达任务必需的上下文，会进入 Selection 闭包，不要用它泛化弱关联。
 
-## 5. 关联知识和 Runtime
+## 5. 关联文档
 
-本地文档使用 `relative-file`；需要检索或远程读取时配置相应 Adapter。Runtime 由独立 Adapter 观察，不把实例写成静态节点。
+本地文档使用 `relative-file`；URL 文档配置 Reader。业务实例由宿主查询，不写成静态图节点。
 
 ## 6. 从公共入口验证
 
@@ -57,7 +57,7 @@ description: 从职责边界、身份、能力目录、关系、知识和验证�
 | HTTP 路由注册 | 是，`route.http` | 可独立选择，有自己的步骤和限制 |
 | 路由请求校验 | 是，`route.validation` | 意图不同，不能只靠路由注册详情猜测 |
 | 请求 Schema | 是，`schema.request` | 声明结构与执行校验职责不同 |
-| `POST /users` | 否，作为 Runtime 实例 | 随项目和环境变化，不是框架的稳定能力 |
+| `POST /users` | 否，由宿主查询业务实例 | 随项目和环境变化，不是框架的稳定能力 |
 | 配置中的一个 boolean | 通常否 | 多数只是某能力的参数，无独立发现价值 |
 
 预期调用方先选验证；作者确认为必需上下文时声明 requires，让 Selection 补齐 Schema，否则只以 related 提示由调用方判断。只有实际配置 Knowledge 后才能读取。若必须读完所有正文才知道选哪个，先修改 whenToUse/distinction；open 成功不等于语义优秀。确认粒度后进入[设计关系](./design-relations)。

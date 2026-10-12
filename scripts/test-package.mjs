@@ -48,6 +48,7 @@ try {
     assert.ok(["package.json", "README.md", "LICENSE"].includes(file.path) || file.path.startsWith("dist/"),
       `Unexpected package file: ${file.path}`);
   }
+  assert(packed.files.every((file) => !/dist\/(?:runtime|retrieval)\/|database-authority-store/.test(file.path)), 'Removed modules must not ship');
   assert.ok(packed.files.some((file) => file.path === "dist/index.d.ts"));
   assert.ok(packed.files.some((file) => file.path === "dist/index.js"));
   await writeFile(path.join(temporary, "package.json"), JSON.stringify({ name: "isolated-consumer", private: true, type: "module" }));
@@ -75,6 +76,7 @@ try {
     assert.equal(api.computeStaticRevision, undefined);
     assert.equal(api.resolveBudgets, undefined);
     assert.equal(api.bindCapabilityId, undefined);
+    for (const name of ['retrieveCapabilities', 'queryKnowledge', 'queryRuntime']) assert.equal(name in api.CapabilityGraph.prototype, false);
     await assert.rejects(import('@devcodex/capability-graph/mcp'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
     await assert.rejects(import('@devcodex/capability-graph/hash'), {code:'ERR_PACKAGE_PATH_NOT_EXPORTED'});
     console.log('Installed tarball runtime checks passed');

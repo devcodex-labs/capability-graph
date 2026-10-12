@@ -70,23 +70,23 @@ const selectedProvider = graph.forProvider('acme.http');
 const selectedDetail = await selectedProvider.getCapabilities(['route']);
 ```
 
-## 来源失效时如何处理
+## 来源更新或读取失败时如何处理
 
-故障隔离不是所有接口统一的部分成功承诺：
+文件定义在 open/reload 时校验后载入内存。当前目录查询不重新扫描磁盘；某个 Provider 的刷新失败时，旧 current 继续可读，联合 `listCatalog` / `listProviders` 仍可返回结果，并用 `refreshFailed` 标记失败。首次加载失败则拒绝 open。
 
-| 操作 | 某个来源不可读时 | 调用方处理 |
+| 场景 | 结果 | 调用方处理 |
 |---|---|---|
-| `getCapabilities` / `readDocuments`，未锁定失效修订 | 正常条目保留，失败条目带错误；读取的槽位可能由文档展开生成 | 检查每项 `ok`，按身份关联，不把失败项当空文档 |
-| `retrieveCapabilities`，未指定修订 | 拒绝不合法候选，保留合法候选和原排名，报告 warning/`partial` | 核对来源与完整性，不假定候选连续排名 |
-| 联合 `listCatalog` / `listProviders` | 查询级失败，不提供故障来源之外的成功目录 | 显式告知来源不可用；业务允许时由调用方另发健康 Provider 的窄范围请求 |
-| 指定的权威修订不可读 | 查询级失败 | 按错误动作重新发现或修复来源，不能静默切换修订 |
+| 定义更新无效或定义文件丢失，reload 失败 | 保留已校验的 current，其他 Provider 可独立刷新成功 | 检查 reload 的逐 Provider 错误，修复定义后再次刷新 |
+| 文档被删除或 Reader 读取失败 | readDocuments/readSpecification 保留成功项及失败槽位；Catalog 不因正文失败失效 | 按 locator/knowledgeId 修复来源，不能把失败项当空文档 |
+| 批量详情混入未知或越界身份 | 正常槽位继续成功，失败项携带原错误 | 检查每项 ok，按原输入槽位处理详情 |
+| graph 已关闭或指定修订已退休 | 查询级失败，包括联合 listCatalog | 重建实例或重新发现，不能静默替换要求的修订 |
 
-可复现故障注入见[多 Provider 隔离测试](../examples/multi-provider)。跨 Provider 组合由 Agent 或上层工作流完成，不写入静态关系。
+可复现的失败刷新及逐项隔离见[多 Provider 隔离测试](../examples/multi-provider)。跨 Provider 组合由 Agent 或上层工作流完成，不写入静态关系。
 
 ## VextJS 与 MonSQLize 的真实来源
 
 推荐分别创建 providers/vextjs/provider.json、providers/vextjs/capabilities/*.json，以及 providers/monsqlize/ 下相同结构。每个 Provider 可选 knowledge/，无需复制所有指南。provider 或 providers 只是容器名称；Core 分别显式注册每个根，不自动发现多个 Provider。
 
-在各 providers[] 配置 knowledgeRoots：directory 绑定获准官方文档目录；package 使用 packageName 和消费项目 resolveFrom 固定实际安装包根。locator 的 root 引用别名；HTTP URL 则通过已配置 Reader 读取。定义根、文档根与 Runtime 的业务项目根是三个不同用途。
+在各 providers[] 配置 knowledgeRoots：directory 绑定获准官方文档目录；package 使用 packageName 和消费项目 resolveFrom 固定实际安装包根。locator 的 root 引用别名；HTTP URL 则通过已配置 Reader 读取。定义根与文档根用途不同，业务项目状态由宿主维护。
 
 真实验证入口为根 scripts/validation/provider-sources.mjs，覆盖原始官方长/短文、外部目录、实际安装包 README 和可选固定 HTTPS。vextjs.mjs 另核验原生 MCP 回读。两 Provider 可有相同本地 capabilityId/knowledgeId，结果仍按 providerId 隔离；不建立跨 Provider requires。固定 Vext 安装包未包含 website，不能假定完整指南在 node_modules 内。

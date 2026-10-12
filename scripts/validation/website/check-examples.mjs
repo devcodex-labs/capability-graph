@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { access, cp, readFile, rm, stat } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CapabilityGraph } from '../../../dist/index.js';
 import { repositoryRoot, artifactsRoot, createTemporaryDirectory } from '../../lib/artifact-paths.mjs';
@@ -130,5 +130,42 @@ try {
 }
 
 await access(path.join(repositoryRoot, 'dist', 'index.d.ts'));
+
+// Execute the README's own inputs and unchanged script through an installed public package.
+const readme = await readFile(path.join(repositoryRoot, 'README.md'), 'utf8');
+const readmeDefinitions = [...readme.matchAll(/```json\r?\n([\s\S]*?)\r?\n```/g)];
+const readmeScripts = [...readme.matchAll(/```js\r?\n([\s\S]*?)\r?\n```/g)];
+assert(readmeDefinitions.length === 2 && readmeScripts.length === 1, 'README minimal inputs changed; update their verification');
+const readmeRoot = await createTemporaryDirectory('readme-consumer-');
+try {
+  const providerRoot = path.join(readmeRoot, 'providers/acme-http');
+  await mkdir(path.join(providerRoot, 'capabilities'), { recursive: true });
+  await mkdir(path.join(providerRoot, 'knowledge'));
+  await writeFile(path.join(providerRoot, 'provider.json'), readmeDefinitions[0][1]);
+  await writeFile(path.join(providerRoot, 'capabilities/route.json'), readmeDefinitions[1][1]);
+  const body = '# HTTP routing\nDeclare methods, paths and handlers in the host application.\n';
+  await writeFile(path.join(providerRoot, 'knowledge/routing.md'), body);
+  await writeFile(path.join(readmeRoot, 'readme.mjs'), readmeScripts[0][1]);
+  await installLocalConsumer(readmeRoot);
+  await writeFile(path.join(readmeRoot, 'verify.mjs'), `
+import assert from 'node:assert/strict';
+let calls = 0;
+console.log = ({ catalog, selection, document }) => {
+  calls++;
+  assert.deepEqual(catalog.items.map(item => item.id), [{ providerId: 'acme.http', capabilityId: 'route' }]);
+  assert.equal(catalog.nextCursor, undefined);
+  assert.deepEqual(selection.requested, [{ providerId: 'acme.http', capabilityId: 'route' }]);
+  assert.deepEqual(selection.resolved, selection.requested);
+  assert.equal(selection.added.length, 0);
+  assert.equal(document.text, ${JSON.stringify(body)});
+  assert.equal(document.hasMore, false);
+};
+await import('./readme.mjs');
+assert.equal(calls, 1);
+`);
+  execFileSync(process.execPath, [path.join(readmeRoot, 'verify.mjs')], { cwd: readmeRoot, stdio: 'pipe', timeout: 30_000 });
+  console.log('README minimal graph/selection/document example passed through the installed public package');
+} finally { await rm(readmeRoot, { recursive: true, force: true }); }
+
 await import('./check-doc-code.mjs');
 console.log(`example check passed: ${statuses.length} status entries, page-only tutorials and independent advanced Fixture`);

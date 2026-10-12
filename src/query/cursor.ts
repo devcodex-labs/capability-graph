@@ -5,7 +5,7 @@ import { inputInvalid } from "./common.js";
 import type { StorePage, StorePageRequest } from "../store/types.js";
 
 export interface CursorBinding {
-  readonly kind: "catalog" | "neighbors" | "detail-knowledge" | "knowledge-members" | "specification-documents" | "runtime" | "document-body" | "specification-body";
+  readonly kind: "catalog" | "neighbors" | "detail-knowledge" | "knowledge-members" | "specification-documents" | "document-body" | "specification-body";
   readonly staticRevision: string;
   readonly filter: unknown;
 }
@@ -15,26 +15,26 @@ function cursorBudget(): never {
   throw new CapabilityGraphError("CG_BUDGET_EXCEEDED", { nextAction: "page_or_filter", details: { reason: "public_cursor_too_large" } });
 }
 /** Bind continuation to query semantics, not authorization; base64url and the filter hash are not a signature. */
-export function encodeCursor(binding: CursorBinding, after: string, runtimeRevision?: string): string {
-  if (after.length > MAX_PUBLIC_CURSOR_LENGTH || (runtimeRevision?.length ?? 0) > MAX_PUBLIC_CURSOR_LENGTH) cursorBudget();
+export function encodeCursor(binding: CursorBinding, after: string): string {
+  if (after.length > MAX_PUBLIC_CURSOR_LENGTH) cursorBudget();
   const encoded = Buffer.from(JSON.stringify({ v: 1, kind: binding.kind, staticRevision: binding.staticRevision,
-    filterHash: hash(binding.filter), after, ...(runtimeRevision === undefined ? {} : { runtimeRevision }) })).toString("base64url");
+    filterHash: hash(binding.filter), after })).toString("base64url");
   // JSON escaping, UTF-8 and base64 all expand input; the final ASCII cursor must fit the decoder's limit.
   if (encoded.length > MAX_PUBLIC_CURSOR_LENGTH) cursorBudget();
   return encoded;
 }
 /** Reject malformed cursors and changed query/revision bindings; callers must still enforce provider scope. */
-export function decodeCursor(value: string | undefined, binding: CursorBinding): { after: string; runtimeRevision?: string } | undefined {
+export function decodeCursor(value: string | undefined, binding: CursorBinding): { after: string } | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== "string" || !value || value.length > MAX_PUBLIC_CURSOR_LENGTH || !/^[A-Za-z0-9_-]+$/.test(value)) inputInvalid();
   let cursor: Record<string, unknown>;
   try { cursor = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Record<string, unknown>; } catch { inputInvalid(); }
   if (!cursor || cursor.v !== 1 || typeof cursor.after !== "string" || typeof cursor.staticRevision !== "string" ||
-      typeof cursor.filterHash !== "string" || (cursor.runtimeRevision !== undefined && typeof cursor.runtimeRevision !== "string")) inputInvalid();
+      typeof cursor.filterHash !== "string") inputInvalid();
   if (cursor.kind !== binding.kind || cursor.staticRevision !== binding.staticRevision || cursor.filterHash !== hash(binding.filter)) {
     throw new CapabilityGraphError("CG_REVISION_MISMATCH", { nextAction: "refresh" });
   }
-  return { after: cursor.after, ...(cursor.runtimeRevision === undefined ? {} : { runtimeRevision: cursor.runtimeRevision as string }) };
+  return { after: cursor.after };
 }
 
 export interface Position { readonly cursor?: string; readonly offset: number }

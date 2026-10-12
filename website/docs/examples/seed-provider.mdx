@@ -1,6 +1,6 @@
 ---
 title: Seed 端到端示例
-description: 查看共享 Seed Provider 如何串联 Provider-owned API、MCP 和真实 Runtime 采集。
+description: 查看共享 Seed Provider 的图谱、文档与 API/MCP 查询链。
 ---
 
 # Seed 端到端示例
@@ -9,7 +9,7 @@ description: 查看共享 Seed Provider 如何串联 Provider-owned API、MCP �
 
 Seed Provider 是仓库内其他示例共享的真实权威来源。它包含 Provider metadata、路由主能力、HTTP/验证细分能力、请求 Schema 能力和本地知识文档。
 
-场景是“给现有 `POST /users` 加请求校验”：调用方发现验证能力、查看关联 Schema、选择两者的知识，需要时再确认真实路由实例。它验证 Core 的发现与边界，不自动修改业务代码。
+场景是“给现有 `POST /users` 加请求校验”：调用方发现验证能力、查看关联 Schema、选择两者的知识。它验证 Core 的发现与边界，不自动修改业务代码。
 
 ## 目录与运行前提
 
@@ -20,7 +20,7 @@ examples/
 ├── seed-provider/  provider.json、5 个能力、PROVIDER.md、knowledge/
 ├── seed-api/       main.ts：普通 API 查询链
 ├── seed-mcp/       独立私有包及 stdio 入口
-└── seed-runtime/   Runtime 服务、HTTP Reader、文本索引及演示入口
+└── http-reader/    HTTP 文档读取和分页演示
 test/              端到端与合同测试
 ```
 
@@ -39,7 +39,7 @@ node dist-test/examples/seed-api/main.js
 
 ## Provider-owned API
 
-`examples/seed-api` 依次执行 Provider 列表、目录、详情、邻居、Selection、本地知识、Specification 读取和可选 Runtime 查询，并在 `finally` 中关闭图实例。它证明普通 Node.js API 可以直接复用 Core，不需要 MCP SDK。
+`examples/seed-api` 依次执行 Provider 列表、目录、详情、邻居、Selection、本地知识、Specification 读取，并在 `finally` 中关闭图实例。它证明普通 Node.js API 可以直接复用 Core，不需要 MCP SDK。
 
 ```sh
 npm test
@@ -65,7 +65,7 @@ const specification = await provider.readSpecification({
 });
 ```
 
-预期 Node 输出 JSON：`catalog.items` 包含五个能力，`selection.resolved` 包含显式选择及 `requires` 闭包，`documents.results` 包含对应知识，`specification.results` 包含单独请求的规范正文。默认未配置 Runtime，结果不包含 `runtime`，不能从静态路由能力推断当前业务路由。示例使用 `try/finally` 关闭图；缺来源、旧修订等失败由根测试覆盖。
+预期 Node 输出 JSON：`catalog.items` 包含五个能力，`selection.resolved` 包含显式选择及 `requires` 闭包，`documents.results` 包含对应知识，`specification.results` 包含单独请求的规范正文。静态能力不说明当前项目是否已有业务路由，宿主自行检查业务状态。示例使用 `try/finally` 关闭图；缺来源、旧修订等失败由根测试覆盖。
 
 ## Provider-owned MCP
 
@@ -79,43 +79,16 @@ npm test
 
 协议测试验证工具发现和调用。工具只是 Provider 接入参考，不冻结所有 Provider 都必须使用相同名称或数量。[查看 MCP 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-mcp)
 
-先完成根目录的 `npm test`，再运行上面的 MCP 命令。预期私有包测试通过，并能发现 14 个查询工具和 Specification Resource；默认 Runtime/检索未配置的调用应返回明确错误。
+先完成根目录的 `npm test`，再运行上面的 MCP 命令。预期私有包测试通过，并能发现 11 个查询工具和 Specification Resource。
 
-手动连接原 Seed 时，让客户端以 stdio 启动 node，参数为 examples/seed-mcp/dist/src/main.js 的绝对路径。它没有 HTTP URL，由客户端管理子进程停止。原 Seed 保持 14 个查询工具及五能力平坦 Catalog；只从 route 主入口开始的完整 server/client 示例另见[Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。两者不混称同一个默认工具集。
+手动连接原 Seed 时，让客户端以 stdio 启动 node，参数为 examples/seed-mcp/dist/src/main.js 的绝对路径。它没有 HTTP URL，由客户端管理子进程停止。原 Seed 保持 11 个查询工具及五能力平坦 Catalog；只从 route 主入口开始的完整 server/client 示例另见[Provider 自有 MCP](../integrations/provider-owned-mcp#seed-调用示例)。两者不混称同一个默认工具集。
 
-## 真实 Runtime
+## HTTP 文档读取
 
-`examples/seed-runtime` 启动独立 HTTP 服务，实际注册和变更路由，再由 `RuntimeAdapter` 采集实例。测试覆盖项目/环境隔离、实时变化、旧构建兼容和失败恢复。
-
-```sh
-npm test
-```
-
-该参考不是通用框架扫描器，也不代表 Core 会启动业务服务。服务生命周期由示例测试管理并在结束时验证端口释放。[查看 Runtime 源码](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-runtime)
-
-只复跑真实 HTTP 场景，可在根构建测试后执行：
-
-```sh
-npm run build:tests
-node --test dist-test/test/real-runtime.test.js
-```
-
-测试启动独立进程，使用同一注册表响应真实业务请求和 Runtime 查询。预期观察到 `GET /users`、`POST /users`，动态注册后 Runtime Revision 改变；错误环境、失联和旧游标不能返回假空结果。诊断输出包含 PID/端口，测试结束关闭进程并验证端口可重新绑定。
-
-手动运行服务前，必须从实际部署的 Provider 取得 Static Revision，按[服务 README](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/README.md)传入项目、环境和构建参数。不要把请求端最新修订填成旧服务的部署修订。
-
-## HTTP 文档与文本检索
-
-在仓库根执行：
+`examples/http-reader` 使用真实 HTTP 服务和显式 origin Reader，分页拼接原始中文、BOM 与 CRLF 文档。运行：
 
 ```sh
 npm run demo:http
 ```
 
-该入口启动真实 HTTP 文档来源与业务服务，从公开 Catalog 建立有限的能力词项索引，再由调用方显式选择 `route.validation`。Selection 的 requires 闭包包含 `schema.request`，文档检索仍只针对明确传入的 selected 和 knowledgeIds。
-
-预期 JSON 包含 `document: "HTTP-GUIDE"`、大于零的 `knowledgeHits`、`zeroHits: 0`、`staleRejected: true`、大于零的 `recoveredHits`、`businessStatus: 201` 和 `modelCalls: 0`。HTTP Reader 读取实际中文正文；片段偏移按 UTF-8 字节计算。正文改变后旧索引被拒绝，由接入方显式 invalidate 后恢复。每次检索固定自己的配置；invalidate 返回后，已失效的在途请求即使完成也不能回填旧缓存。根 `test/http-retrieval.test.ts` 和 `test/text-retrieval.test.ts` 同时覆盖超时、响应超限、重定向、连接关闭、配置和静态修订变更，以及旧请求完成顺序与失效竞争。
-
-这是本机词项检索参考，没有模型或向量数据库，不能据此推断语义搜索质量、Agent 修改代码的成功率或生产容量。临时材料在仓库同级目录，结束时释放两个 HTTP 端口及 Reader 连接。[查看源码](https://github.com/devcodex-labs/capability-graph/blob/main/examples/seed-runtime/retrieval-demo.ts)
-
-只需首次发现时，使用[最小 Provider](../getting-started/first-provider)，不必克隆 Seed；关系、知识和规范可在[进阶教程](../guides/progressive-discovery)按需添加。
+HTTP 测试覆盖超时、并发限制、取消、连接释放、强弱 ETag、来源变化、快照容量和范围证明。宿主负责 Reader 生命周期；文档总大小没有准入上限。

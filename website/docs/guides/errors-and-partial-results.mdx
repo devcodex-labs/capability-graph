@@ -11,8 +11,8 @@ description: 按错误阶段、NextAction、ResultMeta 和逐项结果恢复，�
 
 - **配置/加载失败**：Provider 无法建立有效权威视图。
 - **查询级失败**：范围拒绝、指定修订失效或请求整体无效。
-- **逐项失败**：批量详情、文档或候选中的单项失败，其他槽位仍可成功。
-- **后端未配置/不可用**：Retriever、Reader 或 Runtime Adapter 缺失或失败。
+- **逐项失败**：批量详情或文档中的单项失败，其他槽位仍可成功。
+- **Reader 未配置/不可用**：远程文档缺少匹配 Reader 或传输失败。
 
 需要 G0 的 `route` 定义。在当前程序中复制[最小教程](../getting-started/first-provider)的导入、open 和 finally 关闭结构，用下方代码替换 try 内查询体；`provider` 来自当前 graph.forProvider('acme.http')，不是上一进程已经关闭的对象。这里故意混入不存在的 ID。
 
@@ -36,6 +36,6 @@ try {
 
 预期 `route` 槽位成功，`missing` 槽位携带 `CG_NOT_FOUND`，前者不会因后者而消失。查询级错误进入 `catch` 并继续抛出，不能打印后伪装成功。`getCapabilities()` 和 `readDocuments()` 使用 `results`；Catalog 等分页接口使用 `items`。
 
-不要按 `CapabilityGraphError` 类型盲目信任 Adapter 填充的字段；Core 只投影已知诊断。处理 `partial` 时保留成功项和原始失败类别。
+不要按 `CapabilityGraphError` 类型盲目信任 Reader 填充的字段；Core 只投影已知诊断。处理 `partial` 时保留成功项和原始失败类别。
 
-常见恢复：修正 scope、刷新发现结果、缩小请求或分页、配置对应 Adapter。完整对照见 [ErrorCode and NextAction](../reference/errors) 与 [Troubleshooting](../troubleshooting/index)。
+常见恢复：修正 scope、刷新发现结果、缩小请求或分页、配置对应 Reader。完整对照见 [ErrorCode and NextAction](../reference/errors) 与 [Troubleshooting](../troubleshooting/index)。

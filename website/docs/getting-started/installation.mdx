@@ -5,9 +5,9 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 
 # 安装
 
-<span className="cg-status">本文对应 1.1.0</span>
+<span className="cg-status">本文对应 2.0.0 源码接口</span>
 
-后续教程使用 1.1.0，包含 directory 布局、知识根别名与正文分页。先查询这个确切版本是否已发布，再安装；Registry 的实际结果决定包是否可用。1.0.1 不支持这些新增接口，无版本安装取得的 latest 也可能与本文不同。
+后续教程使用 2.0.0 的文件静态图谱与文档读取接口。先查询这个确切版本是否已发布，再安装；Registry 的实际结果决定包是否可用。1.x 的接口范围与本版不同，无版本安装取得的 latest 也可能与本文不同。
 
 发布版直接安装即可；若确切版本返回 `E404`，使用下方固定源码回退。网络、认证或镜像错误需先排查，不能据此判断版本未发布。首次发现只需两个 JSON 和一个脚本。
 
@@ -24,12 +24,12 @@ description: 安装 Capability Graph，并确认 Node.js、ESM 和包入口要�
 在你的 Node.js 接入项目运行：
 
 ```sh
-npm view @devcodex/capability-graph@1.1.0 version
-npm install @devcodex/capability-graph@1.1.0
+npm view @devcodex/capability-graph@2.0.0 version
+npm install @devcodex/capability-graph@2.0.0
 npm ls @devcodex/capability-graph
 ```
 
-查询与实际安装都应显示 `1.1.0`。如果该版本尚未发布，第一条会返回 `E404`；此时不要用旧版本继续新版教程。
+查询与实际安装都应显示 `2.0.0`。如果该版本尚未发布，第一条会返回 `E404`；此时不要用旧版本继续新版教程。
 
 ## 未发布时从固定源码构建
 
@@ -43,7 +43,7 @@ git -C source remote add origin https://github.com/devcodex-labs/capability-grap
 git -C source fetch --depth=1 origin DOCUMENTATION_COMMIT
 git -C source checkout --detach FETCH_HEAD
 cd source
-node -e "if(require('./package.json').version !== '1.1.0') throw new Error('源码与文档版本不一致')"
+node -e "if(require('./package.json').version !== '2.0.0') throw new Error('源码与文档版本不一致')"
 npm ci
 npm run build
 mkdir ../packages
@@ -57,7 +57,7 @@ node -e "const {execFileSync}=require('node:child_process');const [p]=require('.
 npm ls @devcodex/capability-graph
 ```
 
-打包与消费目录都位于源码仓库外；安装文件名取自本次 `npm pack` 的结果。最后一条应显示 `@devcodex/capability-graph@1.1.0`。以后在消费项目根完成[第一次发现](./first-provider)。
+打包与消费目录都位于源码仓库外；安装文件名取自本次 `npm pack` 的结果。最后一条应显示 `@devcodex/capability-graph@2.0.0`。以后在消费项目根完成[第一次发现](./first-provider)。
 
 已有项目安装上面生成的 tgz 即可，并确认模块配置。`npm pkg set type=module` 会在 `package.json` 写入 `"type": "module"`，让 `.js` 使用 ESM；已有 CommonJS 项目可以把接入脚本命名为 `.mjs`，无需改变整个项目的模块规则。
 
@@ -69,7 +69,10 @@ npm ls @devcodex/capability-graph
 import { CapabilityGraph } from '@devcodex/capability-graph';
 
 if (typeof CapabilityGraph.prototype.readDocumentPage !== 'function') {
-  throw new Error('本教程需要 1.1.0 的正文分页接口，请按安装页核对 npm ls。');
+  throw new Error('本教程需要 2.0.0 的正文分页接口，请按安装页核对 npm ls。');
+}
+for (const name of ['retrieveCapabilities', 'queryKnowledge', 'queryRuntime']) {
+  if (name in CapabilityGraph.prototype) throw new Error('请安装与本文一致的 2.0.0 包');
 }
 console.log(typeof CapabilityGraph.open); // function
 ```
@@ -82,7 +85,7 @@ node check.mjs
 
 ## 安装内容
 
-主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及数据库 Authority、Runtime、两类 Retriever 和远程 Reader 的扩展合同。固定依赖 `bcp-47` 与 `language-subtag-registry`，用于独立于宿主 ICU 的语言标签校验。
+主包包含 Core、TypeScript 类型、文件 Authority、本地 Document Reader，以及宿主自定义文档 Reader 的合同。固定依赖 `bcp-47` 与 `language-subtag-registry`，用于独立于宿主 ICU 的语言标签校验。
 
 它不安装 HTTP/MCP Server、数据库驱动、向量数据库、RAG 后端或 VextJS Adapter。MCP SDK 仅用于仓库的独立私有示例；要提供 MCP，由接入项目安装 SDK 并实现协议层。
 
@@ -97,7 +100,29 @@ node check.mjs
 
 安装后可用 `npm ls @devcodex/capability-graph` 查看项目实际使用的版本；1.0.0 不具备后文的 Selection 与多文档 Specification 接口。
 
-## 从 1.0.1 升级到 1.1.0
+## 从 1.1.0 升级到 2.0.0
+
+2.0 聚焦静态能力图谱与文档原文访问，删除以下接口和配置。这些是破坏性变化，已有消费者可继续固定 1.1.0，或完成迁移再升级。
+
+| 移除内容 | 调整方式 |
+|---|---|
+| 数据库 Authority / DatabaseAuthorityAdapter / DatabaseReadView | 由宿主导出正式 JSON 定义，使用 file Authority；不再配置数据库 view |
+| retrieveCapabilities / CapabilityRetriever / DiscoveryAdapter | 使用 listCatalog 的结构化过滤或明确 ID；自然语言召回由独立模块负责 |
+| queryKnowledge / KnowledgeRetriever / 索引证据、目标、命中与 invalidate 合同 | 使用文档引用和分页接口取得原文，RAG 由独立模块负责 |
+| queryRuntime / RuntimeAdapter / 实例、观察、运行修订和兼容状态 | 由宿主自己的业务状态接口处理 |
+| runtimeAdapters / knowledgeRetriever / capabilityRetriever | 删除这些配置字段；提供 undefined 也明确失败 |
+| budgets.runtime / budgets.queryKnowledge / budgets.retrieveCapabilities | 删除已移除操作的预算分组 |
+| CurrentCapabilityView.runtime / 专属错误、未使用的 CG_TIMEOUT 和 use_retrieval / reduce_document 动作 | 更新结果投影及错误分支，不保留空方法兼容层 |
+
+Provider Schema、能力 ID、四种关系与八种正反查询、requires 闭包、Collection/Specification、directory/legacy 布局、scope 和 reload 继续保留。旧主版本游标请重新开始。文件根与文档来源身份不因产品范围调整而改名。
+
+Provider 内外目录、node_modules 与 URL Reader 都继续支持。文档总大小没有准入上限；单页/全文/JSON/缓存预算分别管理资源。这里的分页取得原文，不建立索引或生成回答。后续独立 RAG 可通过公开能力身份与文档接口接入，目前没有单独发布的替代包。
+
+完整变更见 [2.0.0 迁移清单](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/2.0.0.md)。旧链接已指向此说明；1.1.0 的完整实现保存在历史 tag。
+
+## 历史：从 1.0.1 升级到 1.1.0
+
+<a id="从-101-升级到-110" />
 
 已有 `*.capability.json` 定义与旧相对路径可以继续使用，无需批量改名。新功能按需启用：
 
@@ -112,7 +137,9 @@ node check.mjs
 
 文档总大小没有准入上限。全文超出单篇预算时不会截断返回；改用分页即可完整续读。先锁定依赖版本和来源，再用[最小 Provider](./first-provider)及你实际使用的 Adapter 重测。
 
-## 从 1.0.0 迁移到 1.0.1
+## 历史：从 1.0.0 迁移到 1.0.1
+
+<a id="从-100-迁移到-101" />
 
 这次升级包含破坏性 Schema 变化，**没有双 Schema 兼容层**。即使依赖写的是 `^1.0.0`，npm 也可能安装到 1.0.1；升级前核对 lockfile、备份定义，并在隔离项目中重测。仅锁定旧修订不能让旧定义变成兼容配置。
 
@@ -153,7 +180,7 @@ node check.mjs
 |---|---|---|
 | 规范入口 | `entryRef` → 非空 `documents`；每篇 role 必须为 `specification` | 保存实际 PROVIDER.md；open 后 getProvider 显示 documentCount，显式 readSpecification 返回正文 |
 | 能力知识 | 所有 Document、包括 Collection 成员补必填 `role`，如 `guide`/`example` | readDocuments 成功并能按角色过滤；缺 role 的旧声明预期 `CG_VALIDATION_FAILED` |
-| 数据库 Adapter | 支持全部八类邻居，含 `requires/requiredBy` 的完整有序页 | 对照[数据库合同](../reference/runtime-adapter#databaseauthorityadapter)验证扫描、点读、正反依赖和 close |
+| 1.x 数据库 Adapter（历史范围） | 该接口在 2.0 已移除 | 升级到 2.0 时按本页清单导出文件定义 |
 | 正向依赖 | 作者可声明 `requires`，不能在源定义写派生的 `requiredBy` | open 校验无环和端点；按需调用 resolveSelection 验证完整闭包 |
 | 修订与消费者 | 哈希覆盖关系与文档映射变化，重新取得 Static Revision | TypeScript 重新编译；从新 Catalog 开始，重置旧游标/旧任务修订，不手写 provider.version 代替哈希 |
 

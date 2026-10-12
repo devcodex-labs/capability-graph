@@ -2,25 +2,22 @@ import { rm, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CapabilityGraph } from '@devcodex/capability-graph';
-import { TextCapabilityRetriever, TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
 import { createTemporaryDirectory, repositoryRoot } from '../lib/artifact-paths.mjs';
 import { verifyVextSource } from '../../examples/vextjs/source-provenance.mjs';
 import { exportVextProvider } from '../../examples/vextjs/documentation-provider.mjs';
 import { verifyDocumentationProvider } from './lib/documentation-provider-checks.mjs';
 
 /** Real fixed-source documentation checks, independent of MCP, MongoDB and business application setup. */
-export async function validateVextDocumentation({ frameworkRoot, sourceRoot = frameworkRoot, sourceIdentity }) {
+export async function validateVextDocumentation({ frameworkRoot, sourceRoot = frameworkRoot, sourceIdentity, graphClass = CapabilityGraph }) {
   sourceRoot = await realpath(sourceRoot);
   const source = await verifyVextSource({ frameworkRoot, sourceRoot, sourceIdentity });
   const root = await createTemporaryDirectory('vext-docs-real-'); let graph;
   try {
     const exported = await exportVextProvider({ providerId: 'vextjs', version: source.version, source, sourceRoot,
       outputDir: path.join(root, 'provider'), repositoryRoot });
-    const recall = new TextCapabilityRetriever();
-    graph = await CapabilityGraph.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
-      capabilityRetriever: recall, knowledgeRetriever: new TextKnowledgeRetriever(),
+    graph = await graphClass.open({ hostAllowedProviders: ['vextjs'], integrationEnabledProviders: ['vextjs'],
       providers: [{ providerId: 'vextjs', authority: { kind: 'file', definitionLayout: 'directory', rootDir: exported.rootDir } }] });
-    return { source, ...await verifyDocumentationProvider({ graph, recall, exported, sourceRoot }) };
+    return { source, ...await verifyDocumentationProvider({ graph, exported, sourceRoot }) };
   } finally { await graph?.close(); await rm(root, { recursive: true, force: true }); }
 }
 

@@ -1,200 +1,89 @@
 import assert from "node:assert/strict";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
-import { CoreHost, type StaticOpenConfig } from "../src/core-host.js";
-import { CapabilityGraphError } from "../src/errors.js";
-import { computeEffectiveScope } from "../src/scope.js";
-import { databaseAuthorityStore } from "../src/store/database-authority-store.js";
+import test, { mock } from "node:test";
+import { CapabilityGraph } from "../src/index.js";
+import { CoreHost } from "../src/core-host.js";
+import { FileAuthorityStore } from "../src/store/file-authority-store.js";
 import { memoryGraphStore } from "../src/store/memory-graph-store.js";
 import { ProviderViewStore } from "../src/store/provider-view-store.js";
 import { validateSnapshot } from "../src/validate/index.js";
-import { FakeDatabase, record } from "./contract/fake-database.js";
+import { computeEffectiveScope } from "../src/scope.js";
+import { CapabilityGraphError } from "../src/errors.js";
+import { FileFixture, record } from "./contract/file-fixture.js";
 
-const code = (expected: string) => (error: unknown) => error instanceof CapabilityGraphError && error.code === expected;
-const page = { limit: 100, maxBytes: 262144 };
-const file = (db: FakeDatabase) => validateSnapshot({ source: { kind: "file", rootDir: "." }, provider: db.provider, capabilities: db.records });
-const config = (open: () => Promise<FakeDatabase>): StaticOpenConfig => ({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
-  providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: open } } }] });
+async function view(name: string, fail = false) {
+  const snapshot = await validateSnapshot({ source: { kind: "file", rootDir: "." },
+    provider: { providerId: "seed", name: "Seed", version: "1" }, capabilities: [record("a", { name })] });
+  let closes = 0;
+  return { ...memoryGraphStore(snapshot), get closes() { return closes; }, async close() {
+    closes++; if (fail) throw new Error("private cleanup secret");
+  } };
+}
+const config = (fixture: FileFixture) => ({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
+  providers: [{ providerId: "seed", authority: fixture.authority }] });
 
-test("DB A completes all pages before endpoint checks; hash equals file independent of pagination", async () => {
-  for (const size of [1, 2, 100]) {
-    const db = new FakeDatabase([record("a", { parents: ["z"] }), record("z")]); db.pageSize = size;
-    db.onRead = () => assert.equal(db.scans, Math.ceil(2 / size));
-    const view = await databaseAuthorityStore(db, "seed");
-    assert.equal(view.staticRevision, (await file(db)).staticRevision);
-    db.onRead = undefined;
-    const before = db.scans;
-    const first = await view.listCapabilities({ ...page, limit: 1 });
-    assert.equal(first.items.length, 1); assert.equal(db.scans, before + 1);
-    assert.equal((await view.getCapability("a"))?.parents[0]?.capabilityId, "z");
-    assert.deepEqual((await view.neighbors("z", "children", page)).items, [{ providerId: "seed", capabilityId: "a" }]);
-    await view.close(); await view.close(); assert.equal(db.closed, 1);
-  }
+test("memory reverse indexes are exact and related edges are directional", async () => {
+  const snapshot = await validateSnapshot({ source: { kind: "file", rootDir: "." },
+    provider: { providerId: "seed", name: "Seed", version: "1" }, capabilities: [record("a", { related: ["z"] }), record("z")] });
+  const source = memoryGraphStore(snapshot);
+  assert.deepEqual((await source.getCapability("z"))?.related, []);
+  assert.equal((await source.neighbors("z", "relatedBy", { limit: 100, maxBytes: 262144 })).items[0]?.capabilityId, "a");
 });
 
-test("DB independently rejects disconnected parents, specializes and requires cycles after complete scan", async () => {
-  for (const relation of ["parents", "specializes", "requires"] as const) {
-    const db = new FakeDatabase([record("a"), record("y", { [relation]: ["z"] }), record("z", { [relation]: ["y"] })]);
-    await assert.rejects(databaseAuthorityStore(db, "seed"), code("CG_RELATION_CYCLE"));
-    assert.equal(db.scans, 3); assert.equal(db.closed, 1);
-  }
-  const db = new FakeDatabase([record("a", { parents: ["z"], related: ["z"] }), record("z", { specializes: ["a"], related: ["a"] })]);
-  await (await databaseAuthorityStore(db, "seed")).close();
-});
-
-test("DB high-fanout DAG validation pages relations without repeated whole-record reads", async () => {
-  for (const degree of [250, 1000, 2000]) {
-    const targets = Array.from({ length: degree }, (_, i) => `b${String(i).padStart(5, "0")}`);
-    const db = new FakeDatabase([record("a", { parents: targets }), ...targets.map((id) => record(id))]); db.pageSize = 100;
-    const records = new Map(db.records.map((item) => [item.capabilityId, item]));
-    let rootReads = 0; let pointReads = 0; let rootPages = 0;
-    db.getCapability = async (id) => { pointReads++; if (id === "a") rootReads++; return records.get(id); };
-    db.neighbors = async (id, kind, request) => {
-      assert.ok(request.limit <= 100); assert.ok(request.maxBytes <= 262144);
-      if (id === "a" && kind === "parents") rootPages++;
-      const ids = kind === "parents" && id === "a" ? targets : kind === "children" && id !== "a" ? ["a"] : [];
-      return db.page(ids.map((capabilityId) => ({ providerId: "seed", capabilityId })), request);
-    };
-    const view = await databaseAuthorityStore(db, "seed");
-    try {
-      assert.ok(rootReads <= 10, `degree ${degree}: root record read ${rootReads} times`);
-      assert.ok(pointReads <= 4 * records.size, `degree ${degree}: excessive complete-record validation`);
-      assert.ok(rootPages >= 2 * Math.ceil(degree / 100), "cycle and publication checks must consume complete source pages");
-      assert.equal(view.staticRevision, (await file(db)).staticRevision);
-    } finally { await view.close(); }
-    assert.equal(db.closed, 1);
-  }
-});
-
-test("DB rejects dangling, unordered, duplicate and changed records and closes each candidate", async () => {
-  for (const [records, expected] of [
-    [[record("a", { related: ["z"] })], "CG_VALIDATION_FAILED"],
-    [[record("z"), record("a")], "CG_ADAPTER_CONTRACT_INVALID"],
-    [[record("a"), record("a")], "CG_ADAPTER_CONTRACT_INVALID"],
-  ] as const) {
-    const db = new FakeDatabase([...records]);
-    await assert.rejects(databaseAuthorityStore(db, "seed"), code(expected)); assert.equal(db.closed, 1);
-  }
-  const db = new FakeDatabase([record("a")]);
-  db.onRead = () => { db.records = [record("a", { description: "changed" })]; };
-  await assert.rejects(databaseAuthorityStore(db, "seed"), code("CG_ADAPTER_CONTRACT_INVALID")); assert.equal(db.closed, 1);
-});
-
-test("DB detects revision drift during A and unreadable empty D; no candidate is published", async () => {
-  const drift = new FakeDatabase([record("a")]); drift.onScan = () => { drift.sourceRevision = "db:2"; };
-  await assert.rejects(databaseAuthorityStore(drift, "seed"), code("CG_REVISION_MISMATCH"));
-  const empty = new FakeDatabase([]); empty.onScan = () => { if (empty.scans === 2) throw new Error("lost handle"); };
-  await assert.rejects(databaseAuthorityStore(empty, "seed")); assert.equal(empty.closed, 1);
-  const good = new FakeDatabase([]); const view = await databaseAuthorityStore(good, "seed");
-  assert.equal(good.scans, 2); assert.equal(view.staticRevision, (await file(good)).staticRevision); await view.close();
-});
-
-test("DB rejects oversized, looping and falsely reported neighbor pages", async () => {
-  const db = new FakeDatabase([record("a"), record("b")]);
-  const view = await databaseAuthorityStore(db, "seed");
-  db.neighbors = async () => ({ items: [{ providerId: "seed", capabilityId: "b" }] });
-  await assert.rejects(view.neighbors("a", "parents", page), code("CG_ADAPTER_CONTRACT_INVALID"));
-  db.scanCapabilities = async () => ({ items: [record("a"), record("b")] });
-  await assert.rejects(view.listCapabilities({ ...page, limit: 1 }), code("CG_ADAPTER_CONTRACT_INVALID"));
-  await view.close();
-  const looping = new FakeDatabase([record("a")]); looping.scanCapabilities = async () => ({ items: [record("a")], nextCursor: "same" });
-  await assert.rejects(databaseAuthorityStore(looping, "seed"), code("CG_ADAPTER_CONTRACT_INVALID"));
-  const big = new FakeDatabase([record("a", { description: "x".repeat(262144) })]);
-  await assert.rejects(databaseAuthorityStore(big, "seed"), code("CG_BUDGET_EXCEEDED"));
-});
-
-test("DB query pagination rejects cross-page duplicate catalog and neighbor rows", async () => {
-  const db = new FakeDatabase([
-    record("a", { parents: ["root"] }), record("b", { parents: ["root"] }),
-    record("c", { parents: ["root"] }), record("root"),
-  ]);
-  const view = await databaseAuthorityStore(db, "seed");
-  try {
-    db.scanCapabilities = async (request) => request.cursor === undefined
-      ? { items: [db.records[0]!, db.records[1]!], nextCursor: "catalog-2" }
-      : { items: [db.records[1]!, db.records[2]!] };
-    const catalog = await view.listCapabilities({ ...page, limit: 2 });
-    assert.ok(catalog.nextCursor);
-    await assert.rejects(view.listCapabilities({ ...page, limit: 2, cursor: catalog.nextCursor }), code("CG_ADAPTER_CONTRACT_INVALID"));
-
-    const endpoint = (capabilityId: string) => ({ providerId: "seed", capabilityId });
-    db.neighbors = async (_id, _kind, request) => request.cursor === undefined
-      ? { items: [endpoint("a"), endpoint("b")], nextCursor: "neighbors-2" }
-      : { items: [endpoint("b"), endpoint("c")] };
-    // Complete inverse proof rejects the bad second source page before exposing the first public page.
-    await assert.rejects(view.neighbors("root", "children", { ...page, limit: 2 }), code("CG_ADAPTER_CONTRACT_INVALID"));
-  } finally { await view.close(); }
-});
-
-test("memory reverse indexes are exact and do not add implicit related forward edges", async () => {
-  const db = new FakeDatabase([record("a", { related: ["z"] }), record("z")]);
-  const view = memoryGraphStore(await file(db));
-  assert.deepEqual((await view.getCapability("z"))?.related, []);
-  assert.equal((await view.neighbors("z", "relatedBy", page)).items[0]?.capabilityId, "a");
-});
-
-test("pins retain current/previous sources across repeated swaps and close", async () => {
-  const store = new ProviderViewStore();
-  const dbs = [1, 2, 3, 4].map((i) => new FakeDatabase([record("a", { name: String(i) })]));
-  for (const db of dbs.slice(0, 2)) await store.replaceProvider(await databaseAuthorityStore(db, "seed"));
+test("pins retain current and previous views across repeated swaps and close", async () => {
+  const store = new ProviderViewStore(); const sources = await Promise.all([1, 2, 3, 4].map((i) => view(String(i))));
+  for (const source of sources.slice(0, 2)) await store.replaceProvider(source);
   const pin = store.pin();
-  for (const db of dbs.slice(2)) await store.replaceProvider(await databaseAuthorityStore(db, "seed"));
-  assert.equal(dbs[0]!.closed, 0); assert.equal(dbs[1]!.closed, 0);
+  for (const source of sources.slice(2)) await store.replaceProvider(source);
+  assert.deepEqual(sources.map((source) => source.closes), [0, 0, 0, 0]);
   assert.equal((await pin.previous!.getView("seed")!.getCapability("a"))!.name, "1");
-  await store.close(); assert.equal(dbs[2]!.closed, 1); assert.equal(dbs[3]!.closed, 1);
+  await store.close(); assert.deepEqual(sources.map((source) => source.closes), [0, 0, 1, 1]);
   assert.equal((await pin.current.getView("seed")!.getCapability("a"))!.name, "2");
-  await pin.release(); await pin.release(); assert.deepEqual(dbs.map((db) => db.closed), [1, 1, 1, 1]);
+  await pin.release(); await pin.release(); assert.deepEqual(sources.map((source) => source.closes), [1, 1, 1, 1]);
 });
 
-test("cleanup failure cannot turn an already published swap into a failed reload", async () => {
+test("cleanup failure cannot undo a published swap and private diagnostics stay private", async () => {
   const store = new ProviderViewStore();
-  const db = new FakeDatabase([record("a")]); db.close = async () => { throw new Error("private path"); };
-  await store.replaceProvider(await databaseAuthorityStore(db, "seed"));
-  for (const n of [2, 3]) await store.replaceProvider(await databaseAuthorityStore(new FakeDatabase([record("a", { name: String(n) })]), "seed"));
+  await store.replaceProvider(await view("1", true));
+  for (const name of ["2", "3"]) await store.replaceProvider(await view(name));
   const pin = store.pin(); assert.equal((await pin.current.getView("seed")!.getCapability("a"))!.name, "3"); await pin.release();
-  await assert.rejects(store.close(), code("CG_LOAD_FAILED"));
+  await assert.rejects(store.close(), (error: unknown) => {
+    assert.ok(error instanceof CapabilityGraphError); assert.equal(error.code, "CG_LOAD_FAILED");
+    assert.deepEqual(error.details, { reason: "view_cleanup_failed", count: 1 });
+    assert.doesNotMatch(JSON.stringify(error), /private cleanup secret/); return true;
+  });
 });
 
 for (const queryFails of [false, true]) for (const cleanupFails of [false, true]) {
-  test(`R2: query failure=${queryFails} and retired cleanup failure=${cleanupFails} preserve the primary outcome`, async () => {
-    const db = new FakeDatabase([record("a")]); let version = 0;
-    db.close = async () => { db.closed++; if (cleanupFails) throw new Error("private cleanup secret"); };
-    const host = await CoreHost.open(config(async () => ++version === 1 ? db : new FakeDatabase([record("a", { name: String(version) })])));
-    let started!: () => void; let resume!: () => void;
-    const entered = new Promise<void>((resolve) => { started = resolve; });
-    const gate = new Promise<void>((resolve) => { resume = resolve; });
+  test(`pinned query failure=${queryFails}, retirement cleanup failure=${cleanupFails} preserves its outcome`, async () => {
+    const store = new ProviderViewStore(); const source = await view("1", cleanupFails);
+    await store.replaceProvider(source); const pin = store.pin();
+    await store.replaceProvider(await view("2")); await store.replaceProvider(await view("3"));
+    assert.equal(source.closes, 0);
     const primary = new CapabilityGraphError("CG_INPUT_INVALID", { nextAction: "fix_input" });
-    const outcome = host.query(undefined, undefined, async () => { started(); await gate; if (queryFails) throw primary; return "document"; })
-      .then((value) => ({ value }), (error: unknown) => ({ error }));
-    try {
-      await entered; await host.reload(); await host.reload(); assert.equal(db.closed, 0); resume();
-      const result = await outcome;
-      if (queryFails) { assert.ok("error" in result); assert.equal(result.error, primary); }
-      else { assert.ok("value" in result); assert.equal(result.value, "document"); }
-      assert.equal(db.closed, 1);
-    } finally { resume(); await outcome;
-      if (cleanupFails) await assert.rejects(host.close(), (error: unknown) => {
-        assert.ok(error instanceof CapabilityGraphError); assert.equal(error.code, "CG_LOAD_FAILED");
-        assert.deepEqual(error.details, { reason: "view_cleanup_failed", count: 1 });
-        assert.doesNotMatch(JSON.stringify(error), /private cleanup secret/); return true;
-      }); else await host.close();
-    }
+    const operation = async () => {
+      try { if (queryFails) throw primary; return (await pin.current.getView("seed")!.getCapability("a"))!.name; }
+      finally { await pin.release(); }
+    };
+    if (queryFails) await assert.rejects(operation(), (error: unknown) => error === primary);
+    else assert.equal(await operation(), "1");
+    assert.equal(source.closes, 1);
+    if (cleanupFails) await assert.rejects(store.close(), { code: "CG_LOAD_FAILED" }); else await store.close();
   });
 }
 
-test("R2: close reports direct failures and delayed final-pin failures without raw exceptions", async () => {
+test("close reports direct and delayed final-pin cleanup failures exactly once", async () => {
   for (const pinned of [false, true]) {
-    const store = new ProviderViewStore(); const db = new FakeDatabase([record("a")]);
-    db.close = async () => { db.closed++; throw new Error("private path"); };
-    await store.replaceProvider(await databaseAuthorityStore(db, "seed"));
+    const store = new ProviderViewStore(); const source = await view("1", true); await store.replaceProvider(source);
     const pin = pinned ? store.pin() : undefined;
-    if (pin) { await store.close(); assert.equal(db.closed, 0); await pin.release(); await pin.release(); }
-    else await assert.rejects(store.close(), code("CG_LOAD_FAILED"));
-    await assert.rejects(store.close(), code("CG_LOAD_FAILED")); assert.equal(db.closed, 1);
+    if (pin) { await store.close(); assert.equal(source.closes, 0); await pin.release(); await pin.release(); }
+    else await assert.rejects(store.close(), { code: "CG_LOAD_FAILED" });
+    await assert.rejects(store.close(), { code: "CG_LOAD_FAILED" }); assert.equal(source.closes, 1);
   }
 });
 
-test("scope missing differs from explicit empty and query scope never expands", () => {
+test("scope missing differs from explicit empty and request scope cannot expand", () => {
   assert.equal(computeEffectiveScope({ hostAllowed: ["seed"], integrationEnabled: undefined, phase: "open" }).ok, false);
   const empty = computeEffectiveScope({ hostAllowed: ["seed"], integrationEnabled: [], phase: "open" });
   assert.equal(empty.ok && empty.scope.size, 0);
@@ -202,46 +91,46 @@ test("scope missing differs from explicit empty and query scope never expands", 
   assert.equal(!denied.ok && denied.error.code, "CG_SCOPE_DENIED");
 });
 
-test("open is atomic across providers, distinguishes duplicates, and allows explicit empty", async () => {
-  const db = new FakeDatabase([record("a")]);
-  const base = config(async () => db);
-  await assert.rejects(CoreHost.open({ ...base, providers: [...base.providers, ...base.providers] }), code("CG_DUAL_AUTHORITY"));
-  await assert.rejects(CoreHost.open({ ...base, hostAllowedProviders: [] }), code("CG_SCOPE_DENIED"));
-  const empty = await CoreHost.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: [], providers: [] });
-  assert.deepEqual(await empty.query(undefined, undefined, async (ctx) => ctx.meta.scope), []); await empty.close();
-  await assert.rejects(CoreHost.open({ ...base, hostAllowedProviders: ["seed", "other"], integrationEnabledProviders: ["seed", "other"],
-    providers: [...base.providers, { providerId: "other", authority: { kind: "database", adapter: { id: "fail", openView: async () => { throw new Error("failed"); } } } }] }), code("CG_LOAD_FAILED"));
-  assert.equal(db.closed, 1);
+test("file open is atomic across providers, rejects duplicates and permits explicit empty scope", async () => {
+  const fixture = new FileFixture([record("a")]); const base = config(fixture);
+  await assert.rejects(CapabilityGraph.open({ ...base, providers: [...base.providers, ...base.providers] }), { code: "CG_DUAL_AUTHORITY" });
+  await assert.rejects(CapabilityGraph.open({ ...base, hostAllowedProviders: [] }), { code: "CG_SCOPE_DENIED" });
+  await assert.rejects(CapabilityGraph.open({ ...base, providers: [] }), { code: "CG_CONFIG_INCOMPLETE" });
+  const empty = await CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: [], providers: [] });
+  assert.deepEqual((await empty.listCatalog()).meta.scope, []); await empty.close();
+  await assert.rejects(CapabilityGraph.open({ ...base, hostAllowedProviders: ["seed", "other"], integrationEnabledProviders: ["seed", "other"],
+    providers: [...base.providers, { providerId: "other", authority: { kind: "file", rootDir: path.join(fixture.rootDir, "missing") } }] }), { code: "CG_LOAD_FAILED" });
 });
 
-test("reload serializes and failed candidates preserve readable slots with refreshFailed", async () => {
-  let version = 0;
-  let fail = false;
-  let opening = false;
-  const host = await CoreHost.open(config(async () => {
-    assert.equal(opening, false); opening = true; await new Promise((resolve) => setTimeout(resolve, 2)); opening = false;
-    if (fail) throw new Error("failed");
-    return new FakeDatabase([record("a", { name: String(++version) })]);
-  }));
-  const initial = await host.query(undefined, undefined, async (ctx) => ctx.meta.staticRevision!);
-  await Promise.all([host.reload(), host.reload()]); assert.equal(version, 3);
-  await assert.rejects(host.query(undefined, initial, async () => {}), code("CG_REVISION_MISMATCH"));
-  const current = await host.query(undefined, undefined, async (ctx) => ctx.meta.staticRevision!);
-  fail = true; const failed = await host.reload(); assert.equal(failed.ok, false);
-  assert.equal(failed.providers[0]?.servedFrom, "current");
-  await host.query(undefined, current, async (ctx) => { assert.equal(ctx.meta.refreshFailed, true); assert.equal(ctx.meta.servedFrom, "current"); });
-  await host.close(); await assert.rejects(host.query(undefined, undefined, async () => {}), code("CG_NO_ACTIVE_VIEW"));
+test("file reloads serialize and failed candidates preserve readable revisions", async () => {
+  const fixture = new FileFixture([record("a")]); const host = await CoreHost.open(config(fixture));
+  const original = FileAuthorityStore.prototype.load; let active = 0; let loads = 0;
+  const hook = mock.method(FileAuthorityStore.prototype, "load", async function (this: FileAuthorityStore, ...args: Parameters<typeof original>) {
+    assert.equal(++active, 1);
+    try { loads++; await new Promise((resolve) => setTimeout(resolve, 2)); return await original.apply(this, args); }
+    finally { active--; }
+  });
+  try {
+    const initial = await host.query(undefined, undefined, async (ctx) => ctx.meta.staticRevision!);
+    fixture.records = [record("a", { name: "2" })]; fixture.sync();
+    await Promise.all([host.reload(), host.reload()]); assert.equal(loads, 2);
+    const current = await host.query(undefined, undefined, async (ctx) => ctx.meta.staticRevision!); assert.notEqual(initial, current);
+    await writeFile(path.join(fixture.rootDir, "provider.json"), "invalid-json");
+    assert.equal((await host.reload()).ok, false);
+    await host.query(undefined, current, async (ctx) => { assert.equal(ctx.meta.refreshFailed, true); assert.equal(ctx.meta.servedFrom, "current"); });
+    await assert.rejects(host.query(undefined, initial, async () => {}), { code: "CG_REVISION_MISMATCH" });
+  } finally { hook.mock.restore(); await host.close(); }
+  await assert.rejects(host.query(undefined, undefined, async () => {}), { code: "CG_NO_ACTIVE_VIEW" });
 });
 
-test("previous selection retains its knowledge root; dead backend maps to requested-view failure", async () => {
-  const old = new FakeDatabase([record("a")]); old.knowledgeRootDir = "old-root";
-  const oldRoot = path.resolve("old-root");
-  let calls = 0;
-  const host = await CoreHost.open(config(async () => ++calls === 1 ? old : new FakeDatabase([record("a", { name: "new" })])));
-  const revision = await host.query(undefined, undefined, async (ctx) => ctx.meta.staticRevision!);
-  await host.reload();
-  await host.query(undefined, revision, async (ctx) => { assert.equal(ctx.meta.servedFrom, "previous"); assert.equal(ctx.graph.getView("seed")!.sourceContext.knowledgeRootDir, oldRoot); });
-  old.getCapability = async () => { throw new Error("dead"); };
-  await assert.rejects(host.query(undefined, revision, async (ctx) => ctx.graph.getView("seed")!.getCapability("a")), code("CG_REVISION_MISMATCH"));
-  await host.close();
+test("queries pin real file views through reload and close", async () => {
+  const fixture = new FileFixture([record("a", { name: "old" })]); const host = await CoreHost.open(config(fixture));
+  let entered!: () => void; let resume!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; }); const gate = new Promise<void>((resolve) => { resume = resolve; });
+  const pending = host.query(undefined, undefined, async (ctx) => { entered(); await gate; return (await ctx.graph.getView("seed")!.getCapability("a"))!.name; });
+  try {
+    await started;
+    for (const name of ["new", "latest"]) { fixture.records = [record("a", { name })]; fixture.sync(); await host.reload(); }
+    await host.close(); resume(); assert.equal(await pending, "old");
+  } finally { resume(); await pending; await host.close(); }
 });

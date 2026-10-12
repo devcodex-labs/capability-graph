@@ -20,7 +20,7 @@ import Contracts from '@generated/snippets/contracts-result-meta.mdx';
 | `refreshFailed` | 最近刷新失败，但当前返回视图仍可读 |
 | `scope` | 本次有效 Provider 范围 |
 | `filter` | 实际应用的查询过滤 |
-| `view` | 本次使用的能力、Runtime 和知识内容身份 |
+| `view` | 本次使用的能力修订和文档内容身份 |
 | `warnings` | 有界非致命诊断 |
 | `budgets` | 实际相关的预算值 |
 
@@ -66,11 +66,10 @@ interface BatchResult<T> {
 
 Open 阶段的 Effective Provider Scope 是 `hostAllowedProviders ∩ integrationEnabledProviders`，查询提供 `requestProviderScope` 时再求一次交集。请求范围只能收窄；包含未允许 Provider 时返回 `CG_SCOPE_DENIED`。`BoundProviderGraph` 固定单 Provider并拒绝 `requestProviderScope`；ID 前缀、parent 和类型过滤都不是授权。
 
-## 静态与运行时修订
+## 静态与正文修订
 
 Static Revision 来自规范化 Provider metadata、能力记录、关系和知识映射，知识正文使用独立 contentId。Core 每个 Provider 保留 current 和 previous；`requiredStaticRevision` 匹配 previous 时 `servedFrom` 为 `previous`，更旧或不可读修订返回 `CG_REVISION_MISMATCH`。
 
-Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticRevision`。兼容状态只有 `compatible`、`unknown` 和 `refresh_required`；Core 不因 ID 相同自动判断兼容。
 
 ## 分页与游标
 
@@ -88,9 +87,6 @@ Runtime Revision 由 Adapter 定义，观察同时记录 `observedAgainstStaticR
 | Selection | 32 个显式能力、128 个闭包能力、256 条依赖边 |
 | Document read | 默认页 32,768 字节、全文每次 8 文档；大文档可续读 |
 | Specification documents | 每页 20 项、131,072 页字节；正文仍受 Document read 预算约束 |
-| Capability retrieval | 20 候选、512 单候选字节 |
-| Knowledge query | 32 个原始 selected、每维 128 个过滤值、128 个最终 targets、8 命中、2,048 单个 snippet 字节 |
-| Runtime | 50 默认页、100 最大页、5,000 ms 等待、4,096 facts 字节 |
 
 字节预算使用 UTF-8 或原始 bytes，不是 JavaScript 字符数。条目查询的 `truncated` 表示有续页，`partial` 表示检查 warning 或逐项失败。正文页的 `partial` 表示本页未包含整个文档，即使读取成功且没有 warning/error；续读看 `hasMore/nextCursor`。仅从偏移 0 返回完整正文时，completeness 为 `complete`。单项过大不会被截断成看似合法的数据；无法取得进展时返回 `CG_BUDGET_EXCEEDED`。
 
@@ -127,21 +123,8 @@ Selection 按选择、节点和依赖边数量限制工作量，当前没有独�
 | `read.maxSelected` | 32 | 文档读取原始 selected 数量，去重前检查 |
 | `read.maxFilterValuesPerDimension` | 128 | 直接读取每维 knowledgeIds/roles/locales 原始数量 |
 | `read.maxResponseBytes` | 4194304 | 完整 Core 响应的 JSON UTF-8 字节，含失败槽位、meta 和 view |
-| `retrieveCapabilities.maxCandidates` | 20 | 候选数量，也是缺省 limit |
-| `retrieveCapabilities.maxCandidateBytes` | 512 | UTF-8 单候选字节 |
-| `queryKnowledge.maxHits` | 8 | 命中数量，也是缺省 limit |
-| `queryKnowledge.maxSnippetBytes` | 2048 | UTF-8 单片段字节 |
-| `queryKnowledge.maxSelected` | 32 | 原始 selected 数量 |
-| `queryKnowledge.maxFilterValuesPerDimension` | 128 | 每维过滤原始值数量 |
-| `queryKnowledge.maxTargets` | 128 | 最终文档目标数量 |
-| `queryKnowledge.maxTargetBytes` | 131072 | 最终目标集合 UTF-8 字节 |
-| `runtime.defaultPageSize` | 50 | 实例缺省页数量 |
-| `runtime.maxPageSize` | 100 | 实例页数量上限 |
-| `runtime.timeoutMs` | 5000 | Core 最长等待毫秒，不是取消 |
-| `runtime.maxFactsBytes` | 4096 | 每实例 facts UTF-8 字节 |
-| `runtime.maxAssociationBytes` | 2048 | 每实例整个 associations 的 UTF-8 字节 |
 
-例如 `budgets: { runtime: { timeoutMs: 2000 } }` 只更改等待时间，所有其他默认值保留。增加预算需要结合宿主资源，不使 scope 变成沙箱或后端自动可用。
+例如 `budgets: { read: { maxPageBytes: 4096 } }` 只更改单页容量，所有其他默认值保留。增加预算需要结合宿主资源，不使 scope 变成沙箱或后端自动可用。
 
 新增的三个 read 数量/响应字段在公开配置中可省略，内部总会补齐默认值，旧完整 BudgetConfig 仍可使用。原始数量在查询 pin、点读及 Reader 前检查；展开后的篇数超限也不调用 Reader。总响应需取得有界正文后按 JSON 转义后的字节计算，超限为查询级 CG_BUDGET_EXCEEDED，不能静默丢项。单篇正文超限仍是逐项失败。宿主可降低响应上限以适应自己的上下文容量。
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { CapabilityGraph, CapabilityGraphError, type KnowledgeDocumentRef, type KnowledgeReader, type OpenConfig } from "../src/index.js";
 import { contentId } from "../src/knowledge/local-file-reader.js";
-import { FakeDatabase, record } from "./contract/fake-database.js";
+import { FileFixture, record } from "./contract/file-fixture.js";
 import { createTestDirectory, removeTestDirectory } from "./contract/temporary-directory.js";
 
 const doc = (knowledgeId: string, file = `${knowledgeId}.md`): KnowledgeDocumentRef => ({ kind: "document", knowledgeId, role: "guide", locator: { type: "relative-file", path: file } });
@@ -19,9 +19,7 @@ async function fixture(run: (root: string) => Promise<void>) {
 }
 const config = (root: string, records: ReturnType<typeof record>[], extra: Partial<OpenConfig> = {}): OpenConfig => ({
   hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
-  providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => {
-    const view = new FakeDatabase(records); view.knowledgeRootDir = root; return view;
-  } } } }], ...extra,
+  providers: [{ providerId: "seed", authority: (() => { const view = new FileFixture(records); view.knowledgeRootDir = root; return view.authority; })() }], ...extra,
 });
 
 test("local bytes are read on demand; body updates change contentId, not static revision", async () => fixture(async (root) => {
@@ -40,15 +38,12 @@ test("local bytes are read on demand; body updates change contentId, not static 
 }));
 
 test("direct reads skip Collections unless explicitly named and retain per-item failures", async () => fixture(async (root) => {
-  let retrievalCalls = 0;
-  const graph = await CapabilityGraph.open(config(root, [record("a", { knowledge: [doc("missing"), { kind: "collection", knowledgeId: "manual", members: [] }, http] }), record("b")], {
-    knowledgeRetriever: { id: "fake", retrieve: async () => { retrievalCalls++; throw new Error("must not run"); } },
-  }));
+  const graph = await CapabilityGraph.open(config(root, [record("a", { knowledge: [doc("missing"), { kind: "collection", knowledgeId: "manual", members: [] }, http] }), record("b")]));
   try {
     const page = await graph.readDocuments({ selected: [id("a"), id("b")] });
     assert.deepEqual(page.results.map((slot) => slot.ok ? "ok" : slot.error.code), ["CG_SOURCE_UNREADABLE", "CG_READER_UNCONFIGURED", "CG_KNOWLEDGE_NOT_ASSOCIATED"]);
     assert.deepEqual(page.results.map((slot) => slot.inputIndex), [0, 1, 2]);
-    assert.equal(page.meta.completeness, "partial"); assert.equal(retrievalCalls, 0);
+    assert.equal(page.meta.completeness, "partial");
     const collection = (await graph.readDocuments({ selected: [id("a")], knowledgeIds: ["manual"] })).results[0]!;
     assert.ok(!collection.ok); assert.equal(collection.error.code, "CG_KNOWLEDGE_TYPE_UNSUPPORTED");
     assert.equal(JSON.stringify(page).includes(root), false);
@@ -114,16 +109,15 @@ test("read rechecks jail after load and rejects a newly created outside junction
   } finally { await graph.close(); }
 }));
 
-test("previous and current read their own roots, not cwd or latest configuration", async () => fixture(async (root) => {
+test("previous and current retain their declared document paths across reload", async () => fixture(async (root) => {
   const oldRoot = path.join(root, "old"); const newRoot = path.join(root, "new"); await mkdir(oldRoot); await mkdir(newRoot);
   await writeFile(path.join(oldRoot, "doc.md"), "old"); await writeFile(path.join(newRoot, "doc.md"), "new");
-  let version = 0;
-  const initial = config(root, []);
-  const graph = await CapabilityGraph.open({ ...initial, providers: [{ providerId: "seed", authority: { kind: "database", adapter: { id: "fake", openView: async () => {
-    const db = new FakeDatabase([record("a", { name: String(version), knowledge: [doc("doc")] })]); db.knowledgeRootDir = version ? newRoot : oldRoot; return db;
-  } } } }] });
+  const fixture = new FileFixture([record("a", { knowledge: [{ ...doc("doc"), locator: { type: "relative-file", path: "old/doc.md" } }] })]);
+  fixture.knowledgeRootDir = root;
+  const graph = await CapabilityGraph.open({ hostAllowedProviders: ["seed"], integrationEnabledProviders: ["seed"],
+    providers: [{ providerId: "seed", authority: fixture.authority }] });
   try {
-    const old = (await graph.getProvider("seed")).staticRevision; version++; await graph.reload();
+    const old = (await graph.getProvider("seed")).staticRevision; fixture.records = [record("a", { knowledge: [{ ...doc("doc"), locator: { type: "relative-file", path: "new/doc.md" } }] })]; fixture.sync(); await graph.reload();
     const previous = await graph.readDocuments({ selected: [id("a")], requiredStaticRevision: old });
     const current = await graph.readDocuments({ selected: [id("a")] });
     assert.ok(previous.results[0]?.ok); assert.ok(current.results[0]?.ok);

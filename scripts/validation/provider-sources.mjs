@@ -5,18 +5,16 @@ import { pathToFileURL } from 'node:url';
 import { ProxyAgent } from 'proxy-agent';
 import { CapabilityGraph } from '@devcodex/capability-graph';
 import { bindKnowledgeRoots } from '../../dist/knowledge/roots.js';
-import { HttpKnowledgeReader } from '../../dist-test/examples/seed-runtime/knowledge-reader.js';
-import { TextKnowledgeRetriever } from '../../dist-test/examples/seed-runtime/text-retrieval.js';
+import { HttpKnowledgeReader } from '../../dist-test/examples/http-reader/knowledge-reader.js';
 import { createTemporaryDirectory, repositoryRoot } from '../lib/artifact-paths.mjs';
 import { verifyVextSource, sha256 } from '../../examples/vextjs/source-provenance.mjs';
 import { knowledgeIdForChapter } from '../../examples/vextjs/official-documents.mjs';
 import { exportVextProvider } from '../../examples/vextjs/documentation-provider.mjs';
-import { assertKnowledgeEvidence } from './lib/retrieval-assertions.mjs';
 import { verifyInstalledDocuments } from './lib/package-provenance.mjs';
 
 /** Real direct-source matrix. All generated provider definitions/snapshots are outside the repository. */
 export async function validateProviderSources({ sourceRoot, installedProject, includeHttps = false, sourceIdentity,
-  graphClass = CapabilityGraph, knowledgeClass = TextKnowledgeRetriever, readerClass = HttpKnowledgeReader }) {
+  graphClass = CapabilityGraph, readerClass = HttpKnowledgeReader }) {
   sourceRoot = await realpath(sourceRoot); installedProject = await realpath(installedProject);
   const bindings = await bindKnowledgeRoots({ vext: { kind: 'package', packageName: 'vextjs', resolveFrom: installedProject }, mongo: { kind: 'package', packageName: 'monsqlize', resolveFrom: installedProject } });
   const frameworkRoot = bindings.vext.rootDir; const monsqlizeRoot = bindings.mongo.rootDir;
@@ -73,10 +71,9 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
         await add('vextjs', capabilityId, knowledgeId, { type: 'http', url }, path.join(sourceRoot, originalPath), query, evidence, 'guide', url);
       }
     }
-    const knowledge = new knowledgeClass();
     const monsqlizeRegistry = includeHttps ? await verifyInstalledDocuments({ packageRoot: monsqlizeRoot, lockRoot: sourceRoot,
       outputDirectory: temporary, documents: ['package.json', 'README.md', 'CHANGELOG.md', 'MIGRATION.md'] }) : undefined;
-    graph = await graphClass.open({ hostAllowedProviders: ['vextjs', 'monsqlize'], integrationEnabledProviders: ['vextjs', 'monsqlize'], readers: [reader], knowledgeRetriever: knowledge,
+    graph = await graphClass.open({ hostAllowedProviders: ['vextjs', 'monsqlize'], integrationEnabledProviders: ['vextjs', 'monsqlize'], readers: [reader],
       providers: [
         { providerId: 'vextjs', authority: { kind: 'file', rootDir: exported.rootDir, definitionLayout: 'directory' }, knowledgeRoots: {
           official: { kind: 'directory', rootDir: sourceRoot }, installed: { kind: 'package', packageName: 'vextjs', resolveFrom: installedProject },
@@ -101,12 +98,9 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
       assert.equal(expectedOffset, item.original.length);
       assert.equal(pages > 1, item.original.length > 32768);
       assert.deepEqual(Buffer.from(reconstructed), item.original); provenance[index].readSha256 = sha256(Buffer.from(reconstructed));
-      const search = await bound.queryKnowledge({ selected: [{ capabilityId: item.capabilityId }], knowledgeIds: [item.knowledgeId], text: item.query, limit: 3 });
-      assertKnowledgeEvidence(search, `${item.providerId}/${item.capabilityId}`);
-      assert(search.items.some((hit) => hit.snippet.toLowerCase().includes(item.evidence.toLowerCase())), 'Independent expected text absent from retrieved evidence');
-      for (const hit of search.items) assert.equal(item.original.subarray(hit.startOffset, hit.endOffset).toString(), hit.snippet);
+      assert(reconstructed.toLowerCase().includes(item.evidence.toLowerCase()), 'Independent expected source text absent from reconstructed document');
       results.push({ providerId: item.providerId, capabilityId: item.capabilityId, knowledgeId: item.knowledgeId, locator: item.locator,
-        bytes: item.original.length, pages, query: item.query, knowledgeHits: search.items.length, exactReconstruction: true });
+        bytes: item.original.length, pages, query: item.query, exactReconstruction: true });
     }
     // The same local capabilityId/knowledgeId resolves to independently attributed provider sources.
     const shared = await graph.readDocuments({ selected: [{ providerId: 'vextjs', capabilityId: 'documentation' }, { providerId: 'monsqlize', capabilityId: 'documentation' }] });
@@ -114,8 +108,6 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
     for (const providerId of ['vextjs', 'monsqlize']) {
       const before = (await graph.getProvider(providerId)).staticRevision;
       assert((await graph.reload({ providerId })).ok); assert.equal((await graph.getProvider(providerId)).staticRevision, before);
-      await knowledge.invalidate({ providerId, staticRevision: before, reason: 'metadata' });
-      assertKnowledgeEvidence(await graph.forProvider(providerId).queryKnowledge({ selected: [{ capabilityId: 'documentation' }], text: providerId }), `${providerId}/reload`);
     }
     const packageDocs = ['README.md', 'CHANGELOG.md', 'MIGRATION.md']; const installedDocuments = [];
     for (const file of packageDocs) { const bytes = await readFile(path.join(frameworkRoot, file)); installedDocuments.push({ file, sha256: sha256(bytes), bytes: bytes.length }); }
@@ -125,7 +117,7 @@ export async function validateProviderSources({ sourceRoot, installedProject, in
       monsqlize: { name: monsqlize.name, version: monsqlize.version, packageJsonSha256: sha256(await readFile(path.join(monsqlizeRoot, 'package.json'))),
         identityScope: 'Actual installed package and original-document fingerprints; registry integrity is a separate verification' },
       installedDocuments, websitePackaged, totalSizeAdmissionCap: false, sharedIdentityIsolation: true, reloads: ['vextjs', 'monsqlize'],
-      limitation: 'Document read/retrieval coverage does not establish framework behavior, database execution or Agent success. Native MCP readback is gated by vextjs.mjs separately.' };
+      limitation: 'Document read coverage does not establish framework behavior, database execution or Agent success. Native MCP readback is gated by vextjs.mjs separately.' };
   } finally { await graph?.close(); await reader.close(); agent.destroy(); await rm(temporary, { recursive: true, force: true }); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

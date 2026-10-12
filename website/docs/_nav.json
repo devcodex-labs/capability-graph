@@ -1,4 +1,4 @@
 [
-  { "text": "v1", "link": "/", "activeMatch": "^/" },
+  { "text": "v2", "link": "/", "activeMatch": "^/" },
   { "text": "GitHub", "link": "https://github.com/devcodex-labs/capability-graph" }
 ]

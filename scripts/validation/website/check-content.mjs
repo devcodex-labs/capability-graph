@@ -22,7 +22,7 @@ const sectionLabels = new Map([
   ['troubleshooting', '故障排查']
 ]);
 const expectedNav = [
-  ['v1', '/'],
+  ['v2', '/'],
   ['GitHub', 'https://github.com/devcodex-labs/capability-graph']
 ];
 const expectedRootSidebar = [

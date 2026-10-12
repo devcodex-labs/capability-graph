@@ -8,18 +8,15 @@ export type { BudgetConfig, BudgetOverrides } from "./budgets.js";
 export { CapabilityGraph } from "./capability-graph.js";
 export type { OpenConfig, BoundProviderGraph } from "./capability-graph.js";
 export type { AuthoritySpec, ProviderLoadSpec, ReloadResult } from "./core-host.js";
-export type { DatabaseAuthorityAdapter, DatabaseReadView, StorePage, StorePageRequest, UnvalidatedProviderRecord, UnvalidatedCapabilityRecord } from "./store/types.js";
 export type * from "./query/types.js";
 export type * from "./knowledge/types.js";
 export type { DocumentBodyQuery, SpecificationBodyQuery, DocumentBodyPage } from "./knowledge/pages.js";
 export type { ReadDocumentsQuery, DocumentRead, DocumentReadBatch, ReadSpecificationQuery,
   SpecificationDocumentRead, SpecificationReadBatch } from "./knowledge/read.js";
-export type * from "./retrieval/types.js";
-export type * from "./runtime/types.js";
 export type { KnowledgeRootSpec } from "./knowledge/roots.js";
 export type {
-  CanonicalCapabilityId, QualifiedCapabilityId, StaticRevision, RuntimeRevision,
-  KnowledgeContentId, RuntimeCompatibility, CurrentCapabilityView,
+  CanonicalCapabilityId, QualifiedCapabilityId, StaticRevision,
+  KnowledgeContentId, CurrentCapabilityView,
   ResultMeta, BatchItem, BatchResult,
   KnowledgeLocator, KnowledgeDocumentRef, KnowledgeCollectionRef, KnowledgeRef, KnowledgeKind, SpecificationMetadata, NeighborKind,
 } from "./types.js";

@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  native-and-session:
+  graph-and-documents:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -80,7 +80,7 @@ jobs:
             node scripts/validation/vextjs-file-identity.mjs "$VEXT_ROOT" > "$CG_ARTIFACTS_DIR/verification/vextjs-build-diagnostic.json"
             exit 1
           fi
-      - name: Verify official documentation, native catalog, retrieval and actual TCP Sessions
+      - name: Verify official documentation and native graph declarations
         shell: bash
         run: |
           set -euo pipefail
@@ -93,8 +93,8 @@ jobs:
           path: ${{ steps.paths.outputs.verification }}
           retention-days: 7
 
-  installed-business-consumer:
-    needs: native-and-session
+  installed-graph-consumer:
+    needs: graph-and-documents
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -137,17 +137,16 @@ jobs:
           test "$(git -C "$VEXT_ROOT" rev-parse HEAD)" = "$VEXT_SOURCE_COMMIT"
           npm ci --ignore-scripts --prefix "$VEXT_ROOT"
           npm --prefix "$VEXT_ROOT" run build
-      - name: Install actual packages and verify documentation, HTTPS and MongoDB business requests
+      - name: Install actual packages and verify graph queries, original documents and HTTPS
         shell: bash
         run: |
           set -euo pipefail
           npm run test:docs:vextjs -- "$VEXT_ROOT"
-          docker pull mongo:8.0
           node scripts/validation/vextjs-consumer.mjs "$VEXT_ROOT" "$VEXT_SOURCE_COMMIT" --https
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: vextjs-installed-business-consumer
+          name: vextjs-installed-graph-consumer
           path: |
             ${{ steps.paths.outputs.artifacts }}/vextjs-e2e-*/reports
             ${{ steps.paths.outputs.artifacts }}/vextjs-e2e-*/logs
