@@ -431,3 +431,5 @@ npm run docs:browser
 CG_BUILD_DIR、CG_TEST_DIR、CG_ARTIFACTS_DIR 指定仓库外构建、夹具与消费者位置；CG_SITE_BUILD_DIR 指定仓库外站点输出，CG_SITE_ARTIFACTS_DIR 指定浏览器报告/截图。工具不会因此配置模型或登记宿主。
 
 smoke:package 构建 npm 包并在独立项目安装，检查公开入口、TypeScript、ESM、CLI、MCP 和示例。完整命令与产物路径见[源码开发说明](website/content/resources/development.md)。
+
+维护者直接在 main 开发。推送稳定版本 tag 后，工作流依次校验版本、运行 CI、发布已验证 npm 包、核验 Registry、创建 GitHub Release，并部署同一提交的文档。认证配置、只读演练和恢复步骤见[维护者发版](website/content/resources/releasing.md)，新版变更见 [CHANGELOG](CHANGELOG.md)。

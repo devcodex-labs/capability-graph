@@ -1,6 +1,12 @@
-name: publish documentation manually
+name: deploy documentation
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact validated release commit
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -8,12 +14,21 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     env:
       CG_SITE_BASE: /capability-graph/
       CG_SITE_URL: https://devcodex-labs.github.io/capability-graph
+      DEPLOY_SHA: ${{ inputs.ref || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 0
+      - name: Verify the deployment commit
+        env:
+          EXPECTED_SHA: ${{ env.DEPLOY_SHA }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

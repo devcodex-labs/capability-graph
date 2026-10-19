@@ -2,7 +2,8 @@
   "name": "@devcodex/capability-graph",
   "version": "2.0.0",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
   "repository": {
@@ -14,6 +15,7 @@
     "plugin",
     "examples",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "changelogs"
   ],
@@ -52,6 +54,9 @@
     "build": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
     "smoke:package": "node scripts/package-smoke.mjs",
+    "release:check": "node scripts/check-release.mjs",
+    "release:registry": "node scripts/release-registry.mjs",
+    "test:release": "node --test scripts/release.test.mjs",
     "docs:dev": "npm --prefix website run dev",
     "docs:build": "npm --prefix website run build",
     "docs:check": "npm --prefix website run check",

@@ -2,7 +2,7 @@
 
 This is a new implementation governed by the confirmed requirements v3.1 and Usage Contract v1.4. Do not use old source, tests, configuration, examples or architecture as implementation references. Historical `changelogs/` files are read-only.
 
-Stay on the existing working branch. Do not create a worktree or rewrite history. Do not publish a package or push changes without authorization.
+Develop directly on `main`, as requested by the user. Do not create feature branches or worktrees, or rewrite history. Do not publish a package or push changes without authorization. Release automation runs from version tags; never create or push a release tag merely to test the workflow.
 
 The handoff and execution checkpoint are outside this repository at `/workspace/capability-graph-rebuild-20261019/`. Read `reports/RESUME.md` and the confirmed handoff baselines before continuing. Do not copy the handoff PoC stubs into product code.
 

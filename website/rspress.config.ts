@@ -9,7 +9,7 @@ const groups = [
   { text: '宿主接入', items: [['完整接入清单', '/integrations/overview'], ['Codex 便捷登记', '/integrations/codex'], ['MCP stdio / HTTP', '/integrations/mcp'], ['已有 MCP Server', '/integrations/existing-server'], ['Agent Tool Adapter', '/integrations/tools'], ['Skill 与 Plugin', '/integrations/skill-plugin'], ['CLI 与维护', '/integrations/cli'], ['远程 HTTPS', '/integrations/remote']] },
   { text: 'API 参考', items: [['完整配置', '/reference/configuration'], ['SDK 方法与结果', '/reference/sdk'], ['公开类型', '/reference/types'], ['错误与恢复', '/reference/errors']] },
   { text: '示例', items: [['运行示例', '/examples/index'], ['多个 Provider', '/examples/multi-provider'], ['VextJS', '/examples/vextjs']] },
-  { text: '资源', items: [['安全与授权', '/resources/security'], ['版本与兼容', '/resources/compatibility'], ['故障排查', '/resources/troubleshooting'], ['源码开发与检查', '/resources/development']] },
+  { text: '资源', items: [['安全与授权', '/resources/security'], ['版本与兼容', '/resources/compatibility'], ['故障排查', '/resources/troubleshooting'], ['源码开发与检查', '/resources/development'], ['维护者发版', '/resources/releasing']] },
 ];
 export default defineConfig({
   root: path.join(import.meta.dirname, 'content'),

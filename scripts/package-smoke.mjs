@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
+import {fingerprint} from './release-registry.mjs';
 const source = fileURLToPath(new URL('../', import.meta.url));
 const base = path.resolve(process.env.CG_ARTIFACTS_DIR ?? path.join(source, '../capability-graph-artifacts'));
 await fs.mkdir(base, { recursive: true });
@@ -85,4 +86,16 @@ const cli = spawnSync(bin, ['doctor', '--config', path.join(consumer, 'config.js
 assert.equal(cli.status, 0, cli.stderr); assert.equal(JSON.parse(cli.stdout).toolCount, 5);
 const evidence = { status: 'PASS', node: process.version, platform: process.platform, tarball, integrity: pack.integrity, files: pack.files, consumer, optionalSDKsAbsent: true, types: 'PASS (skipLibCheck=false)', runtime: runtime.trim(), bin: 'PASS', examples: 'PASS minimal/multi-provider/embedded MCP', maintenance: 'PASS installed setup/doctor/clean' };
 await fs.writeFile(path.join(root, 'evidence.json'), JSON.stringify(evidence, null, 2));
+if (process.env.CG_RELEASE_DIR) {
+  const output = path.resolve(process.env.CG_RELEASE_DIR), repository = await fs.realpath(source);
+  assert(output !== repository && !output.startsWith(repository + path.sep) && !repository.startsWith(output + path.sep), 'Release output must be outside source');
+  await fs.mkdir(output, {recursive: true});
+  const canonical = await fs.realpath(output);
+  assert(canonical !== repository && !canonical.startsWith(repository + path.sep) && !repository.startsWith(canonical + path.sep), 'Release output must be outside source');
+  const bytes = await fs.readFile(tarball), hashes = fingerprint(bytes);
+  assert.equal(hashes.integrity, pack.integrity, 'Release archive differs from npm pack integrity');
+  await fs.writeFile(path.join(output, pack.filename), bytes, {flag: 'wx'});
+  await fs.writeFile(path.join(output, 'SHA256SUMS'), `${hashes.sha256}  ${pack.filename}\n`, {flag: 'wx'});
+  await fs.writeFile(path.join(output, 'release-package.json'), JSON.stringify({name: manifest.name, version: manifest.version, filename: pack.filename, ...hashes}, null, 2) + '\n', {flag: 'wx'});
+}
 console.log(JSON.stringify({ status: 'PASS', node: process.version, tarball, evidence: path.join(root, 'evidence.json') }, null, 2));

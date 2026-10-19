@@ -1,8 +1,26 @@
 name: validate
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
+  release-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm run test:release
+        env:
+          CG_RELEASE_TEST_DIR: ${{ runner.temp }}/release-tests
+      - run: npm run release:check -- --dry-run
   test:
     strategy:
       fail-fast: false
