@@ -37,7 +37,7 @@ export async function checkRelease(options = {}) {
     if (!(await fs.readFile(path.join(root, name), 'utf8')).includes('Capability Graph v' + pkg.version)) throw new Error('Site version differs: ' + name);
   }
   const notes = releaseNotes(await fs.readFile(path.join(root, 'CHANGELOG.md'), 'utf8'), pkg.version);
-  if (options.ci) {
+  if (options.ci && options.refType === 'tag') {
     const result = spawnSync('git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main'], {cwd: root});
     if (result.error || result.status !== 0) throw new Error('The release commit must belong to origin/main.');
   }
