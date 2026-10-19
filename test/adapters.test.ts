@@ -44,8 +44,8 @@ test('OpenAI output budget, configuration and pre-cancel fail explicitly', async
   let calls = 0; const model = createOpenAIExecutor({ apiKey: 'synthetic', model: 'controlled', fetch: async () => { calls++; return output(JSON.stringify(wire)); } });
   await assert.rejects(model.select({ input: 'x', catalog: [], context: {}, revision: 'x', signal: AbortSignal.abort() }), error('CG_MODEL_CANCELLED')); assert.equal(calls, 0);
 });
-test('Codex adapter never starts a model without a usable explicitly resolved CLI', async () => {
+test('Codex adapter rejects unsupported platforms or a missing CLI before starting a model', async () => {
   const g = await graph(createCodexExecutor({ command: '/definitely-absent-codex-cli', scratchRoot: process.env.CG_TEST_DIR! }));
-  await assert.rejects(g.match({ input: 'x' }), error('CG_MODEL_UNAVAILABLE')); await g.close();
+  await assert.rejects(g.match({ input: 'x' }), error(process.platform === 'linux' ? 'CG_MODEL_UNAVAILABLE' : 'CG_MODEL_EXECUTOR_UNSAFE')); await g.close();
   assert.throws(() => createCodexExecutor({ maxOutputBytes: 0 }), error('CG_CONFIG_INVALID'));
 });
