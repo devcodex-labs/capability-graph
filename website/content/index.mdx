@@ -1,0 +1,54 @@
+---
+pageType: custom
+title: Capability Graph
+description: 声明能力，理解适用条件，解析显式依赖。
+---
+
+export const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+export const href = (path) => `${base}${path}.html`;
+
+<main className="cg-home">
+  <section className="cg-hero">
+    <div>
+      <p className="cg-eyebrow">STATIC JSON / SHARED GRAPH / OPTIONAL MODEL</p>
+      <h1>让能力有据可查。</h1>
+      <p className="cg-lead">用 JSON 描述框架、SDK 和项目已有的能力。让应用与 AI 宿主按需发现能力，读取使用说明，检查适用条件与显式依赖。</p>
+      <div className="cg-actions">
+        <a className="cg-button cg-primary" href={href('/getting-started/quick-start')}>开始使用 →</a>
+        <a className="cg-button" href={href('/integrations/overview')}>选择接入方式</a>
+      </div>
+    </div>
+    <aside className="cg-console" aria-label="静态查询示例">
+      <div className="cg-console-label">static.mjs · 无需模型</div>
+      <pre><code>{`const graph = await CapabilityGraph.open({
+  providers: [{ file: './provider.json' }]
+});
+try {
+  await graph.resolve({
+    ids: ['acme::route']
+  });
+} finally { await graph.close(); }`}</code></pre>
+      <div className="cg-console-result">route → requires → schema</div>
+    </aside>
+  </section>
+  <p className="cg-version">Capability Graph v2.0.0 · Node.js ≥22.12.0 · ESM。通过 npm 安装，按需选择静态 SDK、宿主模型或独立模型匹配。<a href={href('/getting-started/installation')}>查看安装步骤</a></p>
+  <section className="cg-section">
+    <h2>按你已有的环境接入</h2>
+    <p>同一份声明，同一套权限与解析语义。选择适合你的模型来源和运行方式。</p>
+    <div className="cg-grid">
+      <a className="cg-card" href={href('/getting-started/quick-start')}><small>01 / APPLICATION</small><h3>应用直接查询</h3><p>已知能力 ID 时，用 SDK 读取目录、详情与依赖。静态查询无需模型和模型凭据。</p><span>运行第一个图谱 →</span></a>
+      <a className="cg-card" href={href('/integrations/codex')}><small>02 / HOST MODEL</small><h3>宿主当前模型</h3><p>通过 MCP 暴露能力目录，让宿主选择已有 ID，再由 Graph 解析。Skill 指导完整调用流程。</p><span>查看 Codex 接入 →</span></a>
+      <a className="cg-card" href={href('/models/match')}><small>03 / MODEL EXECUTOR</small><h3>应用主动匹配</h3><p>显式接入 OpenAI、独立 Codex CLI 或已有模型调用，用一次 match 获取选择与解析结果。</p><span>配置模型匹配 →</span></a>
+    </div>
+  </section>
+  <section className="cg-section">
+    <h2>从声明到可解释的结果</h2>
+    <p>Graph 验证真实 ID、授权范围、结构化 Context 和四类固定关系。结果保留未知条件、不可用依赖和 Revision，供调用方判断下一步。</p>
+    <div className="cg-grid">
+      <a className="cg-card" href={href('/guide/providers')}><h3>最小 JSON 起步</h3><p>必填字段少，复杂用法按需补充。多个 Provider 使用各自文件，知识正文按引用单独读取。</p></a>
+      <a className="cg-card" href={href('/guide/relations')}><h3>显式关系与依赖</h3><p>支持跨 Provider、反向查询与 requires 传递闭包，缺失目标如实返回 partial。</p></a>
+      <a className="cg-card" href={href('/guide/lifecycle')}><h3>一致视图与原子更新</h3><p>静态快照不可变。reload 校验全部候选后一次发布，失败保留旧视图。</p></a>
+    </div>
+    <div className="cg-link-row"><a href={href('/reference/configuration')}>完整配置</a><a href={href('/reference/sdk')}>API 参考</a><a href={href('/examples/vextjs')}>VextJS 案例</a><a href="https://github.com/devcodex-labs/capability-graph">GitHub ↗</a></div>
+  </section>
+</main>

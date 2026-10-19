@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "providers": [],
+  "allowedProviders": [],
+  "transport": "http",
+  "enableMatch": false
+}

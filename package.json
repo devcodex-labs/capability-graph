@@ -1,104 +1,80 @@
 {
   "name": "@devcodex/capability-graph",
   "version": "2.0.0",
-  "description": "Framework-agnostic capability graph engine for AI coding systems and developer tooling.",
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devcodex-labs/capability-graph.git"
+  },
+  "files": [
+    "dist",
+    "plugin",
+    "examples",
+    "README.md",
+    "LICENSE",
+    "changelogs"
+  ],
+  "description": "Discover declared capabilities, evaluate applicability and resolve dependencies for applications and AI hosts.",
   "type": "module",
+  "bin": {
+    "capability-graph": "./dist/cli/main.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "types": "./dist/index.d.ts",
-  "bin": { "capability-graph": "./dist/cli/main.js" },
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "import": "./dist/tools/index.js"
     },
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
       "import": "./dist/mcp/index.js"
     },
-    "./mcp/server": {
-      "types": "./dist/mcp/server.d.ts",
-      "import": "./dist/mcp/server.js"
+    "./adapters/openai": {
+      "types": "./dist/adapters/openai.d.ts",
+      "import": "./dist/adapters/openai.js"
     },
-    "./readers/http": {
-      "types": "./dist/readers/http.d.ts",
-      "import": "./dist/readers/http.js"
+    "./adapters/codex": {
+      "types": "./dist/adapters/codex.d.ts",
+      "import": "./dist/adapters/codex.js"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "scripts": {
-    "postinstall": "node scripts/postinstall.mjs",
     "build": "node scripts/build.mjs",
-    "build:tests": "node scripts/build-tests.mjs",
-    "prepack": "npm run build",
-    "pretest": "npm run build && npm run test:types",
-    "test": "npm run build:tests && node scripts/run-tests.mjs",
-    "test:types": "tsc -p tsconfig.consumer.json",
-    "pretest:mcp": "npm run build && npm run build:tests",
-    "test:mcp": "node scripts/test-mcp.mjs",
-    "pretest:install": "npm run build",
-    "test:install": "node scripts/test-install.mjs",
-    "test:install:built": "node scripts/validation/assert-current-build.mjs && node scripts/test-install.mjs",
-    "pretest:consumers": "npm run build",
-    "test:consumers": "node scripts/test-consumers.mjs",
-    "test:consumers:built": "node scripts/validation/assert-current-build.mjs && node scripts/test-consumers.mjs",
-    "pretest:integration": "npm run build",
-    "test:integration": "node scripts/validation/website/check-mcp-integration.mjs",
-    "test:integration:built": "node scripts/validation/assert-current-build.mjs && node scripts/validation/website/check-mcp-integration.mjs",
-    "pretest:package": "npm run build",
-    "test:package": "node scripts/test-package.mjs",
-    "test:package:built": "node scripts/validation/assert-current-build.mjs && node scripts/test-package.mjs",
-    "preevaluate": "npm run build && npm run build:tests",
-    "evaluate": "node scripts/evaluate-seed.mjs",
-    "evaluate:built": "node scripts/validation/assert-current-build.mjs && node scripts/evaluate-seed.mjs",
-    "preevaluate:capacity": "npm run build",
-    "evaluate:capacity": "node scripts/validation/capacity.mjs",
-    "test:docs": "node scripts/run-doc-tests.mjs",
-    "test:docs:vextjs": "node scripts/validation/website/check-vextjs-tutorial.mjs",
-    "test:site": "playwright test --config test/website/playwright.config.ts",
-    "demo:http": "npm run build && npm run build:tests && node dist-test/examples/http-reader/main.js",
-    "pretest:docs": "npm run build",
-    "test:site:cross": "playwright test --config test/website/playwright.smoke.config.ts"
+    "test": "node scripts/test.mjs",
+    "smoke:package": "node scripts/package-smoke.mjs",
+    "docs:dev": "npm --prefix website run dev",
+    "docs:build": "npm --prefix website run build",
+    "docs:check": "npm --prefix website run check",
+    "docs:browser": "npm --prefix website run check:browser"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@modelcontextprotocol/server": "2.3.1",
+    "ajv": "8.20.0",
+    "toml-eslint-parser": "0.10.0",
+    "undici": "7.30.1"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
-    "@playwright/test": "1.63.0",
-    "@types/node": "22.18.6",
-    "axe-core": "4.11.1",
-    "proxy-agent": "6.5.0",
-    "typescript": "5.9.2",
-    "yaml": "2.9.1"
+    "@types/node": "24.0.0",
+    "openai": "7.39.0",
+    "typescript": "5.9.2"
   },
-  "overrides": {
-    "basic-ftp": "6.2.3"
+  "peerDependencies": {
+    "openai": "^7.39.0"
   },
-  "private": false,
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/devcodex-labs/capability-graph.git"
-  },
-  "bugs": {
-    "url": "https://github.com/devcodex-labs/capability-graph/issues"
-  },
-  "homepage": "https://devcodex-labs.github.io/capability-graph/",
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
-  "engines": {
-    "node": "^20.19.0 || >=22.12.0"
-  },
-  "files": [
-    "dist",
-    "scripts/postinstall.mjs",
-    "README.md",
-    "LICENSE"
-  ],
-  "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/client": "2.0.0",
-    "ajv": "8.17.1",
-    "toml-eslint-parser": "0.10.1",
-    "bcp-47": "2.1.1",
-    "language-subtag-registry": "0.4.2"
+  "peerDependenciesMeta": {
+    "openai": {
+      "optional": true
+    }
   }
 }

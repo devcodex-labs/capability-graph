@@ -1,160 +1,433 @@
 # Capability Graph
 
-Capability Graph 是一个相对简单的静态能力图谱：从 JSON 文件加载 Provider 和能力定义，在内存中查询能力、关系及必要上下文，并按需读取关联文档。接入方可以通过自己的 Node.js API 或 MCP 将这些查询提供给使用者或 Agent。
+用静态 JSON 声明框架、SDK 和项目已有的能力，让应用与 AI 宿主发现能力、获取使用说明、检查适用条件并解析显式依赖。
 
-## 当前版本与安装
+**v2.0.0** · Node.js / TypeScript SDK · MCP stdio / Streamable HTTP · Codex Skill / Plugin
 
-本文对应 **2.0.0** 的源码接口。使用发布包前先确认确切版本可用；`E404` 时按[安装页](https://devcodex-labs.github.io/capability-graph/getting-started/installation)固定文档提交构建源码。网络、认证或镜像失败不能证明版本不存在。源码修改不会自动发布 npm 或部署站点。
+Provider 作者声明能力与关系；模型选择已有 ID；Graph 验证授权、结构化条件及依赖；调用方决定如何使用。Graph 不执行能力或依赖，不自动扫描项目推断事实，也不提供 RAG、Embedding、关键词 Matcher 或 Agent Runtime。
+
+[选择接入方式](#接入方式) · [安装](#安装到使用项目) · [第一个图谱](#声明与静态查询) · [配置](#配置与多个-provider) · [Codex](#codex-使用当前模型) · [主动匹配](#应用主动匹配) · [CLI](#cli-与维护) · [完整使用手册](website/content/getting-started/introduction.md)
+
+## 接入方式
+
+| 使用场景 | 接入入口 | 谁选择能力 |
+| --- | --- | --- |
+| 程序已知 ID，无模型查询 | Node.js / TypeScript SDK | 调用方 |
+| 程序自然语言匹配，调用 OpenAI API | `createOpenAIExecutor` → `match()` | 显式 API 模型 |
+| 程序自然语言匹配，独立调用 Codex CLI | `createCodexExecutor` → `match()` | 独立只读 CLI 任务 |
+| 复用已有 SDK、私有模型或网关 | 自定义 `ModelExecutor.select` → `match()` | 调用方提供的模型 |
+| 已有 Agent | `createGraphTools` 定义与调用封装 | 通常宿主当前模型 |
+| 已有 MCP Server | 合并工具列表、转发 Graph 调用 | 通常客户端当前模型 |
+| 本地 MCP 客户端 | stdio，客户端管理服务进程 | 客户端当前模型 |
+| 本地或共享 MCP 服务 | Streamable HTTP，客户端连接 URL | 通常客户端当前模型 |
+| ChatGPT Work | 真实 HTTPS MCP + 宿主连接配置 | 远程宿主当前模型 |
+| 普通 Codex 用户 | 显式 `setup` → stdio MCP + 官方 Skill | Codex 当前模型 |
+| 已有 MCP 连接，只安装使用指导 | 官方 `capability-discovery` Skill | 宿主当前模型 |
+| 按 Plugin 机制整体分发 | MCP 清单 + Skill | 宿主当前模型 |
+
+Skill 指导调用，Plugin 提供分发，setup 管理登记；它们可以组合使用，同一份 Graph 定义和授权语义贯穿全部入口。默认 MCP 不调用第二个模型。
+
+## 安装到使用项目
+
+使用 **Node.js >=22.12.0、ESM**，JavaScript 和 TypeScript API 相同。`.mjs` 可直接执行；`.js` 所在项目需设置 `"type":"module"`；TypeScript 编译到 ESM/NodeNext 后运行。
+
+在你的应用项目中通过 npm 安装：
 
 ```sh
-npm view @devcodex/capability-graph@2.0.0 version
+mkdir graph-demo
+cd graph-demo
+npm init -y
 npm install @devcodex/capability-graph@2.0.0
 ```
 
-Node.js：`^20.19.0 || >=22.12.0`。ESM 与 TypeScript 类型覆盖根 SDK、`/mcp`、`/mcp/server`、`/readers/http` 四个入口；CLI 名称为 `capability-graph`。根 SDK 导入不会启动服务或注册配置。2.0 移除了数据库权威来源、能力召回、知识检索和 Runtime，升级前查看[2.0 迁移清单](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/2.0.0.md)。已发布的 1.1.0 与其 tag 保留原有接口。
+静态 Graph 无需 OpenAI/Codex SDK 或模型凭据。安装不启动服务、不调用模型、不登记 MCP/Skill，也不修改宿主配置。本地命令可在使用项目中通过 `npx --no-install capability-graph` 调用。
 
-## 目录导航
-
-- [当前版本与安装](#当前版本与安装)
-- [最小接入](#最小接入)
-- [MCP工具、服务与CLI](#mcp工具服务与cli)
-- [能做什么](#能做什么)
-- [职责边界](#职责边界)
-- [示例、验证与维护](#示例验证与维护)
-
-## MCP工具、服务与CLI
-
-以下能力对应本次源码与本地打包制品，使用 Registry 前核验确切版本及子入口。未发布时，在当前对应源码根运行 `npm ci`、`npm pack --pack-destination ../packages`，安装本次生成的 tgz；公开站和源码不会自动发布。
-
-| 方式 | 入口与资源归属 |
-|---|---|
-| 普通JSON / 自有模型宿主 | `/mcp` 的 `createCapabilityGraphToolkit(graph)`；12个冻结JSON Schema，宿主决定调用流程，借用graph |
-| SDK v1/v2内嵌 | 同一toolkit分别接低层Server或McpServer.registerTool；可合并Provider自有工具和渐进发现 |
-| 独立stdio/HTTP | `/mcp/server` 的 `createCapabilityGraphServer`；默认127.0.0.1:3333/mcp，借用graph，调用方负责关闭Reader/graph |
-| 全局CLI | `serve/provider/codex/doctor/assist`；服务配置增删下次启动生效 |
-| HTTP文档 | `/readers/http` 的 `HttpKnowledgeReader`；精确Origin、UTF-8字节、取消和可选快照，宿主关闭Reader及自己的Agent |
-
-默认账户配置为 `~/.capability-graph/config.json`，最小内容 `{"schemaVersion":1,"providers":[]}`；`--config`可显式选择文件。下面命令以已有本地打包制品为前提：
+需要在多个项目中使用 CLI 时，可以全局安装：
 
 ```sh
-npm install -g ./packages/devcodex-capability-graph-2.0.0.tgz
-capability-graph provider add --id acme.http --root /absolute/path/providers/acme-http --layout directory
-capability-graph doctor --json
+npm install --global @devcodex/capability-graph@2.0.0
 ```
 
-第一条只有在能证明正常直接全局安装时自动注册stdio并完成临时协议探针；不会创建虚构Provider。`--ignore-scripts`、本地/依赖安装或无法证明直接目标时，可运行 `capability-graph codex register`。`provider add --root`填写你实际的目录，示例路径需替换；Provider ID须与该目录的provider.json一致。添加配置后重新启动服务。
+## 声明与静态查询
 
-诊断分别返回 `installed/configRegistered/localProtocolVerified/clientConnected`；临时探针通过后，外部Codex客户端连接仍可为`unknown`。完整示例、变量来源、配置默认值与排错见[MCP与CLI接入](https://devcodex-labs.github.io/capability-graph/integrations/mcp-and-cli)。卸载前运行 `capability-graph codex unregister`，再 `npm uninstall -g @devcodex/capability-graph`；Provider资料和配置保留。
+在使用项目中创建 `provider.json`：
 
-## 最小接入
-
-在接入项目准备以下目录；Provider 目录是数据，不需要单独安装依赖：
-
-```text
-providers/
-└── acme-http/
-    ├── provider.json
-    ├── capabilities/
-    │   └── route.json
-    └── knowledge/
-        └── routing.md
-```
-
-`provider.json`：
-
-```json
-{ "providerId": "acme.http", "name": "Acme HTTP", "version": "1" }
-```
-
-`capabilities/route.json`：
-
+<!-- example:examples/minimal/provider.json -->
 ```json
 {
-  "capabilityId": "route",
-  "name": "HTTP routing",
-  "description": "Declare HTTP routes.",
-  "whenToUse": "An application needs an HTTP endpoint.",
-  "knowledge": [{
-    "kind": "document", "knowledgeId": "routing-guide", "role": "guide",
-    "locator": { "type": "relative-file", "path": "knowledge/routing.md" }
-  }]
+  "providerId": "acme",
+  "name": "Acme HTTP",
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "id": "route",
+      "name": "Validated HTTP endpoint",
+      "description": "Create an HTTP endpoint with request validation.",
+      "whenToUse": "The application needs an HTTP endpoint with validated input.",
+      "usage": { "instructions": "Declare the request schema, then register the endpoint." },
+      "relations": { "requires": ["schema"] },
+      "documents": [{ "id": "guide", "source": { "type": "file", "path": "knowledge/guide.md" } }]
+    },
+    { "id": "schema", "name": "Request schema", "description": "Declare a schema to validate request input." }
+  ]
 }
 ```
 
-将实际路由说明保存到 `knowledge/routing.md`，再运行 ESM 脚本：
+创建 `knowledge/guide.md`，写入自己的指南。本例的 requires 是作者为“带请求校验的 endpoint”明确声明的依赖，不表示所有路由都必须校验。
+
+Provider 必填 `providerId/name/version/capabilities`，能力必填 `id/name/description`；`capabilities:[]` 合法。关系中的同 Provider 目标可写局部 ID，公开查询用完整 `providerId::capabilityId`。未知字段拒绝，JSON 不包含函数或执行脚本。
+
+创建 `static.mjs`：
+
+<!-- example:examples/minimal/static.mjs -->
+```js
+import {CapabilityGraph} from '@devcodex/capability-graph';
+import {fileURLToPath} from 'node:url';
+const graph=await CapabilityGraph.open({providers:[{file:fileURLToPath(new URL('./provider.json',import.meta.url))}]});
+try {
+  const catalog=await graph.listCatalog();
+  const detail=await graph.getCapabilities({ids:['acme::route']});
+  const resolved=await graph.resolve({ids:['acme::route']});
+  const document=await graph.readDocument({capabilityId:'acme::route',documentId:'guide'});
+  console.log(JSON.stringify({catalog:catalog.items.map(c=>c.id),usage:detail.items[0].capability.usage.instructions,selected:resolved.selected,nodes:resolved.nodes.map(n=>({id:n.capability.id,origin:n.origin,applicability:n.applicability.status})),completeness:resolved.meta.completeness,documentId:document.documentId},null,2));
+} finally {await graph.close();}
+```
+
+执行 `node static.mjs`，输出投影为：
+
+```json
+{
+  "catalog": ["acme::route", "acme::schema"],
+  "usage": "Declare the request schema, then register the endpoint.",
+  "selected": ["acme::route"],
+  "nodes": [
+    { "id": "acme::route", "origin": "selected", "applicability": "applicable" },
+    { "id": "acme::schema", "origin": "dependency", "applicability": "applicable" }
+  ],
+  "completeness": "complete",
+  "documentId": "guide"
+}
+```
+
+实际 ResolveResult 的节点包含完整 CapabilityDetail、ApplicabilityResult，顶层还有 edges、unresolved、meta.revision/warnings。Catalog 只放精简字段，不默认附长说明、关系与文档正文。返回值可修改，不会影响 Graph 私有快照。
+
+## 配置与多个 Provider
+
+SDK 在代码中使用 `CapabilityGraph.open(options)`；CLI 从纯 JSON 配置加载。先保存 `graph.config.json`：
+
+```json
+{
+  "schemaVersion": 1,
+  "providers": [{ "file": "./provider.json" }],
+  "allowedProviders": ["acme"]
+}
+```
+
+| 配置 | 使用规则 |
+| --- | --- |
+| `providers` | 必填数组，可为 []；多 Provider 配置多个来源，providerId 唯一 |
+| `providers[].file` | JSON 路径，与 definition 互斥；文档根固定为该 JSON 所在目录 |
+| `providers[].definition` | 内联纯 JSON 定义，按值加载 |
+| `providers[].documentRoot` | 仅内联来源可用，存在本地文档时必需，为可信本地根 |
+| `allowedProviders` | 省略为全部已加载；[] 为零授权。调用参数只能缩小范围 |
+| `model` | SDK 为 ModelExecutor；CLI 为 openai/codex adapter 配置；静态查询可省略 |
+| `limits` | 正安全整数的字节预算，默认见下文 |
+| CLI `transport` | 缺省 stdio；serve 的显式 --transport 覆盖它 |
+| CLI `enableMatch` | 缺省 false，true 要求已配置 executor |
+| CLI `http` | HTTP 地址、认证、来源、预算；与 Provider 定义分开 |
+
+SDK 相对路径以 open 当时 cwd 为基准；CLI 相对路径以配置文件目录为基准。上面的静态示例使用 import.meta.url 固定文件位置，避免启动目录差异。
+
+可以按 Provider 放置文件：
+
+```text
+my-graph/
+├── graph.config.json
+└── providers/
+    ├── acme/
+    │   ├── provider.json
+    │   └── knowledge/guide.md
+    └── shared/
+        ├── provider.json
+        └── knowledge/schema.md
+```
+
+然后 providers 分别写 `./providers/acme/provider.json`、`./providers/shared/provider.json`。这是显式文件接入；当前不会自动扫描目录或合并 capabilities 分文件。
+
+跨 Provider 关系写完整 ID，例如 `requires:["shared::schema"]`。目标已加载且授权时展开；未加载或无权读取时统一返回 `target_unavailable` 与 partial。显式查询越权根整次失败，不当空结果。完整可运行例子见 [multi-provider/main.mjs](examples/multi-provider/main.mjs)。
+
+## 关系、Context 与知识文件
+
+四类正向关系为 parents、specializes、related、requires；反向 children、specializedBy、relatedBy、requiredBy 由索引产生，不写入声明。parents/specializes/requires 各自禁止环，related 可以有环。
+
+resolve 默认展开 requires 传递闭包；显式 `relations:[]` 只取根；其他正/反向关系从根一跳，不自动继续展开所到关联节点的依赖。边始终保留原始正向方向。
+
+Context 示例：
+
+```json
+{
+  "facts": { "framework": "acme", "framework.version": "1.0.0", "production": true },
+  "notes": "Only the supplied facts are known."
+}
+```
+
+facts 是平面 string/有限 number/boolean 映射，点号是字面键，不访问嵌套对象。`appliesTo.all` 支持严格同类型 eq、in、稳定 SemVer 的 AND 比较范围，例如 `>=1.0.0 <2.0.0`；不支持 ^/~/*/或、预发布与 build metadata。notes 仅供模型参考，不参与静态适用判断。Context 不授予权限，Graph 不自动补事实。
+
+关联文档通过 `documents:[{id,source:{type:'file',path:'knowledge/guide.md'}}]` 声明，再按 capabilityId/documentId 读取；不能传任意路径。text 为 UTF-8，去首 BOM、保留 CRLF；byteLength/contentHash 来自同一次稳定读取的原始字节。URL 只作引用，readDocument 返回 `CG_DOCUMENT_REFERENCE_ONLY`，不自动抓取。完整路径安全前提见[安全说明](website/content/resources/security.md)。
+
+## Codex 使用当前模型
+
+这条路线使用当前 Codex 模型，通过 MCP 选择与解析能力；无需额外 API Key 或独立 Codex 匹配登录目录。
+
+全局安装 CLI 后，将命令中的配置路径替换为你的真实绝对路径：
+
+```sh
+capability-graph setup --host codex --config /absolute/path/graph.config.json --dry-run
+capability-graph setup --host codex --config /absolute/path/graph.config.json
+capability-graph doctor --host codex
+```
+
+本地安装则使用该 bin 的绝对路径，或在使用项目执行 `npx --no-install capability-graph ...`。
+
+setup 显式登记 `capability_graph` stdio MCP，安装 `capability-discovery` Skill，并记录 Node/CLI/配置的绝对路径。服务进程由宿主管理，无需手工常驻 HTTP 或 Plugin marketplace。
+
+按客户端要求重载配置/开启新会话，然后明确请求：
+
+```text
+请使用 capability-discovery，为创建带请求校验的 Acme HTTP 接口发现能力，
+展示依赖、适用条件和使用说明，不执行能力。
+```
+
+Skill 指导 Provider/Catalog → 当前模型选择真实 ID → Resolve → 必要时按 ID 读文档，不自动处理每条消息。匹配依据来自用户任务与可靠项目事实，不因只加载某个 Provider 就假设项目采用该框架。
+
+stdio 支持 **2026-07-28 / 2025-06-18**。Codex CLI 0.163.0 的 stdio 使用后者；服务按协商版本输出结果信封。HTTP 使用 2026-07-28，接入条件见[兼容说明](website/content/resources/compatibility.md)。
+
+## 应用主动匹配
+
+需要由应用提交自然语言并一次得到选择和子图时，显式配置 ModelExecutor，调用 match。无需先手工 resolve。
+
+### OpenAI API
+
+另装可选 SDK：
+
+```sh
+npm install openai@7.39.0
+```
+
+在应用运行环境配置 `CG_MODEL_API_KEY`、`CG_MODEL_NAME`；这些名称由下例读取，库不自动采用它们。模型需支持 strict Structured Outputs，Codex 登录不提供 API 凭据。
 
 ```js
-import path from 'node:path';
-import { CapabilityGraph } from '@devcodex/capability-graph';
+import {CapabilityGraph, GraphError} from '@devcodex/capability-graph';
+import {createOpenAIExecutor} from '@devcodex/capability-graph/adapters/openai';
 
+const apiKey = process.env.CG_MODEL_API_KEY;
+const model = process.env.CG_MODEL_NAME;
+if (!apiKey || !model) throw new Error('Configure CG_MODEL_API_KEY and CG_MODEL_NAME');
 const graph = await CapabilityGraph.open({
-  hostAllowedProviders: ['acme.http'],
-  integrationEnabledProviders: ['acme.http'],
-  providers: [{ providerId: 'acme.http', authority: {
-    kind: 'file', definitionLayout: 'directory', rootDir: path.resolve('providers/acme-http')
-  } }]
+  providers: [{file:'./provider.json'}],
+  model: createOpenAIExecutor({apiKey, model})
 });
 try {
-  const provider = graph.forProvider('acme.http');
-  const catalog = await provider.listCatalog({ limit: 20 });
-  const selection = await provider.resolveSelection({ selected: ['route'] });
-  const document = await provider.readDocumentPage({ capabilityId: 'route', knowledgeId: 'routing-guide' });
-  console.log({ catalog, selection, document });
+  const result = await graph.match({
+    input:'创建带请求校验的 Acme HTTP 接口',
+    context:{facts:{framework:'acme'}}
+  }, {timeoutMs:60000});
+  console.log(result.status, result.selection, result.graph);
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(error.code, error.phase, error.nextAction);
+  process.exitCode = 1;
 } finally { await graph.close(); }
 ```
 
-完整首次接入见[最小 Provider](https://devcodex-labs.github.io/capability-graph/getting-started/first-provider)，逐步添加关系、文档与规范见[进阶教程](https://devcodex-labs.github.io/capability-graph/guides/progressive-discovery)。
+适配器使用 Responses、strict JSON Schema、store:false、无自动重试；只发送授权 Catalog、input、Context 和 Revision。可配置 HTTPS baseURL 对接兼容该协议的网关，或提供可信 fetch。确认所用模型与账号支持 strict Structured Outputs；Chat Completions 地址不能直接用作 Responses 地址。
 
-## 能做什么
+### 独立 Codex CLI
 
-| 操作 | 用途 |
-|---|---|
-| `listProviders` / `getProvider` / `listSpecificationDocuments` | Provider 与规范文档元数据 |
-| `listCatalog` / `getCapabilities` | 分页发现、结构化过滤与有界详情 |
-| `getNeighbors` / `resolveSelection` | 八种正反向关系；沿 `requires` 展开必要上下文 |
-| `listKnowledgeMembers` | Collection 文档成员发现 |
-| `readDocuments` / `readSpecification` | 显式读取完整文档，逐项检查 `ok` |
-| `readDocumentPage` / `readSpecificationPage` | 原始 UTF-8 字节分页，调用方决定范围及是否续读 |
-| `reload` / `close` | 显式更新定义、保留 current/previous、释放图谱资源 |
+普通 Node.js 应用需要独立匹配任务时使用此路径；不接管当前桌面会话、不依赖 Codex SDK。
 
-完整身份是 `{ providerId, capabilityId }`，显示形式为 `acme.http::route`。`parents`、`specializes`、`requires` 分别无环；`related` 有方向。关系端点必须在同一 Provider 内；联合目录保留各自身份与修订。选择由调用方决定，Core 仅沿 `requires` 补齐上下文。
+```js
+import {CapabilityGraph} from '@devcodex/capability-graph';
+import {createCodexExecutor} from '@devcodex/capability-graph/adapters/codex';
 
-文件根在 `open` 时固定。新目录启用 `directory`；缺省 `legacy` 继续读取 `*.capability.json`。定义最多 262144 UTF-8 字节，文档总大小没有准入上限。全文默认每篇返回 32 KiB、每次最多 8 篇；较大正文改用默认 32 KiB 的分页读取，保留全文身份与游标。正文变化会拒绝旧游标，分页拼接保留 BOM、CRLF 和原始 UTF-8。
+const graph = await CapabilityGraph.open({
+  providers:[{file:'./provider.json'}],
+  model:createCodexExecutor({
+    command:'/absolute/pinned-codex/bin/codex',
+    runtimeRoot:'/absolute/pinned-codex',
+    authHome:'/absolute/dedicated-codex-home',
+    scratchRoot:'/absolute/isolated-matcher-scratch'
+  })
+});
+try {
+  console.log(await graph.match({input:'创建带请求校验的 Acme HTTP 接口'}));
+} finally { await graph.close(); }
+```
 
-文档支持 Provider 内目录、显式获准的外部目录、真实 `node_modules` 包根，以及通过宿主 `KnowledgeReader` 读取的 URL。`knowledgeRoots` 配置来源别名，locator 的 `root` 只引用该 Provider 的别名；私有根不会进入公共结果。URL Reader 的访问策略、连接和关闭由宿主管理。
+上述路径是需替换的本机配置。当前仅支持 **Linux + bubblewrap + 原生 CLI 0.163.0**。先在独立 CODEX_HOME 完成该 CLI 的 login --device-auth 与 login status，再配置 authHome。runtimeRoot 只含可信 CLI 安装资源；每轮独立只读最小挂载、禁用执行工具，取消/超时后回收子进程及 scratch。不满足隔离条件时明确拒绝。完整准备与默认值见[模型接入](website/content/models/codex.md)。
 
-每个启用 Provider 必须恰有一个文件来源；scope 只能缩小。检查 `meta.completeness`、`warnings`、逐项 `ok` 和续页游标。`reload` 完整校验新定义后才替换视图，失败保留旧视图并标记 `refreshFailed`；更旧的修订明确失败。
+### 自定义已有模型调用
 
-## 职责边界
+实现公开 `ModelExecutor.select(request)`，接收 input、context、授权 catalog、revision、signal，返回 ModelSelection，再传给 open.model。无需新建网关。Graph 校验候选 ID/授权/结构，再确定性解析。
 
-能力图谱负责声明与查询。能力执行、Agent 意图判断、业务项目状态、RAG 的分块索引/Embedding/数据库/排名以及回答生成由宿主或独立模块负责。这里的文档分页是原文访问，不是知识检索。未来 RAG 可以使用公开能力身份、文档引用和分页接口，自行管理索引；主包不预留空检索框架。
+完整自有 Chat Completions 示例见 [custom-executor.mjs](examples/custom-executor.mjs)。它是应用代码适配，不表示新增内置协议；配置其三个环境变量后才能对真实服务运行。CLI JSON 不接受函数或执行模块。
 
-共享MCP工具层提供12个查询，独立服务处理协议、入站校验和请求生命周期。Provider可在自己的宿主合并工具、资源和渐进发现策略。自定义Reader是进程内受信任代码，Provider scope不隔离进程。
+## 如何判断返回结果
 
-## 示例、验证与维护
+| 维度 | 状态与含义 |
+| --- | --- |
+| `match.status` | matched/no_match/ambiguous/needs_context，模型选择的业务状态 |
+| `node.applicability.status` | applicable/inapplicable/unknown，显式 Context 条件的确定性判断 |
+| `graph.meta.completeness` | complete/partial，依赖与请求关系是否完整展开 |
 
-- [Seed API](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-api)：图谱发现、选择、文档与规范的完整链路。
-- [Seed MCP](https://github.com/devcodex-labs/capability-graph/tree/main/examples/seed-mcp)：SDK v1私有宿主，复用12个共享查询工具并保留Provider自有规范Resource。
-- [HTTP Reader](https://github.com/devcodex-labs/capability-graph/tree/main/examples/http-reader)：真实 HTTP、原字节分页、ETag、取消和资源清理。
-- [VextJS](https://github.com/devcodex-labs/capability-graph/tree/main/examples/vextjs)：固定来源的官方文档主题、安装包及 URL 读取；验证说明与实际执行范围一致。
+多项共同需要可以 matched；互斥候选缺依据才 ambiguous。matched 仍可能 unknown 或 partial，不能直接等同可执行。模型语义可能误选，Graph 不保证语义正确率。
+
+认证、取消、超时、拒绝、非法/越权 ID 是错误，不伪装 no_match。默认 match 总 deadline 60000ms，可设 1–600000ms；signal、deadline、close 首先观察到的终止生效，迟到结果丢弃。timeoutMs:null 与 relations:null 都不是省略。自定义 executor 负责自己的外部资源回收。
+
+## MCP stdio 与 Streamable HTTP
+
+已有 MCP 客户端可直接启动：
+
+```sh
+npx --no-install capability-graph serve --config graph.config.json --transport stdio
+```
+
+客户端 command 使用已安装可执行文件的绝对路径，args 填 serve、--config、绝对 JSON 路径、--transport、stdio。stdout 仅协议，诊断写 stderr，进程由客户端管理。
+
+HTTP 由部署方显式启动：
+
+```sh
+npx --no-install capability-graph serve --config graph.config.json --transport http
+```
+
+默认 `http://127.0.0.1:3333/mcp`。支持现代协议的客户端连接此 URL。Codex CLI 0.163.0 的 HTTP 路线需显式启用其现代协议能力，例如已有配置中合并：
+
+```toml
+[features]
+mcp_2026_07_28 = true
+
+[mcp_servers.capability_graph]
+url = "http://127.0.0.1:3333/mcp"
+```
+
+不要重复添加同名 TOML 节。setup 管理的 stdio 与手工 HTTP 是可选路线，不同时覆盖同名登记。stdio 支持 2026-07-28/2025-06-18；HTTP 仅 2026-07-28，不承诺其他版本兼容。
+
+默认五工具与 SDK 对应：
+
+| Tool | 方法 |
+| --- | --- |
+| capability_graph_list_providers | listProviders |
+| capability_graph_list_catalog | listCatalog |
+| capability_graph_get_capabilities | getCapabilities |
+| capability_graph_resolve | resolve |
+| capability_graph_read_document | readDocument |
+
+成功 structuredContent 与 SDK 一致；执行失败 isError:true，文本为机器可读错误 JSON。服务端明确配置 executor 并 enableMatch:true 才增加 capability_graph_match。HTTP 开启它还需显式 requestTimeoutMs >=65000，推荐75000；公开匿名始终禁止开启。
+
+默认 HTTP 预算：请求体1 MiB、响应20 MiB、并发32、请求30000ms、关闭5000ms。Host、Origin、认证、路由和预算在调用前检查。远程 private 需要认证；公开 anonymous 仅明确批准的 Provider，默认不提供文档正文。TLS/OAuth 网关由部署层提供。
+
+ChatGPT Work 接入需要宿主可访问的 **HTTPS** 地址、兼容的 MCP HTTP 协议和宿主接受的认证方式。部署后按宿主要求添加连接，在新会话检查工具发现、选择与 Resolve。详见[远程接入](website/content/integrations/remote.md)。
+
+## 已有 Agent 或 MCP Server
+
+Agent 使用 `@devcodex/capability-graph/tools` 的 createGraphTools，取得 definitions 和 call。每个定义包含 inputSchema/outputSchema，Adapter 借用 Graph；默认五工具，可显式启用 match。宿主格式映射由应用负责，不为各框架增加专有包。
+
+已有 MCP Server 保留原 transport/tools/resources/prompts，只合并 Graph 工具定义并分流命中名称。工具冲突明确失败，未命中调用交回原路由。成功/错误映射成协商版本的 MCP 信封，最后由 Graph 创建者关闭它。
+
+[完整 server.mjs](examples/mcp/server.mjs) 提供原 ping、资源、Prompt 与 Graph 工具共存的可运行例子。消费者另装官方 @modelcontextprotocol/server@2.3.1，复制整个 examples/ 后由客户端启动它。
+
+## Skill 与 Plugin
+
+官方 Skill 位于 `plugin/skills/capability-discovery/SKILL.md`，可单独复制到宿主支持的 Skill 位置，但仍需已有可用 MCP 连接。setup 会显式安装同一 Skill；它不接管每条用户消息。
+
+Plugin 包含根 plugin.json/mcp.json、skills，以及 Codex 兼容 `.codex-plugin/plugin.json` / `.mcp.json`。默认指向本地 HTTP 3333 端口，服务需显式启动；安装 Plugin 不自动提供运行中的服务。
+
+需要 Plugin 分发时：通过 npm 安装 → 复制包内 plugin 到自有目录 → 配置其中 graph.config.json → 显式启动 HTTP 服务 → 按宿主本地 marketplace 机制安装 Plugin → 新会话使用 Skill。初始 providers/allowedProviders 为空，需要自己的声明。
+
+Codex 安装步骤、清单差异和兼容限制见[完整教程](website/content/integrations/skill-plugin.md)。Codex Plugin 使用 HTTP；stdio 请使用前面的 setup 登记方式。
+
+## CLI 与维护
+
+图谱命令：
+
+```sh
+capability-graph validate --file provider.json
+capability-graph doctor --config graph.config.json
+capability-graph serve --config graph.config.json --transport stdio
+capability-graph serve --config graph.config.json --transport http
+```
+
+宿主维护：
+
+```sh
+capability-graph setup --host codex --config /absolute/path/graph.config.json --dry-run
+capability-graph setup --host codex --config /absolute/path/graph.config.json
+capability-graph doctor --host codex
+capability-graph doctor --host codex --repair --dry-run
+capability-graph doctor --host codex --repair
+capability-graph clean --host codex --dry-run
+capability-graph clean --host codex
+```
+
+维护命令支持 --json；host 支持 codex。用户 MCP 配置在 CODEX_HOME/config.toml，缺省 ~/.codex/config.toml；Skill 在 ~/.agents/skills/capability-discovery/SKILL.md；拥有权状态在 ~/.capability-graph/。
+
+setup 幂等，只修改自有 MCP 表和 Skill，保存绝对路径。dry-run 不写文件、不启动服务、不调用模型。doctor 实际启动登记服务列工具后关闭测试进程，不等同宿主模型完成任务。repair 只补自有缺失项，clean 不删业务配置、Provider 或知识文件。遇到同名非自有项、用户编辑、未知 symlink 或不安全 TOML 布局明确冲突，不覆盖。
+
+维护报告含 command/status/changed/checks/paths/warnings；status 为 ok/planned/conflict/failed。退出码 0 成功或预览、1 配置/启动失败、2 参数无效、3 保护冲突。validate/doctor --config/serve 失败退出1。
+
+更新后安装路径变化可显式重跑 setup。清理后按宿主要求重载，不强制杀掉宿主会话。中断事务/锁需检查状态，不能强制覆盖用户内容。
+
+## API、生命周期与预算
+
+| 方法 | 返回及行为 |
+| --- | --- |
+| open | 加载/严格校验全部来源；授权固定 |
+| listProviders / listCatalog | 完整授权摘要或精简目录，没有隐式分页或截断 |
+| getCapabilities | 完整详情与适用结果，不读取文档正文 |
+| resolve | selected/nodes/edges/unresolved/meta |
+| readDocument | 已声明本地正文、原始字节数/哈希 |
+| match | status/selection/同快照 graph |
+| reload | ok/revision/providers/error?，全部候选校验后原子发布 |
+| close | 幂等，拒绝新工作、取消活动 match，不关闭借用 executor |
+
+所有静态结果包含授权视图 Revision。它不包含文档正文、Context、模型状态或绝对路径；隐藏 Provider 更新不改变公开 Revision。reload 失败保留旧快照，必须检查 ok 和 updated/unchanged/failed/not_applied；增删来源需重新 open。
+
+Core 默认 UTF-8 字节预算：Provider/Catalog/Result/ModelCatalog 各8 MiB，Document1 MiB，input/ModelOutput各64 KiB，Context128 KiB。对应 limits 字段完整列在[配置参考](website/content/reference/configuration.md)。超限显式错误，不删数据冒充完整。
+
+SDK 失败为 GraphError，稳定字段 code/phase/message/可选 nextAction，可用 toJSON。空结果、unknown、partial 与错误分别处理。详细参数、嵌套返回字段、全部公开类型和错误恢复见 [SDK 参考](website/content/reference/sdk.md)、[类型](website/content/reference/types.md)、[错误](website/content/reference/errors.md)。
+
+## 运行示例
+
+本地 npm 安装后，将包内 examples/ 复制到你的项目中运行：
+
+```sh
+cp -R node_modules/@devcodex/capability-graph/examples ./examples
+node examples/minimal/static.mjs
+node examples/multi-provider/main.mjs
+node examples/vextjs/resolve.mjs
+```
+
+[VextJS 示例](examples/vextjs/guide.md) 基于真实 vextjs@2.0.0 API；另安装该版本后执行 `node examples/vextjs/verify.mjs`，验证真实路由注册、有效请求与 body 校验。Graph 不加载或执行该路由，示例关系由作者维护。
+
+独立 Codex 匹配适配器要求 Linux、bubblewrap 和固定版本的原生 CLI，不支持 Windows/WSL。Codex Plugin 使用 HTTP，普通 Codex stdio 接入使用 setup。OpenAI 与远程宿主还需满足模型、协议、网络和认证条件，详见[兼容说明](website/content/resources/compatibility.md)。
+
+## 源码开发
+
+以下命令面向源码贡献者。应用集成请使用前面的 npm 安装方式。
 
 ```sh
 npm ci
 npm test
-npm run test:package
-npm run test:consumers
-npm run test:install
-npm run evaluate
-npm run demo:http
-npm run evaluate:capacity
+npm run build
+npm run smoke:package
+npm --prefix website ci
+npm run docs:check
+npm run docs:build
+npm run docs:browser
 ```
 
-容量验证默认 1 万文件节点、2 个 Provider、10 并发，核对完整目录、关系、Selection、reload、已 pin 查询与 close。读取使用明确标注的受控 Reader，真实网络由 HTTP/VextJS 验证覆盖；本机延迟与采样内存不代表生产容量承诺。
+文档源码位于 website/content，独立 Rspress 工程和主题位于 website/。docs:dev 启动本地开发；站点依赖与构建输出不进入 SDK npm 包。
 
-正式站点测试位于 `test/website`，验证工具位于 `scripts/validation/website`，`website` 保存文档、主题、资源与站点配置。临时消费者、日志、报告和生成产物放在项目同级专用目录，通过 `CG_ARTIFACTS_DIR` 指定；普通构建输出为 `dist/` 和 `dist-test/`，云端验证在仓库外副本执行。
+CG_BUILD_DIR、CG_TEST_DIR、CG_ARTIFACTS_DIR 指定仓库外构建、夹具与消费者位置；CG_SITE_BUILD_DIR 指定仓库外站点输出，CG_SITE_ARTIFACTS_DIR 指定浏览器报告/截图。工具不会因此配置模型或登记宿主。
 
-更多入口：[贡献指南](https://github.com/devcodex-labs/capability-graph/blob/main/CONTRIBUTING.md)、[测试说明](https://github.com/devcodex-labs/capability-graph/blob/main/test/README.md)、[未发布改动](https://github.com/devcodex-labs/capability-graph/blob/main/changelogs/unreleased.md)、[文档站点](https://devcodex-labs.github.io/capability-graph/)。站点 `release.json` 记录实际包版本及文档提交。
-
-## 许可证
-
-[Apache-2.0](LICENSE)
+smoke:package 构建 npm 包并在独立项目安装，检查公开入口、TypeScript、ESM、CLI、MCP 和示例。完整命令与产物路径见[源码开发说明](website/content/resources/development.md)。

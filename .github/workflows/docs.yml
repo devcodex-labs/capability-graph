@@ -1,0 +1,36 @@
+name: documentation
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    env:
+      CG_SITE_BUILD_DIR: ${{ runner.temp }}/capability-graph-site
+      CG_SITE_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-browser
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+        working-directory: website
+      - run: npm run docs:check
+      - run: npm run docs:build
+      - run: npx --no-install playwright install --with-deps chromium
+        working-directory: website
+      - run: npm run docs:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: documentation-review
+          path: |
+            ${{ runner.temp }}/capability-graph-site
+            ${{ runner.temp }}/capability-graph-browser
+          include-hidden-files: true

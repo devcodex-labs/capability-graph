@@ -1,22 +1,3 @@
-export { CapabilityGraphError } from "./errors.js";
-export {
-  QUALIFIED_SEPARATOR, ID_PATTERN, KNOWLEDGE_ID_PATTERN,
-  isId, isKnowledgeId, formatQualifiedId, parseQualifiedId, equalId, idKey,
-} from "./identity.js";
-export type { ErrorCode, NextAction, ErrorShape } from "./errors.js";
-export type { BudgetConfig, BudgetOverrides } from "./budgets.js";
-export { CapabilityGraph } from "./capability-graph.js";
-export type { OpenConfig, BoundProviderGraph } from "./capability-graph.js";
-export type { AuthoritySpec, ProviderLoadSpec, ReloadResult } from "./core-host.js";
-export type * from "./query/types.js";
-export type * from "./knowledge/types.js";
-export type { DocumentBodyQuery, SpecificationBodyQuery, DocumentBodyPage } from "./knowledge/pages.js";
-export type { ReadDocumentsQuery, DocumentRead, DocumentReadBatch, ReadSpecificationQuery,
-  SpecificationDocumentRead, SpecificationReadBatch } from "./knowledge/read.js";
-export type { KnowledgeRootSpec } from "./knowledge/roots.js";
-export type {
-  CanonicalCapabilityId, QualifiedCapabilityId, StaticRevision,
-  KnowledgeContentId, CurrentCapabilityView,
-  ResultMeta, BatchItem, BatchResult,
-  KnowledgeLocator, KnowledgeDocumentRef, KnowledgeCollectionRef, KnowledgeRef, KnowledgeKind, SpecificationMetadata, NeighborKind,
-} from "./types.js";
+export { CapabilityGraph } from './graph.js';
+export { GraphError } from './errors.js';
+export type * from './types.js';

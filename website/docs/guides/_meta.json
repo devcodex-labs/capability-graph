@@ -1,9 +1,0 @@
-[
-  { "type": "file", "name": "progressive-discovery", "label": "渐进发现与按需读取" },
-  { "type": "file", "name": "model-a-provider", "label": "建模 Provider" },
-  { "type": "file", "name": "design-relations", "label": "设计关系" },
-  { "type": "file", "name": "add-local-knowledge", "label": "添加本地知识" },
-  { "type": "file", "name": "multiple-providers", "label": "使用多个 Provider" },
-  { "type": "file", "name": "lifecycle-and-reload", "label": "管理生命周期与重新加载" },
-  { "type": "file", "name": "errors-and-partial-results", "label": "处理错误与部分结果" }
-]

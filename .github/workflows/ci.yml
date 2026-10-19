@@ -1,43 +1,25 @@
-name: CI
-
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
-  workflow_call:
-    inputs:
-      commit:
-        description: Immutable commit supplied by the release workflow
-        required: true
-        type: string
-
+name: validate
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
-
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: ["20.19.0", "22.12.0", "24.19.0"]
+        node: ['22.12.0', '24']
+    runs-on: ${{ matrix.os }}
+    env:
+      CG_BUILD_DIR: ${{ runner.temp }}/capability-graph-build
+      CG_TEST_DIR: ${{ runner.temp }}/capability-graph-fixtures
+      CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-artifacts
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.commit || github.sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
       - run: npm test
-      - run: npm run test:package:built
-      - run: npm run test:consumers:built
-      - run: npm run test:install:built
-      - run: npm run test:integration:built
-      - run: npm ci --ignore-scripts
-        working-directory: examples/seed-mcp
-      - run: npm test
-        working-directory: examples/seed-mcp
+      - run: npm run smoke:package

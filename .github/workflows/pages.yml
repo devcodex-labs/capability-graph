@@ -1,0 +1,40 @@
+name: publish documentation manually
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: capability-graph-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CG_SITE_BUILD_DIR: ${{ runner.temp }}/site
+      CG_SITE_BASE: /capability-graph/
+      CG_SITE_URL: https://devcodex-labs.github.io/capability-graph
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm --prefix website ci --no-audit --no-fund
+      - run: npm run docs:check
+      - run: npm run docs:build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deploy

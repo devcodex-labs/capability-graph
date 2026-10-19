@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "providerId": "vextjs",
+  "name": "VextJS greeting example",
+  "version": "2.0.0",
+  "description": "A manually declared greeting recipe verified against the published VextJS 2.0.0 API.",
+  "capabilities": [
+    {
+      "id": "greeting.create",
+      "name": "Validated greeting endpoint",
+      "description": "Create POST /hello accepting a validated name and returning a greeting.",
+      "whenToUse": "The application needs this example's validated greeting recipe.",
+      "appliesTo": { "all": [{ "field": "framework", "op": "eq", "value": "vextjs" }, { "field": "framework.version", "op": "semverRange", "range": ">=2.0.0 <3.0.0" }] },
+      "relations": { "requires": ["route.post", "validation.body"] },
+      "usage": { "instructions": "Combine defineRoutes/app.post and validate.body as shown in routes/hello.ts. Graph resolution does not register the endpoint.", "input": "A JSON body with a name containing 1–30 characters.", "output": "A JSON greeting response.", "examples": ["POST /hello with {\"name\":\"Ada\"}"] },
+      "documents": [{ "id": "guide", "title": "Example scope and verification", "source": { "type": "file", "path": "guide.md" } }]
+    },
+    {
+      "id": "route.post",
+      "name": "POST route declaration",
+      "description": "Use defineRoutes and app.post(path, options, handler) to declare an HTTP POST route.",
+      "usage": { "instructions": "Import defineRoutes from vextjs. Register app.post('/hello', options, async (req, res) => { ... }) in its callback." }
+    },
+    {
+      "id": "validation.body",
+      "name": "Body validation",
+      "description": "Declare validate.body with schema-dsl strings and read validated values using req.valid('body').",
+      "usage": { "instructions": "Set options.validate.body to { name: 'string:1-30' }, then use req.valid('body').name in the handler." }
+    }
+  ]
+}

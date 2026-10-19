@@ -1,7 +1,0 @@
-[
-  { "type": "file", "name": "node-api", "label": "Node.js 中使用 Core" },
-  { "type": "custom-link", "link": "/getting-started/provider-owned-api", "label": "设计 Provider API" },
-  { "type": "file", "name": "provider-owned-mcp", "label": "Provider 自有 MCP" },
-  { "type": "file", "name": "mcp-and-cli", "label": "MCP与CLI接入" },
-  { "type": "file", "name": "knowledge-reader", "label": "KnowledgeReader 接入" }
-]

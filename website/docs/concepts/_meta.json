@@ -1,6 +1,0 @@
-[
-  { "type": "file", "name": "provider-and-specification", "label": "Provider、能力与规范" },
-  { "type": "file", "name": "capability-identity", "label": "身份与关系" },
-  { "type": "file", "name": "knowledge", "label": "知识模型" },
-  { "type": "file", "name": "provider-scope", "label": "作用域、修订与完整性" }
-]
