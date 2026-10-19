@@ -1,12 +1,8 @@
 name: deploy documentation
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      ref:
-        description: Exact validated release commit
-        required: true
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -14,12 +10,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       CG_SITE_BASE: /capability-graph/
       CG_SITE_URL: https://devcodex-labs.github.io/capability-graph
-      DEPLOY_SHA: ${{ inputs.ref || github.sha }}
+      DEPLOY_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:

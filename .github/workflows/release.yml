@@ -62,7 +62,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          registry-url: https://registry.npmjs.org/
           package-manager-cache: false
       - uses: actions/download-artifact@v7
         with:
@@ -74,8 +73,6 @@ jobs:
       - name: Publish exactly the verified archive
         if: steps.registry.outputs.publish == 'true'
         run: npm publish "$RUNNER_TEMP/release/"*.tgz --registry=https://registry.npmjs.org/ --access public --tag latest --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Verify registry bytes and exact/default installation
         run: node scripts/release-registry.mjs verify "$RUNNER_TEMP/release/"*.tgz
         env:
@@ -114,12 +111,3 @@ jobs:
           else
             gh release create "$RELEASE_TAG" "$RUNNER_TEMP/release/"*.tgz "$RUNNER_TEMP/release/SHA256SUMS" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
-  docs:
-    needs: release
-    uses: ./.github/workflows/pages.yml
-    with:
-      ref: ${{ github.sha }}
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
