@@ -10,7 +10,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      CG_SITE_BUILD_DIR: ${{ runner.temp }}/site
       CG_SITE_BASE: /capability-graph/
       CG_SITE_URL: https://devcodex-labs.github.io/capability-graph
     steps:
@@ -23,6 +22,8 @@ jobs:
       - run: npm --prefix website ci --no-audit --no-fund
       - run: npm run docs:check
       - run: npm run docs:build
+        env:
+          CG_SITE_BUILD_DIR: ${{ runner.temp }}/site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/site

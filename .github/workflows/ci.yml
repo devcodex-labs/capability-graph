@@ -10,10 +10,6 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         node: ['22.12.0', '24']
     runs-on: ${{ matrix.os }}
-    env:
-      CG_BUILD_DIR: ${{ runner.temp }}/capability-graph-build
-      CG_TEST_DIR: ${{ runner.temp }}/capability-graph-fixtures
-      CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-artifacts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,4 +18,10 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm test
+        env:
+          CG_BUILD_DIR: ${{ runner.temp }}/capability-graph-build
+          CG_TEST_DIR: ${{ runner.temp }}/capability-graph-fixtures
+          CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-artifacts
       - run: npm run smoke:package
+        env:
+          CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-artifacts

@@ -5,10 +5,6 @@ permissions:
 jobs:
   build-and-check:
     runs-on: ubuntu-latest
-    env:
-      CG_SITE_BUILD_DIR: ${{ runner.temp }}/capability-graph-site
-      CG_SITE_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-browser
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,9 +19,17 @@ jobs:
         working-directory: website
       - run: npm run docs:check
       - run: npm run docs:build
+        env:
+          CG_SITE_BUILD_DIR: ${{ runner.temp }}/capability-graph-site
       - run: npx --no-install playwright install --with-deps chromium
         working-directory: website
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
       - run: npm run docs:browser
+        env:
+          CG_SITE_BUILD_DIR: ${{ runner.temp }}/capability-graph-site
+          CG_SITE_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-browser
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
       - uses: actions/upload-artifact@v4
         if: always()
         with:
