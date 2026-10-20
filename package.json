@@ -10,6 +10,17 @@
     "type": "git",
     "url": "git+https://github.com/devcodex-labs/capability-graph.git"
   },
+  "keywords": [
+    "capability-graph",
+    "mcp",
+    "ai",
+    "provider",
+    "dependency-graph"
+  ],
+  "homepage": "https://devcodex-labs.github.io/capability-graph/",
+  "bugs": {
+    "url": "https://github.com/devcodex-labs/capability-graph/issues"
+  },
   "files": [
     "dist",
     "plugin",
