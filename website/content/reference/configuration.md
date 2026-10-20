@@ -1,6 +1,6 @@
 # 完整配置参考
 
-SDK 从根入口导入 CapabilityGraph，CLI 从 graph.config.json 读取纯 JSON。字段严格校验，未知字段/错误类型/null 不按省略处理。参数中的 undefined 仅适用于代码调用。
+SDK 从根入口导入CapabilityGraph，CLI从graph.config.json读取纯JSON。未知字段和错误类型按各字段拒绝；null不是通用“采用默认值”的写法，具体差异见本页对照。undefined只适用于代码调用，不能写进JSON。
 
 ## Graph 与 Provider 来源
 
@@ -18,18 +18,36 @@ SDK 相对路径按 open 时 cwd 固定。CLI 对 Provider、documentRoot、Code
 
 ## GraphLimits
 
-| 字段 | 默认 |
-| --- | --- |
-| maxProviderBytes | 8388608 |
-| maxCatalogBytes | 8388608 |
-| maxResultBytes | 8388608 |
-| maxDocumentBytes | 1048576 |
-| maxInputBytes | 65536 |
-| maxContextBytes | 131072 |
-| maxModelCatalogBytes | 8388608 |
-| maxModelOutputBytes | 65536 |
+| 路径（SDK：open.limits；CLI：limits） | 默认UTF-8字节 | 限制的对象与超限 |
+| --- | --- | --- |
+| limits.maxProviderBytes | 8388608（8 MiB） | 每份Provider文件原始字节/内联定义JSON；CG_DEFINITION_INVALID |
+| limits.maxCatalogBytes | 8388608（8 MiB） | 完整CatalogResult；CG_CATALOG_TOO_LARGE |
+| limits.maxResultBytes | 8388608（8 MiB） | 普通查询/文档/匹配的完整JSON返回；CG_RESULT_TOO_LARGE |
+| limits.maxDocumentBytes | 1048576（1 MiB） | 单次本地文档原始字节；CG_DOCUMENT_TOO_LARGE |
+| limits.maxInputBytes | 65536（64 KiB） | match.input文本；CG_INPUT_TOO_LARGE |
+| limits.maxContextBytes | 131072（128 KiB） | 结构化Context的JSON字节；CG_INPUT_TOO_LARGE |
+| limits.maxModelCatalogBytes | 8388608（8 MiB） | 发给executor的完整候选Catalog数组；CG_MODEL_CONTEXT_EXCEEDED |
+| limits.maxModelOutputBytes | 65536（64 KiB） | executor返回选择的JSON字节；CG_MODEL_OUTPUT_TOO_LARGE |
 
 超限显式失败，不隐式分页、截断或删字段冒充完整结果。
+
+以上均为正安全整数，不是token配额。目录结果也受maxResultBytes限制。OpenAI/Codex适配器自己的maxOutputBytes默认65536，用于模型候选/外部传输边界；HTTP响应预算则约束协议封套，不能把三个层次互相替代。
+
+## 省略、undefined、null与空数组
+
+| 调用位置 | 省略或undefined | null | [] |
+| --- | --- | --- | --- |
+| SDK open.providers | 必填，缺少失败 | 配置失败 | 合法空图谱 |
+| open.allowedProviders | 全部已加载 | 配置失败 | 零授权 |
+| listCatalog/listProviders的query.providers | 全部授权来源 | 输入失败 | 完整空列表 |
+| resolve.ids/getCapabilities.ids | 缺少失败 | 输入失败 | 非法，根数组必须非空 |
+| resolve.relations | 默认requires闭包 | CG_INPUT_INVALID | 只取根 |
+| 查询context | 空事实 | CG_CONTEXT_INVALID | 结构非法 |
+| match.options.timeoutMs | 60000毫秒 | CG_INPUT_INVALID | 类型非法 |
+| open.limits或某个预算值 | 容器省略用默认；容器中显式undefined预算值不合法 | CG_CONFIG_INVALID | 容器非法 |
+| MCP http及其预算/认证字段 | 按字段默认 | CG_CONFIG_INVALID | 仅allowedOrigins/allowedHostnames等数组字段可为空 |
+
+例外需按当前实现区分：两个内置模型适配器的maxOutputBytes运行时使用nullish缺省，null会采用65536；公开TypeScript声明仍仅接受可选number，推荐省略字段，不把这一兼容行为推广到Graph/HTTP预算。关系或超时传null不会采用默认值。
 
 ## CLI 顶层
 

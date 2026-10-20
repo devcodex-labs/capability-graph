@@ -5,5 +5,5 @@ const graph=await CapabilityGraph.open({providers:[
 ],allowedProviders:['acme','shared']});
 try {
   const result=await graph.resolve({ids:['acme::route']});
-  console.log(JSON.stringify({selected:result.selected,nodes:result.nodes.map(n=>n.capability.id),edges:result.edges,completeness:result.meta.completeness},null,2));
+  console.log(JSON.stringify(result,null,2));
 } finally {await graph.close();}

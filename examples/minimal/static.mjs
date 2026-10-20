@@ -1,10 +1,17 @@
-import {CapabilityGraph} from '@devcodex/capability-graph';
-import {fileURLToPath} from 'node:url';
-const graph=await CapabilityGraph.open({providers:[{file:fileURLToPath(new URL('./provider.json',import.meta.url))}]});
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { fileURLToPath } from 'node:url';
+
+let graph;
 try {
-  const catalog=await graph.listCatalog();
-  const detail=await graph.getCapabilities({ids:['acme::route']});
-  const resolved=await graph.resolve({ids:['acme::route']});
-  const document=await graph.readDocument({capabilityId:'acme::route',documentId:'guide'});
-  console.log(JSON.stringify({catalog:catalog.items.map(c=>c.id),usage:detail.items[0].capability.usage.instructions,selected:resolved.selected,nodes:resolved.nodes.map(n=>({id:n.capability.id,origin:n.origin,applicability:n.applicability.status})),completeness:resolved.meta.completeness,documentId:document.documentId},null,2));
-} finally {await graph.close();}
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }]
+  });
+  const result = await graph.resolve({ ids: ['acme::route'] });
+  console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
+  process.exitCode = 1;
+} finally {
+  await graph?.close();
+}

@@ -7,10 +7,10 @@
 先安装 CLI：
 
 ```sh
-npm install --global @devcodex/capability-graph@2.0.0
+npm install --global @devcodex/capability-graph
 ```
 
-创建[快速开始](/getting-started/quick-start)中的 Provider、知识文件和 graph.config.json。已有项目本地安装时，也可在该项目中用 `npx --no-install capability-graph` 运行以下命令。其他安装方式见[安装说明](/getting-started/installation)。
+创建[快速开始](/getting-started/quick-start)中的provider.json和graph.config.json即可，不要求知识文件。已有项目本地安装时，也可在该项目中用 `npx --no-install capability-graph` 运行以下命令。其他安装方式见[安装说明](/getting-started/installation)。
 
 ## 预览、登记与诊断
 
@@ -49,3 +49,11 @@ capability-graph clean --host codex
 ```
 
 只管理仍属于本模块的未修改项；用户编辑或同名冲突不会被覆盖。clean 不删业务配置/Provider/知识文件，清理后按宿主要求重载，不强制结束宿主会话。参数、报告与退出码见[CLI](/integrations/cli)。
+
+## 如何判断登记成功
+
+dry-run的planned只表示预览完整；实际setup报告ok及changed表示登记结果。host doctor会临时启动已登记服务并做工具发现，然后关闭子进程；它不证明当前聊天模型已完成业务任务。
+
+新会话中应能发现五个静态工具，Catalog包含显式配置的acme::route/acme::schema，再由当前模型选择ID并Resolve。最小Provider没有guide正文，不要把readDocument失败当安装失败；需要正文时换成[详情来源](/guide/results#读取目录详情与知识正文)。
+
+有登记但工具缺失时先核对Node/CLI/配置绝对路径与宿主协议；只有Skill可见时检查MCP连接。更新安装位置后显式重跑setup再新会话；不要重复安装同名Plugin。隔离维护目录验证与用户实际宿主接入是两项证据。

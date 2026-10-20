@@ -60,6 +60,7 @@
     "docs:dev": "npm --prefix website run dev",
     "docs:build": "npm --prefix website run build",
     "docs:check": "npm --prefix website run check",
+    "docs:examples": "node scripts/check-doc-examples.mjs",
     "docs:browser": "npm --prefix website run check:browser"
   },
   "dependencies": {

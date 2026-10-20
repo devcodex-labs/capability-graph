@@ -6,6 +6,8 @@
 
 Provider 作者声明能力与关系；模型选择已有 ID；Graph 验证授权、结构化条件及依赖；调用方决定如何使用。Graph 不执行能力或依赖，不自动扫描项目推断事实，也不提供 RAG、Embedding、关键词 Matcher 或 Agent Runtime。
 
+## 目录导航
+
 [选择接入方式](#接入方式) · [安装](#安装到使用项目) · [第一个图谱](#声明与静态查询) · [配置](#配置与多个-provider) · [Codex](#codex-使用当前模型) · [主动匹配](#应用主动匹配) · [CLI](#cli-与维护) · [完整使用手册](website/content/getting-started/introduction.md)
 
 ## 接入方式
@@ -37,7 +39,7 @@ Skill 指导调用，Plugin 提供分发，setup 管理登记；它们可以组�
 mkdir graph-demo
 cd graph-demo
 npm init -y
-npm install @devcodex/capability-graph@2.0.0
+npm install @devcodex/capability-graph
 ```
 
 静态 Graph 无需 OpenAI/Codex SDK 或模型凭据。安装不启动服务、不调用模型、不登记 MCP/Skill，也不修改宿主配置。本地命令可在使用项目中通过 `npx --no-install capability-graph` 调用。
@@ -45,15 +47,15 @@ npm install @devcodex/capability-graph@2.0.0
 需要在多个项目中使用 CLI 时，可以全局安装：
 
 ```sh
-npm install --global @devcodex/capability-graph@2.0.0
+npm install --global @devcodex/capability-graph
 ```
 
 ## 声明与静态查询
 
-在使用项目中创建 `provider.json`：
+首次运行只需两个文件，不需要模型、凭据或知识目录。在 `graph-demo/` 项目根目录创建 `provider.json`：
 
 <!-- example:examples/minimal/provider.json -->
-```json
+```json title="provider.json"
 {
   "providerId": "acme",
   "name": "Acme HTTP",
@@ -65,51 +67,140 @@ npm install --global @devcodex/capability-graph@2.0.0
       "description": "Create an HTTP endpoint with request validation.",
       "whenToUse": "The application needs an HTTP endpoint with validated input.",
       "usage": { "instructions": "Declare the request schema, then register the endpoint." },
-      "relations": { "requires": ["schema"] },
-      "documents": [{ "id": "guide", "source": { "type": "file", "path": "knowledge/guide.md" } }]
+      "relations": { "requires": ["schema"] }
     },
     { "id": "schema", "name": "Request schema", "description": "Declare a schema to validate request input." }
   ]
 }
 ```
 
-创建 `knowledge/guide.md`，写入自己的指南。本例的 requires 是作者为“带请求校验的 endpoint”明确声明的依赖，不表示所有路由都必须校验。
+本例描述“带请求校验的 HTTP 接口”。`route` 通过作者显式声明的 `requires` 依赖 `schema`；Graph 解析声明，真正注册和执行仍由应用负责。`providerId/name/version/capabilities` 是来源必填字段，能力必填 `id/name/description`；`whenToUse`、`usage` 和关系按需填写。`schema` 没有使用说明也是合法的。
 
-Provider 必填 `providerId/name/version/capabilities`，能力必填 `id/name/description`；`capabilities:[]` 合法。关系中的同 Provider 目标可写局部 ID，公开查询用完整 `providerId::capabilityId`。未知字段拒绝，JSON 不包含函数或执行脚本。
-
-创建 `static.mjs`：
+在同一目录创建 `static.mjs`。`import.meta.url` 定位脚本旁的声明；成功时只输出完整 JSON，失败时诊断写 stderr，最后关闭 Graph。
 
 <!-- example:examples/minimal/static.mjs -->
-```js
-import {CapabilityGraph} from '@devcodex/capability-graph';
-import {fileURLToPath} from 'node:url';
-const graph=await CapabilityGraph.open({providers:[{file:fileURLToPath(new URL('./provider.json',import.meta.url))}]});
+```js title="static.mjs"
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { fileURLToPath } from 'node:url';
+
+let graph;
 try {
-  const catalog=await graph.listCatalog();
-  const detail=await graph.getCapabilities({ids:['acme::route']});
-  const resolved=await graph.resolve({ids:['acme::route']});
-  const document=await graph.readDocument({capabilityId:'acme::route',documentId:'guide'});
-  console.log(JSON.stringify({catalog:catalog.items.map(c=>c.id),usage:detail.items[0].capability.usage.instructions,selected:resolved.selected,nodes:resolved.nodes.map(n=>({id:n.capability.id,origin:n.origin,applicability:n.applicability.status})),completeness:resolved.meta.completeness,documentId:document.documentId},null,2));
-} finally {await graph.close();}
-```
-
-执行 `node static.mjs`，输出投影为：
-
-```json
-{
-  "catalog": ["acme::route", "acme::schema"],
-  "usage": "Declare the request schema, then register the endpoint.",
-  "selected": ["acme::route"],
-  "nodes": [
-    { "id": "acme::route", "origin": "selected", "applicability": "applicable" },
-    { "id": "acme::schema", "origin": "dependency", "applicability": "applicable" }
-  ],
-  "completeness": "complete",
-  "documentId": "guide"
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }]
+  });
+  const result = await graph.resolve({ ids: ['acme::route'] });
+  console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
+  process.exitCode = 1;
+} finally {
+  await graph?.close();
 }
 ```
 
-实际 ResolveResult 的节点包含完整 CapabilityDetail、ApplicabilityResult，顶层还有 edges、unresolved、meta.revision/warnings。Catalog 只放精简字段，不默认附长说明、关系与文档正文。返回值可修改，不会影响 Graph 私有快照。
+```sh
+node static.mjs
+```
+
+| 配置/调用 | 含义与默认行为 |
+| --- | --- |
+| `providers:[{file:...}]` | 加载这个 JSON；同一来源的 file 与内联 definition 互斥 |
+| `allowedProviders` 省略 | 授权全部已加载来源；空数组表示零授权 |
+| `resolve.ids:['acme::route']` | 选中的根；必须使用完整 ID，数组非空 |
+| `relations` 省略 | 默认展开 requires 依赖闭包；`[]` 仅保留根 |
+| `context` 省略 | 不提供事实；本例无静态条件，因此 applicable |
+| `model` 省略 | 静态方法不调用模型 |
+
+以下是该稳定声明的真实完整 stdout，与 API 原结果一致。Revision 取决于声明和授权，修改输入后可能改变：
+
+```json
+{
+  "selected": [
+    "acme::route"
+  ],
+  "nodes": [
+    {
+      "capability": {
+        "id": "acme::route",
+        "providerId": "acme",
+        "name": "Validated HTTP endpoint",
+        "description": "Create an HTTP endpoint with request validation.",
+        "whenToUse": "The application needs an HTTP endpoint with validated input.",
+        "usage": {
+          "instructions": "Declare the request schema, then register the endpoint."
+        },
+        "relations": {
+          "parents": [],
+          "specializes": [],
+          "related": [],
+          "requires": [
+            "acme::schema"
+          ]
+        },
+        "documents": []
+      },
+      "origin": "selected",
+      "applicability": {
+        "status": "applicable",
+        "missingFacts": [],
+        "invalidFacts": [],
+        "failedConditions": []
+      }
+    },
+    {
+      "capability": {
+        "id": "acme::schema",
+        "providerId": "acme",
+        "name": "Request schema",
+        "description": "Declare a schema to validate request input.",
+        "relations": {
+          "parents": [],
+          "specializes": [],
+          "related": [],
+          "requires": []
+        },
+        "documents": []
+      },
+      "origin": "dependency",
+      "applicability": {
+        "status": "applicable",
+        "missingFacts": [],
+        "invalidFacts": [],
+        "failedConditions": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "acme::route",
+      "type": "requires",
+      "to": "acme::schema"
+    }
+  ],
+  "unresolved": [],
+  "meta": {
+    "revision": "sha256:be714d7dc37a706d72862ee2d485c7c127a9f684d8124796f4fc65e786a5285a",
+    "completeness": "complete",
+    "warnings": []
+  }
+}
+```
+
+`selected` 是请求的根；依赖也会进入 `nodes`，由 `origin` 区分。ID 在 `node.capability.id`；`edges` 保持原始正向，`unresolved:[]` 和 `meta.completeness:'complete'` 表示关系完整展开，不能据此宣称已执行成功。
+
+在取得 `result` 后可用这段**消费片段**展示说明；它不是另一个独立脚本：
+
+```js
+for (const { capability, origin, applicability } of result.nodes) {
+  console.log(`${capability.id} (${origin}, ${applicability.status})`);
+  console.log(capability.usage?.instructions ?? '该能力没有提供使用说明');
+}
+```
+
+已有内存对象时可传 `providers:[{definition}]`，完整无文件版本见 [inline.mjs](examples/minimal/inline.mjs)，复制到项目后执行 `node inline.mjs`。两种来源返回同一种完整结果。[快速开始](website/content/getting-started/quick-start.md)解释两种写法及参数，[结果指南](website/content/guide/results.md)说明每个字段和下一步判断。
+
+目录、详情与知识读取独立放在 [details.mjs](examples/minimal/details.mjs)。按[运行示例](website/content/examples/index.md)复制完整 examples 后，运行 `node examples/minimal/details.mjs`；它使用 `details.provider.json` 和随附 `knowledge/guide.md`，输出完整 `{catalog,details,document}`，不增加最小示例前置条件。
 
 ## 配置与多个 Provider
 
@@ -217,27 +308,32 @@ npm install openai@7.39.0
 在应用运行环境配置 `CG_MODEL_API_KEY`、`CG_MODEL_NAME`；这些名称由下例读取，库不自动采用它们。模型需支持 strict Structured Outputs，Codex 登录不提供 API 凭据。
 
 ```js
-import {CapabilityGraph, GraphError} from '@devcodex/capability-graph';
-import {createOpenAIExecutor} from '@devcodex/capability-graph/adapters/openai';
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { createOpenAIExecutor } from '@devcodex/capability-graph/adapters/openai';
+import { fileURLToPath } from 'node:url';
 
 const apiKey = process.env.CG_MODEL_API_KEY;
 const model = process.env.CG_MODEL_NAME;
+const baseURL = process.env.CG_MODEL_BASE_URL;
 if (!apiKey || !model) throw new Error('Configure CG_MODEL_API_KEY and CG_MODEL_NAME');
-const graph = await CapabilityGraph.open({
-  providers: [{file:'./provider.json'}],
-  model: createOpenAIExecutor({apiKey, model})
-});
+let graph;
 try {
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }],
+    model: createOpenAIExecutor({ apiKey, model, ...(baseURL ? { baseURL } : {}) })
+  });
   const result = await graph.match({
-    input:'创建带请求校验的 Acme HTTP 接口',
-    context:{facts:{framework:'acme'}}
-  }, {timeoutMs:60000});
-  console.log(result.status, result.selection, result.graph);
+    input: '创建带请求校验的 Acme HTTP 接口',
+    context: { facts: { framework: 'acme' } }
+  }, { timeoutMs: 60000 });
+  console.log(JSON.stringify(result, null, 2));
 } catch (error) {
   if (!(error instanceof GraphError)) throw error;
-  console.error(error.code, error.phase, error.nextAction);
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
   process.exitCode = 1;
-} finally { await graph.close(); }
+} finally {
+  await graph?.close();
+}
 ```
 
 适配器使用 Responses、strict JSON Schema、store:false、无自动重试；只发送授权 Catalog、input、Context 和 Revision。可配置 HTTPS baseURL 对接兼容该协议的网关，或提供可信 fetch。确认所用模型与账号支持 strict Structured Outputs；Chat Completions 地址不能直接用作 Responses 地址。
@@ -247,21 +343,29 @@ try {
 普通 Node.js 应用需要独立匹配任务时使用此路径；不接管当前桌面会话、不依赖 Codex SDK。
 
 ```js
-import {CapabilityGraph} from '@devcodex/capability-graph';
-import {createCodexExecutor} from '@devcodex/capability-graph/adapters/codex';
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { createCodexExecutor } from '@devcodex/capability-graph/adapters/codex';
+import { fileURLToPath } from 'node:url';
 
-const graph = await CapabilityGraph.open({
-  providers:[{file:'./provider.json'}],
-  model:createCodexExecutor({
-    command:'/absolute/pinned-codex/bin/codex',
-    runtimeRoot:'/absolute/pinned-codex',
-    authHome:'/absolute/dedicated-codex-home',
-    scratchRoot:'/absolute/isolated-matcher-scratch'
-  })
-});
+let graph;
 try {
-  console.log(await graph.match({input:'创建带请求校验的 Acme HTTP 接口'}));
-} finally { await graph.close(); }
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }],
+    model: createCodexExecutor({
+      command: '/opt/pinned-codex/bin/codex',
+      runtimeRoot: '/opt/pinned-codex',
+      authHome: '/private/dedicated-codex-home',
+      scratchRoot: '/var/tmp/capability-graph-matcher'
+    })
+  });
+  console.log(JSON.stringify(await graph.match({ input: '创建带请求校验的 Acme HTTP 接口' }), null, 2));
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
+  process.exitCode = 1;
+} finally {
+  await graph?.close();
+}
 ```
 
 上述路径是需替换的本机配置。当前仅支持 **Linux + bubblewrap + 原生 CLI 0.163.0**。先在独立 CODEX_HOME 完成该 CLI 的 login --device-auth 与 login status，再配置 authHome。runtimeRoot 只含可信 CLI 安装资源；每轮独立只读最小挂载、禁用执行工具，取消/超时后回收子进程及 scratch。不满足隔离条件时明确拒绝。完整准备与默认值见[模型接入](website/content/models/codex.md)。
@@ -407,7 +511,7 @@ node examples/multi-provider/main.mjs
 node examples/vextjs/resolve.mjs
 ```
 
-[VextJS 示例](examples/vextjs/guide.md) 基于真实 vextjs@2.0.0 API；另安装该版本后执行 `node examples/vextjs/verify.mjs`，验证真实路由注册、有效请求与 body 校验。Graph 不加载或执行该路由，示例关系由作者维护。
+[VextJS 示例](examples/vextjs/guide.md) 基于真实 vextjs@2.0.0 API；另安装该版本后执行 `node --experimental-strip-types examples/vextjs/verify.mjs`，在Node22.12剥离类型，验证真实框架处理链的路由和body校验。createTestApp使用内存请求，不监听TCP端口；Graph不加载或执行路由，示例关系由作者维护。
 
 独立 Codex 匹配适配器要求 Linux、bubblewrap 和固定版本的原生 CLI，不支持 Windows/WSL。Codex Plugin 使用 HTTP，普通 Codex stdio 接入使用 setup。OpenAI 与远程宿主还需满足模型、协议、网络和认证条件，详见[兼容说明](website/content/resources/compatibility.md)。
 

@@ -23,6 +23,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
         working-directory: website
       - run: npm run docs:check
+      - run: npm run docs:examples
+        env:
+          CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-doc-examples
       - run: npm run docs:build
         env:
           CG_SITE_BUILD_DIR: ${{ runner.temp }}/capability-graph-site
@@ -40,6 +43,7 @@ jobs:
         with:
           name: documentation-review
           path: |
+            ${{ runner.temp }}/capability-graph-doc-examples
             ${{ runner.temp }}/capability-graph-site
             ${{ runner.temp }}/capability-graph-browser
           include-hidden-files: true

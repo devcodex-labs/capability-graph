@@ -11,10 +11,10 @@ const graph=await CapabilityGraph.open({providers:[
 ],allowedProviders:['acme','shared']});
 try {
   const result=await graph.resolve({ids:['acme::route']});
-  console.log(JSON.stringify({selected:result.selected,nodes:result.nodes.map(n=>n.capability.id),edges:result.edges,completeness:result.meta.completeness},null,2));
+  console.log(JSON.stringify(result,null,2));
 } finally {await graph.close();}
 ```
 
-预期 selected 为 acme::route，nodes 为 acme::route 与 shared::schema，边为 acme::route requires shared::schema，completeness 为 complete。requires 是作者明确声明的依赖，Graph 不自动执行它。
+脚本输出完整 ResolveResult。selected 为 acme::route，nodes[].capability.id 为 acme::route 与 shared::schema，边为 acme::route requires shared::schema，meta.completeness 为 complete；不是 nodes 字符串数组。[结果指南](/guide/results)解释所有字段。requires 是作者明确声明的依赖，Graph 不自动执行它。
 
 如果只授权 acme，外部 shared 目标不能展开，返回 target_unavailable 与 partial；显式直接查询越权根则整次失败。Context 不能扩大授权。

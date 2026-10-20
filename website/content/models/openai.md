@@ -10,10 +10,73 @@
 | maxOutputBytes | 否 / 65536 | 正安全整数，限制候选 UTF-8 字节 |
 | fetch | 否 / 内置可信传输 | 应用可提供受信任传输，不由模型或 MCP 参数设置 |
 
-完整 open/match/错误处理/close 代码见[match](/models/match)。SDK 只发送本次 input、Context、授权 Catalog、Revision；Responses API 设置 store:false，关闭自动重试。默认遵循系统 CA 与代理。
+## 安装与完整调用
+
+在你的应用项目中先按[快速开始](/getting-started/quick-start)保存provider.json；本例不需要知识文件。安装本库和可选SDK：
+
+```sh
+npm install @devcodex/capability-graph openai@7.39.0
+```
+
+环境变量名由下面的应用脚本读取，不是Graph约定的自动配置项。apiKey/model必填；CG_MODEL_BASE_URL可省略，填写时必须是支持Responses及strict输出的HTTPS API根地址。
+
+Bash：
+
+```bash
+export CG_MODEL_API_KEY='你的API凭据'
+export CG_MODEL_NAME='你有权限的模型ID'
+# 仅自有兼容网关需要：export CG_MODEL_BASE_URL='https://gateway.example.com/v1'
+node openai.mjs
+```
+
+PowerShell：
+
+```powershell
+$env:CG_MODEL_API_KEY='你的API凭据'
+$env:CG_MODEL_NAME='你有权限的模型ID'
+# 仅自有兼容网关需要：$env:CG_MODEL_BASE_URL='https://gateway.example.com/v1'
+node openai.mjs
+```
+
+在provider.json旁保存openai.mjs。上面的运行命令会实际调用你的模型并可能产生费用；本地文档校验或受控传输不等于真实账号验证。
+
+```js title="openai.mjs"
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { createOpenAIExecutor } from '@devcodex/capability-graph/adapters/openai';
+import { fileURLToPath } from 'node:url';
+
+const apiKey = process.env.CG_MODEL_API_KEY;
+const model = process.env.CG_MODEL_NAME;
+const baseURL = process.env.CG_MODEL_BASE_URL;
+if (!apiKey || !model) throw new Error('Configure CG_MODEL_API_KEY and CG_MODEL_NAME');
+let graph;
+try {
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }],
+    model: createOpenAIExecutor({ apiKey, model, ...(baseURL ? { baseURL } : {}) })
+  });
+  const result = await graph.match({
+    input: '创建带请求校验的 Acme HTTP 接口',
+    context: { facts: { framework: 'acme' } }
+  }, { timeoutMs: 60000 });
+  console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
+  process.exitCode = 1;
+} finally {
+  await graph?.close();
+}
+```
+
+成功stdout为完整MatchResult，结构和四种业务状态见[结果处理](/models/match)。GraphError输出code/phase/nextAction；认证、额度、网关协议不兼容等不得当作no_match。未配置的环境变量会在创建Graph前明确报错。
+
+SDK只发送本次input、Context、授权精简Catalog、Revision；Responses请求使用text.format的json_schema/strict、store:false并关闭自动重试，不自动读取知识正文。默认遵循系统CA及代理。
 
 CLI JSON 使用 model:{type:'openai',apiKeyEnv:'CG_MODEL_API_KEY',model:'你可用的模型'}；环境变量名称由配置决定，不把明文 Key 写入 JSON。
 
 baseURL 不能把 Chat Completions 自动变成 Responses。内置适配器不提供 Chat Completions、xAI 预设或格式自动降级，可在[自定义执行器](/models/custom)中对接现有调用。
+
+官方[Structured Outputs说明](https://developers.openai.com/api/docs/guides/structured-outputs#structured-outputs-vs-json-mode)区分schema约束输出与只保证JSON语法的JSON mode。你的模型和网关必须满足本适配器所需契约；不能仅凭“兼容OpenAI”判断可用。
 
 首次接入时，使用有权限的模型运行一次 match，确认返回 status、selection 和同 Revision 的 graph。遇到认证、额度、协议或结构化输出错误时，按 [GraphError](/reference/errors) 的 code/phase/nextAction 排查；CLI 登录与 OpenAI API 账号凭据分别配置。

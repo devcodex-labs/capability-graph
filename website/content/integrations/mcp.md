@@ -1,4 +1,4 @@
-# Tool、MCP、CLI 与 Plugin
+# MCP stdio 与 HTTP
 
 通用 Agent Tool Adapter 借用 Graph，返回 definitions 和 call，不关闭 Graph：
 
@@ -45,7 +45,7 @@ try {
 }
 ```
 
-把 CG_HTTP_TOKEN 配到部署环境。不要把明文 token 放 JSON、manifest 或命令行。对外 HTTPS/TLS 由部署代理提供；如宿主要求用户级 OAuth，使用其支持的网关，v1 不提供 OAuth/RBAC 服务。公共匿名配置 access:'public-readonly' 时 Graph 必须显式 allowedProviders，仅包含已批准公开的声明；默认禁止文档正文，enableMatch 必须 false。可信部署可以显式 publicDocuments:true 批准所有已声明文档正文，公开前审核文件根。
+把CG_HTTP_TOKEN配到部署环境。CLI配置接受环境变量名，SDK接受token本身。对外HTTPS/TLS由部署代理提供；宿主要求用户级OAuth时使用其支持的网关，本服务不实现OAuth/RBAC。公共匿名配置access:'public-readonly'时Graph必须显式allowedProviders，仅包含已批准声明；默认禁止正文且enableMatch必须false。publicDocuments:true会批准全部已声明正文，公开前核对根与材料。
 
 代码片段中的 graph 来自[快速开始](/getting-started/quick-start)，由应用创建并最终关闭。
 
@@ -62,3 +62,220 @@ CLI 配置 schemaVersion 为 1（可省），providers 必填；可选 allowedPr
 从项目内启动可使用 npx --no-install capability-graph serve --config graph.config.json --transport http，或把 http 换为 stdio。不要把人工终端日志输出到 stdio stdout。
 
 宿主从 Catalog 选择真实 ID，再 Resolve；刷新后若 Revision 不同应重新选择。安装 Skill/Plugin 的流程见对应页面，远程 HTTPS 见[远程部署](/integrations/remote)。
+
+## stdio：让客户端托管进程
+
+在你的ESM项目安装本库和客户端SDK：
+
+```sh
+npm install @devcodex/capability-graph @modelcontextprotocol/client@2.3.1
+```
+
+按[快速开始](/getting-started/quick-start)在项目根保存provider.json与graph.config.json。把下列代码保存为mcp-stdio.mjs，在该目录执行 `node mcp-stdio.mjs`。示例使用Node启动本地安装包的bin脚本，不依赖源码仓库；GUI宿主也须填实际已安装Node/CLI/配置的绝对路径。
+
+```js title="mcp-stdio.mjs"
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const client = new Client({ name: 'graph-reader', version: '1' }, {
+  versionNegotiation: { mode: { pin: '2026-07-28' } }
+});
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [fileURLToPath(new URL('./cli/main.js', import.meta.resolve('@devcodex/capability-graph'))),
+    'serve', '--config', path.resolve('graph.config.json'), '--transport', 'stdio'],
+  stderr: 'pipe'
+});
+transport.stderr?.on('data', bytes => process.stderr.write(bytes));
+try {
+  await client.connect(transport);
+  const tools = await client.listTools();
+  console.error('工具：', tools.tools.map(tool => tool.name));
+  const catalog = await client.callTool({ name: 'capability_graph_list_catalog', arguments: {} });
+  if (catalog.isError) throw new Error(JSON.stringify(catalog));
+  const entry = catalog.structuredContent?.items?.find(item => item.id === 'acme::route');
+  if (!entry) throw new Error('Catalog中没有acme::route，请检查声明与授权');
+  const result = await client.callTool({ name: 'capability_graph_resolve', arguments: { ids: [entry.id] } });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.isError) process.exitCode = 1;
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+} finally {
+  await client.close();
+}
+```
+
+客户端启动服务→发现五工具→读Catalog→从真实目录确认acme::route→Resolve→打印完整MCP结果→关闭连接和子进程。工具名及服务就绪诊断写stderr，客户端stdout只输出结果JSON；服务进程stdout专用于MCP，不能混入日志。这里选择已知案例ID，不调用第二个模型。
+
+## HTTP：先启动服务，再连接
+
+在终端A的项目根执行，保持进程运行：
+
+```sh
+npx --no-install capability-graph serve --config graph.config.json --transport http
+```
+
+默认stderr报告ready及 `http://127.0.0.1:3333/mcp`。这是MCP Streamable HTTP端点，不存在REST `/resolve`。在终端B同一项目保存mcp-http.mjs并执行 `node mcp-http.mjs`：
+
+```js title="mcp-http.mjs"
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+
+const url = process.env.CG_MCP_URL ?? 'http://127.0.0.1:3333/mcp';
+const client = new Client({ name: 'graph-http-reader', version: '1' }, {
+  versionNegotiation: { mode: { pin: '2026-07-28' } }
+});
+try {
+  await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+  const tools = await client.listTools();
+  console.error('工具：', tools.tools.map(tool => tool.name));
+  const catalog = await client.callTool({ name: 'capability_graph_list_catalog', arguments: {} });
+  if (catalog.isError) throw new Error(JSON.stringify(catalog));
+  const entry = catalog.structuredContent?.items?.find(item => item.id === 'acme::route');
+  if (!entry) throw new Error('Catalog中没有acme::route，请检查声明与授权');
+  const result = await client.callTool({ name: 'capability_graph_resolve', arguments: { ids: [entry.id] } });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.isError) process.exitCode = 1;
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+} finally {
+  await client.close();
+}
+```
+
+CG_MCP_URL由此示例读取以选择已有服务，Graph不自动采用该变量。HTTP客户端close仅关闭自己的连接；验证结束后回终端A按Ctrl+C，由服务依次关闭传输和Graph。共享服务由其部署方管理，不因某个客户端退出就停止。
+
+## 工具参数与结果
+
+| 工具 | 参数 | 成功structuredContent |
+| --- | --- | --- |
+| capability_graph_list_providers | 可选providers数组 | ProviderListResult |
+| capability_graph_list_catalog | 可选providers数组 | CatalogResult，精简目录 |
+| capability_graph_get_capabilities | ids、可选context | CapabilityDetailResult |
+| capability_graph_resolve | ids、可选context/relations | 完整ResolveResult |
+| capability_graph_read_document | capabilityId、documentId | DocumentReadResult |
+| capability_graph_match（显式启用） | input、可选context/providers | MatchResult |
+
+默认是五个静态查询工具，不是一项能力一个Tool。第六个工具只有服务端显式配置executor和enableMatch:true才出现；它会使用服务端模型，不是自动复用客户端模型。HTTP还需显式requestTimeoutMs>=65000，公开匿名模式禁止开启。
+
+## 读取协议封套
+
+现代2026-07-28成功结果包含isError:false、content及structuredContent，后者与SDK返回相同，完整字段见[结果指南](/guide/results)。执行失败是isError:true，content中的text为GraphError JSON，通常没有成功structuredContent；协议本身的坏请求由SDK返回协议错误，客户端调用可reject。
+
+stdio协商2025-06-18时，当前官方SDK2.3.1实测仍返回content:[]、structuredContent和isError，不能写成“只有text”。现代2026-07-28线路另外带外层_meta（含io.modelcontextprotocol/serverInfo）与resultType，SDK客户端可能规范化外层字段。外层MCP元信息不是Graph结果内的meta.revision。
+
+本页脚本固定现代协议。SDK2.3.1需要旧协议时使用 `versionNegotiation:{mode:'legacy'}`，不要用pin:'2025-06-18'（pin只接受现代协议）；实际版本用client.getNegotiatedProtocolVersion()核对。HTTP只支持当前实现的2026-07-28，不从stdio兼容性推断HTTP支持。
+
+<details>
+<summary>现代协议一次成功调用的完整线路封包</summary>
+
+```json
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "capability-graph",
+      "version": "2.0.0"
+    }
+  },
+  "content": [],
+  "structuredContent": {
+    "selected": [
+      "acme::route"
+    ],
+    "nodes": [
+      {
+        "capability": {
+          "id": "acme::route",
+          "providerId": "acme",
+          "name": "Validated HTTP endpoint",
+          "description": "Create an HTTP endpoint with request validation.",
+          "whenToUse": "The application needs an HTTP endpoint with validated input.",
+          "usage": {
+            "instructions": "Declare the request schema, then register the endpoint."
+          },
+          "relations": {
+            "parents": [],
+            "specializes": [],
+            "related": [],
+            "requires": [
+              "acme::schema"
+            ]
+          },
+          "documents": []
+        },
+        "origin": "selected",
+        "applicability": {
+          "status": "applicable",
+          "missingFacts": [],
+          "invalidFacts": [],
+          "failedConditions": []
+        }
+      },
+      {
+        "capability": {
+          "id": "acme::schema",
+          "providerId": "acme",
+          "name": "Request schema",
+          "description": "Declare a schema to validate request input.",
+          "relations": {
+            "parents": [],
+            "specializes": [],
+            "related": [],
+            "requires": []
+          },
+          "documents": []
+        },
+        "origin": "dependency",
+        "applicability": {
+          "status": "applicable",
+          "missingFacts": [],
+          "invalidFacts": [],
+          "failedConditions": []
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "acme::route",
+        "type": "requires",
+        "to": "acme::schema"
+      }
+    ],
+    "unresolved": [],
+    "meta": {
+      "revision": "sha256:be714d7dc37a706d72862ee2d485c7c127a9f684d8124796f4fc65e786a5285a",
+      "completeness": "complete",
+      "warnings": []
+    }
+  },
+  "isError": false,
+  "resultType": "complete"
+}
+```
+
+</details>
+
+同一SDK对不存在ID的执行失败如下；text需JSON.parse后读取code/phase，不能访问成功structuredContent：
+
+```json
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "capability-graph",
+      "version": "2.0.0"
+    }
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"code\":\"CG_CAPABILITY_NOT_FOUND\",\"phase\":\"query\",\"message\":\"Requested capability does not exist\",\"nextAction\":\"refresh\"}"
+    }
+  ],
+  "isError": true
+}
+```
+
+下一步：普通[Codex登记](/integrations/codex)、[已有Server](/integrations/existing-server)、[Agent工具](/integrations/tools)或[远程HTTPS](/integrations/remote)。

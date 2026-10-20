@@ -75,8 +75,22 @@ try{await embeddedClient.connect(embeddedTransport);assert.equal((await embedded
 `);
 const runtime = run(process.execPath, ['consumer.mjs'], consumer);
 const minimal = JSON.parse(run(process.execPath, ['examples/minimal/static.mjs'], consumer));
-assert.deepEqual(minimal.catalog, ['acme::route', 'acme::schema']); assert.equal(minimal.documentId, 'guide'); assert.equal(minimal.completeness, 'complete');
-const multi = JSON.parse(run(process.execPath, ['examples/multi-provider/main.mjs'], consumer)); assert.deepEqual(multi.nodes, ['acme::route', 'shared::schema']);
+assert.deepEqual(minimal.selected, ['acme::route']);
+assert.deepEqual(minimal.nodes.map(node => [node.capability.id, node.origin, node.applicability.status]), [['acme::route', 'selected', 'applicable'], ['acme::schema', 'dependency', 'applicable']]);
+assert.deepEqual(minimal.edges, [{from:'acme::route', type:'requires', to:'acme::schema'}]);
+assert.deepEqual(minimal.unresolved, []); assert.equal(minimal.meta.completeness, 'complete');
+assert.match(minimal.meta.revision, /^sha256:[a-f0-9]{64}$/); assert.deepEqual(minimal.meta.warnings, []);
+assert.equal(minimal.nodes[1].capability.usage, undefined);
+const inline = JSON.parse(run(process.execPath, ['examples/minimal/inline.mjs'], consumer));
+assert.deepEqual(inline, minimal);
+const details = JSON.parse(run(process.execPath, ['examples/minimal/details.mjs'], consumer));
+assert.deepEqual(details.catalog.items.map(item => item.id), ['acme::route', 'acme::schema']);
+assert.equal(details.details.items[0].capability.usage.instructions, 'Declare the request schema, then register the endpoint.');
+assert.equal(details.document.documentId, 'guide'); assert.match(details.document.text, /Validated Acme endpoint/);
+const multi = JSON.parse(run(process.execPath, ['examples/multi-provider/main.mjs'], consumer));
+assert.deepEqual(multi.nodes.map(node => node.capability.id), ['acme::route', 'shared::schema']);
+assert.deepEqual(multi.edges, [{from:'acme::route', type:'requires', to:'shared::schema'}]);
+assert.deepEqual(multi.unresolved, []); assert.equal(multi.meta.completeness, 'complete');
 const hostEnv = { HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, '.codex') };
 for (const args of [['setup', '--host', 'codex', '--config', path.join(consumer, 'config.json')], ['doctor', '--host', 'codex'], ['clean', '--host', 'codex']]) {
   const result = JSON.parse(run(process.execPath, [path.join(packageRoot, 'dist/cli/main.js'), ...args, '--json'], consumer, hostEnv)); assert.equal(result.status, 'ok');
@@ -84,6 +98,11 @@ for (const args of [['setup', '--host', 'codex', '--config', path.join(consumer,
 const bin = path.join(consumer, 'node_modules', '.bin', 'capability-graph' + (process.platform === 'win32' ? '.cmd' : ''));
 const cli = spawnSync(bin, ['doctor', '--config', path.join(consumer, 'config.json')], { cwd: consumer, encoding: 'utf8', env, timeout: 10000, shell: process.platform === 'win32' });
 assert.equal(cli.status, 0, cli.stderr); assert.equal(JSON.parse(cli.stdout).toolCount, 5);
+run(process.execPath, [path.join(source, 'scripts/check-doc-examples.mjs')], consumer, {
+  CG_DOC_CONSUMER: consumer,
+  CG_DOC_ARTIFACTS_DIR: path.join(root, 'docs-examples'),
+  CG_DOC_PACKAGE_INTEGRITY: pack.integrity
+});
 const evidence = { status: 'PASS', node: process.version, platform: process.platform, tarball, integrity: pack.integrity, files: pack.files, consumer, optionalSDKsAbsent: true, types: 'PASS (skipLibCheck=false)', runtime: runtime.trim(), bin: 'PASS', examples: 'PASS minimal/multi-provider/embedded MCP', maintenance: 'PASS installed setup/doctor/clean' };
 await fs.writeFile(path.join(root, 'evidence.json'), JSON.stringify(evidence, null, 2));
 if (process.env.CG_RELEASE_DIR) {

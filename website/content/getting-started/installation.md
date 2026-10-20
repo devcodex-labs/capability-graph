@@ -10,7 +10,7 @@
 mkdir graph-demo
 cd graph-demo
 npm init -y
-npm install @devcodex/capability-graph@2.0.0
+npm install @devcodex/capability-graph
 ```
 
 使用 .mjs 可以直接执行；.js 所在 package.json 需设置 type:module。TypeScript 使用同一 API 和包内类型，编译到 NodeNext/ESM 后运行，不需要项目源码或链接源码 node_modules。
@@ -28,7 +28,7 @@ npx --no-install capability-graph doctor --config graph.config.json
 需要跨项目使用 CLI 或为 Codex 登记服务时，可以全局安装：
 
 ```sh
-npm install --global @devcodex/capability-graph@2.0.0
+npm install --global @devcodex/capability-graph
 capability-graph doctor --config /absolute/path/graph.config.json
 ```
 

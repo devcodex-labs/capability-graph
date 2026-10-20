@@ -9,8 +9,7 @@
       "description": "Create an HTTP endpoint with request validation.",
       "whenToUse": "The application needs an HTTP endpoint with validated input.",
       "usage": { "instructions": "Declare the request schema, then register the endpoint." },
-      "relations": { "requires": ["schema"] },
-      "documents": [{ "id": "guide", "source": { "type": "file", "path": "knowledge/guide.md" } }]
+      "relations": { "requires": ["schema"] }
     },
     { "id": "schema", "name": "Request schema", "description": "Declare a schema to validate request input." }
   ]

@@ -7,10 +7,12 @@
 在你的 ESM 项目中安装依赖并复制示例，然后运行：
 
 ```sh
-npm install @devcodex/capability-graph@2.0.0 vextjs@2.0.0
+npm install @devcodex/capability-graph vextjs@2.0.0
 cp -R node_modules/@devcodex/capability-graph/examples ./examples
 node examples/vextjs/resolve.mjs
-node examples/vextjs/verify.mjs
+node --experimental-strip-types examples/vextjs/verify.mjs
 ```
 
 resolve 只读取声明，返回三节点图。verify 单独运行真实 VextJS 的 `createTestApp`，注册 `routes/hello.ts`，检查有效请求返回 greeting、空 name 返回 422，并关闭 App。422 与 2.0.0 的公开 ValidationError 类型约定一致。Graph 不加载或执行该路由。临时测试项目放在 `CG_ARTIFACTS_DIR` 或系统临时目录，临时 node_modules/vextjs 链接到该消费者真实安装的 VextJS。
+
+Node22.12.0需显式--experimental-strip-types加载随附TS路由；这是该版本实验性类型剥离功能。createTestApp使用真实框架处理链及内存模拟请求，不监听TCP端口；该检查不代替真实部署和宿主接入验证。

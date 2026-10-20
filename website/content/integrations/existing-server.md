@@ -12,7 +12,7 @@
 在你的项目安装依赖并复制示例：
 
 ```sh
-npm install @devcodex/capability-graph@2.0.0 @modelcontextprotocol/server@2.3.1
+npm install @devcodex/capability-graph @modelcontextprotocol/server@2.3.1
 cp -R node_modules/@devcodex/capability-graph/examples ./examples
 ```
 

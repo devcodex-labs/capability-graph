@@ -94,3 +94,144 @@ export interface GraphErrorShape { code: string; phase: ErrorPhase; message: str
 /tools 额外导出 GraphToolsOptions、GraphToolDefinition、ToolCallOutcome、GraphTools；/mcp 导出 McpLimits、McpHttpOptions、McpServerOptions、McpServerAddress、McpServer。两个 adapter 各自导出 OpenAIExecutorOptions、CodexExecutorOptions。
 
 GraphError 是 Error 子类，提供 code/phase/可选 nextAction 与 toJSON()；维护命令报告仅是 CLI 输出，不增加根 SDK 导出。
+
+## 子入口导入与完整声明
+
+以下定义摘自包内对应.d.ts。为便于阅读省略了相对import行：CapabilityGraph及GraphErrorShape/MatchOptions/ModelExecutor均来自根入口。下面四个子入口是公开面，内部Provider Schema/helper未因此变成导出模块。
+
+### /tools
+
+把Graph的五/六项查询交给已有Agent工具系统，定义和call借用Graph。
+
+导入路径：`@devcodex/capability-graph/tools`。所有字段和方法如下：
+
+```ts
+export interface GraphToolsOptions {
+    enableMatch?: boolean;
+}
+export interface GraphToolDefinition {
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
+}
+export type ToolCallOutcome<T = unknown> = {
+    ok: true;
+    data: T;
+} | {
+    ok: false;
+    error: GraphErrorShape;
+};
+export interface GraphTools {
+    readonly definitions: readonly GraphToolDefinition[];
+    call(name: string, arguments_?: unknown, options?: MatchOptions): Promise<ToolCallOutcome>;
+}
+export declare function createGraphTools(graph: CapabilityGraph, options?: GraphToolsOptions): GraphTools;
+```
+
+### /mcp
+
+创建MCP服务并管理传输，Graph仍由创建者关闭。
+
+导入路径：`@devcodex/capability-graph/mcp`。所有字段和方法如下：
+
+```ts
+export interface McpLimits {
+    maxBodyBytes?: number;
+    maxResponseBytes?: number;
+    maxInFlight?: number;
+    requestTimeoutMs?: number;
+    shutdownTimeoutMs?: number;
+}
+export interface McpHttpOptions {
+    host?: string;
+    port?: number;
+    path?: string;
+    access?: 'local' | 'public-readonly' | 'private';
+    auth?: {
+        type: 'none';
+    } | {
+        type: 'bearer';
+        token: string;
+    };
+    publicDocuments?: boolean;
+    allowedOrigins?: string[];
+    allowedHostnames?: string[];
+    limits?: McpLimits;
+}
+export interface McpServerOptions {
+    graph: CapabilityGraph;
+    transport: 'stdio' | 'http';
+    enableMatch?: boolean;
+    http?: McpHttpOptions;
+}
+export type McpServerAddress = {
+    transport: 'stdio';
+} | {
+    transport: 'http';
+    host: string;
+    port: number;
+    path: string;
+    url: string;
+};
+export interface McpServer {
+    start(): Promise<McpServerAddress>;
+    waitUntilClosed(): Promise<void>;
+    close(): Promise<void>;
+}
+export declare function createMcpServer(options: McpServerOptions): McpServer;
+```
+
+### /adapters/openai
+
+显式选择API模型时使用；不是宿主当前模型的前置依赖。
+
+导入路径：`@devcodex/capability-graph/adapters/openai`。所有字段和方法如下：
+
+```ts
+export interface OpenAIExecutorOptions {
+    apiKey: string;
+    model: string;
+    baseURL?: string;
+    maxOutputBytes?: number;
+    /** Trusted transport override; useful for a managed gateway or controlled tests. */
+    fetch?: typeof globalThis.fetch;
+}
+export declare function createOpenAIExecutor(options: OpenAIExecutorOptions): ModelExecutor;
+```
+
+### /adapters/codex
+
+应用独立匹配进程的配置；平台/隔离限制见对应模型页。
+
+导入路径：`@devcodex/capability-graph/adapters/codex`。所有字段和方法如下：
+
+```ts
+export interface CodexExecutorOptions {
+    /** Official native CLI executable; the verified target is 0.163.0. */
+    command?: string;
+    authHome?: string;
+    scratchRoot?: string;
+    /** Read-only installation resources, excluding business files and credentials. */
+    runtimeRoot?: string;
+    model?: string;
+    maxOutputBytes?: number;
+}
+export declare function createCodexExecutor(options?: CodexExecutorOptions): ModelExecutor;
+```
+
+### GraphError
+
+根入口的Error子类；普通异步查询reject该错误，reload候选失败另以ok:false返回。
+
+```ts
+export declare class GraphError extends Error implements GraphErrorShape {
+    readonly code: string;
+    readonly phase: ErrorPhase;
+    readonly nextAction?: NextAction;
+    constructor(code: string, phase: ErrorPhase, message: string, nextAction?: NextAction);
+    toJSON(): GraphErrorShape;
+}
+```
+
+CLI维护报告不是根入口类型，Graph不导出内部Schema；不要从包内dist私有路径导入未声明模块。

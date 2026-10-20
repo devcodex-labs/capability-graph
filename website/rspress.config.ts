@@ -4,12 +4,13 @@ import { pluginSitemap } from '@rspress/plugin-sitemap';
 
 const groups = [
   { text: '开始使用', items: [['产品与接入路线', '/getting-started/introduction'], ['安装', '/getting-started/installation'], ['第一个图谱', '/getting-started/quick-start']] },
-  { text: '使用指南', items: [['Provider 声明', '/guide/providers'], ['关系与多个 Provider', '/guide/relations'], ['Context 与适用条件', '/guide/context'], ['关联知识文件', '/guide/documents'], ['Revision 与生命周期', '/guide/lifecycle']] },
-  { text: '主动模型匹配', items: [['match 与结果处理', '/models/match'], ['OpenAI 与兼容网关', '/models/openai'], ['独立 Codex CLI', '/models/codex'], ['自定义执行器', '/models/custom']] },
-  { text: '宿主接入', items: [['完整接入清单', '/integrations/overview'], ['Codex 便捷登记', '/integrations/codex'], ['MCP stdio / HTTP', '/integrations/mcp'], ['已有 MCP Server', '/integrations/existing-server'], ['Agent Tool Adapter', '/integrations/tools'], ['Skill 与 Plugin', '/integrations/skill-plugin'], ['CLI 与维护', '/integrations/cli'], ['远程 HTTPS', '/integrations/remote']] },
+  { text: '使用指南', items: [['读取解析结果', '/guide/results'], ['Provider 声明', '/guide/providers'], ['关系与多个 Provider', '/guide/relations'], ['Context 与适用条件', '/guide/context'], ['关联知识文件', '/guide/documents'], ['Revision 与生命周期', '/guide/lifecycle']] },
+  { text: '主动模型匹配', items: [['匹配状态与结果处理', '/models/match'], ['OpenAI 与兼容网关', '/models/openai'], ['独立 Codex CLI', '/models/codex'], ['自定义执行器', '/models/custom']] },
+  { text: '宿主接入', items: [['完整接入清单', '/integrations/overview'], ['Codex 便捷登记', '/integrations/codex'], ['MCP stdio 与 HTTP', '/integrations/mcp'], ['已有 MCP Server', '/integrations/existing-server'], ['Agent Tool Adapter', '/integrations/tools'], ['Skill 与 Plugin', '/integrations/skill-plugin'], ['CLI 与维护', '/integrations/cli'], ['远程 HTTPS', '/integrations/remote']] },
   { text: 'API 参考', items: [['完整配置', '/reference/configuration'], ['SDK 方法与结果', '/reference/sdk'], ['公开类型', '/reference/types'], ['错误与恢复', '/reference/errors']] },
   { text: '示例', items: [['运行示例', '/examples/index'], ['多个 Provider', '/examples/multi-provider'], ['VextJS', '/examples/vextjs']] },
-  { text: '资源', items: [['安全与授权', '/resources/security'], ['版本与兼容', '/resources/compatibility'], ['故障排查', '/resources/troubleshooting'], ['源码开发与检查', '/resources/development'], ['维护者发版', '/resources/releasing']] },
+  { text: '排障与安全', items: [['安全与授权', '/resources/security'], ['版本与兼容', '/resources/compatibility'], ['故障排查', '/resources/troubleshooting']] },
+  { text: '维护者', items: [['源码开发与检查', '/resources/development'], ['维护者发版', '/resources/releasing']] },
 ];
 export default defineConfig({
   root: path.join(import.meta.dirname, 'content'),
@@ -21,7 +22,7 @@ export default defineConfig({
   search: { codeBlocks: true },
   builderConfig: { performance: { buildCache: false } },
   themeConfig: {
-    darkMode: false,
+    darkMode: true,
     nav: [
       { text: '指南', link: '/getting-started/introduction', activeMatch: '^/(getting-started|guide)/' },
       { text: '模型匹配', link: '/models/match', activeMatch: '^/models/' },

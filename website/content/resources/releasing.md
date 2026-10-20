@@ -40,7 +40,7 @@ GitHub Release 使用 job 的 GitHub token，无需个人 PAT。Pages 的发布�
 - plugin/plugin.json、plugin/.codex-plugin/plugin.json 的版本。
 - website/package.json、website/package-lock.json 及其根包版本。
 - src/mcp/index.ts 与 src/cli/diagnose.ts 中的协议身份版本。
-- 站点页脚、首页、llms.txt 生成器、README 和安装示例里的本包版本。
+- 站点页脚、首页、llms.txt生成器和README的版本标签；默认安装保留npm install @devcodex/capability-graph，实际版本用独立消费者核对。
 - 根 CHANGELOG.md 中本版本的 `## MAJOR.MINOR.PATCH` 段落。
 
 历史 changelogs/ 保持原样；发版说明取自新的根 CHANGELOG.md。

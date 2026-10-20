@@ -4,13 +4,15 @@ title: Capability Graph
 description: 声明能力，理解适用条件，解析显式依赖。
 ---
 
+import { CodeBlock } from '@rspress/core/theme';
+
 export const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 export const href = (path) => `${base}${path}.html`;
 
 <main className="cg-home">
   <section className="cg-hero">
     <div>
-      <p className="cg-eyebrow">STATIC JSON / SHARED GRAPH / OPTIONAL MODEL</p>
+      <p className="cg-eyebrow">声明能力 · 解析依赖 · 按需接入模型</p>
       <h1>让能力有据可查。</h1>
       <p className="cg-lead">用 JSON 描述框架、SDK 和项目已有的能力。让应用与 AI 宿主按需发现能力，读取使用说明，检查适用条件与显式依赖。</p>
       <div className="cg-actions">
@@ -19,19 +21,117 @@ export const href = (path) => `${base}${path}.html`;
       </div>
     </div>
     <aside className="cg-console" aria-label="静态查询示例">
-      <div className="cg-console-label">static.mjs · 无需模型</div>
-      <pre><code>{`const graph = await CapabilityGraph.open({
-  providers: [{ file: './provider.json' }]
-});
+      <div className="cg-console-label">保存 provider.json 后运行 · 无需模型</div>
+
+      <CodeBlock lang="js" title="static.mjs">
+
+```js
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { fileURLToPath } from 'node:url';
+
+let graph;
 try {
-  await graph.resolve({
-    ids: ['acme::route']
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }]
   });
-} finally { await graph.close(); }`}</code></pre>
-      <div className="cg-console-result">route → requires → schema</div>
+  const result = await graph.resolve({ ids: ['acme::route'] });
+  console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
+  process.exitCode = 1;
+} finally {
+  await graph?.close();
+}
+```
+
+      </CodeBlock>
+
+      <div className="cg-console-result">选中 route，展开 schema 依赖。<a href={href("/getting-started/quick-start")}>查看声明与参数说明 →</a></div>
     </aside>
   </section>
   <p className="cg-version">Capability Graph v2.0.0 · Node.js ≥22.12.0 · ESM。通过 npm 安装，按需选择静态 SDK、宿主模型或独立模型匹配。<a href={href('/getting-started/installation')}>查看安装步骤</a></p>
+  <details>
+    <summary>查看完整解析结果</summary>
+
+    <CodeBlock lang="json" title="完整解析结果">
+
+```json
+{
+  "selected": [
+    "acme::route"
+  ],
+  "nodes": [
+    {
+      "capability": {
+        "id": "acme::route",
+        "providerId": "acme",
+        "name": "Validated HTTP endpoint",
+        "description": "Create an HTTP endpoint with request validation.",
+        "whenToUse": "The application needs an HTTP endpoint with validated input.",
+        "usage": {
+          "instructions": "Declare the request schema, then register the endpoint."
+        },
+        "relations": {
+          "parents": [],
+          "specializes": [],
+          "related": [],
+          "requires": [
+            "acme::schema"
+          ]
+        },
+        "documents": []
+      },
+      "origin": "selected",
+      "applicability": {
+        "status": "applicable",
+        "missingFacts": [],
+        "invalidFacts": [],
+        "failedConditions": []
+      }
+    },
+    {
+      "capability": {
+        "id": "acme::schema",
+        "providerId": "acme",
+        "name": "Request schema",
+        "description": "Declare a schema to validate request input.",
+        "relations": {
+          "parents": [],
+          "specializes": [],
+          "related": [],
+          "requires": []
+        },
+        "documents": []
+      },
+      "origin": "dependency",
+      "applicability": {
+        "status": "applicable",
+        "missingFacts": [],
+        "invalidFacts": [],
+        "failedConditions": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "acme::route",
+      "type": "requires",
+      "to": "acme::schema"
+    }
+  ],
+  "unresolved": [],
+  "meta": {
+    "revision": "sha256:be714d7dc37a706d72862ee2d485c7c127a9f684d8124796f4fc65e786a5285a",
+    "completeness": "complete",
+    "warnings": []
+  }
+}
+```
+
+    </CodeBlock>
+
+  </details>
   <section className="cg-section">
     <h2>按你已有的环境接入</h2>
     <p>同一份声明，同一套权限与解析语义。选择适合你的模型来源和运行方式。</p>
@@ -49,6 +149,6 @@ try {
       <a className="cg-card" href={href('/guide/relations')}><h3>显式关系与依赖</h3><p>支持跨 Provider、反向查询与 requires 传递闭包，缺失目标如实返回 partial。</p></a>
       <a className="cg-card" href={href('/guide/lifecycle')}><h3>一致视图与原子更新</h3><p>静态快照不可变。reload 校验全部候选后一次发布，失败保留旧视图。</p></a>
     </div>
-    <div className="cg-link-row"><a href={href('/reference/configuration')}>完整配置</a><a href={href('/reference/sdk')}>API 参考</a><a href={href('/examples/vextjs')}>VextJS 案例</a><a href="https://github.com/devcodex-labs/capability-graph">GitHub ↗</a></div>
+    <div className="cg-link-row"><a href={href('/guide/results')}>读懂完整结果</a><a href={href('/reference/configuration')}>完整配置</a><a href={href('/reference/sdk')}>API 参考</a><a href={href('/examples/vextjs')}>VextJS 案例</a><a href="https://github.com/devcodex-labs/capability-graph">GitHub ↗</a></div>
   </section>
 </main>

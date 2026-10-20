@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "minimal-file",
+      "category": "required",
+      "page": "getting-started/quick-start.md",
+      "title": "static.mjs",
+      "source": "examples/minimal/static.mjs",
+      "assertions": [
+        "complete ResolveResult",
+        "no knowledge fixture",
+        "optional usage"
+      ]
+    },
+    {
+      "id": "minimal-inline",
+      "category": "required",
+      "page": "getting-started/quick-start.md",
+      "title": "inline.mjs",
+      "source": "examples/minimal/inline.mjs",
+      "assertions": [
+        "same complete result",
+        "no provider fixture"
+      ]
+    },
+    {
+      "id": "details",
+      "category": "required",
+      "page": "guide/results.md",
+      "title": "details.mjs",
+      "source": "examples/minimal/details.mjs",
+      "assertions": [
+        "catalog/detail/document raw results"
+      ]
+    },
+    {
+      "id": "relations",
+      "category": "required",
+      "page": "guide/relations.md",
+      "source": "examples/scenarios/relations.mjs",
+      "assertions": [
+        "embedded public example assertions",
+        "complete stdout"
+      ]
+    },
+    {
+      "id": "context",
+      "category": "required",
+      "page": "guide/context.md",
+      "source": "examples/scenarios/context.mjs",
+      "assertions": [
+        "embedded public example assertions",
+        "complete stdout"
+      ]
+    },
+    {
+      "id": "match",
+      "category": "required",
+      "page": "models/match.md",
+      "source": "examples/scenarios/match.mjs",
+      "assertions": [
+        "embedded public example assertions",
+        "complete stdout"
+      ]
+    },
+    {
+      "id": "documents",
+      "category": "required",
+      "page": "guide/documents.md",
+      "source": "examples/scenarios/documents.mjs",
+      "assertions": [
+        "embedded public example assertions",
+        "complete stdout"
+      ]
+    },
+    {
+      "id": "lifecycle",
+      "category": "required",
+      "page": "guide/lifecycle.md",
+      "source": "examples/scenarios/lifecycle.mjs",
+      "assertions": [
+        "embedded public example assertions",
+        "complete stdout"
+      ]
+    },
+    {
+      "id": "multi-provider",
+      "category": "required",
+      "page": "examples/multi-provider.md",
+      "source": "examples/multi-provider/main.mjs",
+      "assertions": [
+        "complete cross-provider result"
+      ]
+    },
+    {
+      "id": "vextjs-graph",
+      "category": "required",
+      "page": "examples/vextjs.md",
+      "source": "examples/vextjs/resolve.mjs",
+      "assertions": [
+        "three-node graph",
+        "no framework execution"
+      ]
+    },
+    {
+      "id": "mcp-stdio",
+      "category": "required",
+      "page": "integrations/mcp.md",
+      "title": "mcp-stdio.mjs",
+      "assertions": [
+        "real SDK client discovery/catalog/resolve/close"
+      ]
+    },
+    {
+      "id": "mcp-http",
+      "category": "required",
+      "page": "integrations/mcp.md",
+      "title": "mcp-http.mjs",
+      "assertions": [
+        "real HTTP client",
+        "server cleanup"
+      ]
+    },
+    {
+      "id": "graph-error",
+      "category": "expected-error",
+      "page": "reference/errors.md",
+      "title": "error.mjs",
+      "expectedCode": "CG_CAPABILITY_NOT_FOUND"
+    },
+    {
+      "id": "openai",
+      "category": "conditional",
+      "page": "models/openai.md",
+      "title": "openai.mjs",
+      "prerequisites": "Account, API key, permitted model, Responses strict; real paid requests require separate user authorization."
+    },
+    {
+      "id": "codex",
+      "category": "conditional",
+      "page": "models/codex.md",
+      "title": "codex.mjs",
+      "prerequisites": "Linux, native CLI 0.163.0, bubblewrap, trusted installation and separate login."
+    },
+    {
+      "id": "custom-model",
+      "category": "controlled",
+      "page": "models/custom.md",
+      "title": "custom-executor.mjs",
+      "source": "examples/custom-executor.mjs",
+      "prerequisites": "Controlled fetch validates transport branches; real endpoint remains separate."
+    },
+    {
+      "id": "vextjs-framework",
+      "category": "conditional",
+      "page": "examples/vextjs.md",
+      "source": "examples/vextjs/verify.mjs",
+      "prerequisites": "Separately installed vextjs@2.0.0; Node22.12 uses --experimental-strip-types."
+    },
+    {
+      "id": "plugin",
+      "category": "static",
+      "page": "integrations/skill-plugin.md",
+      "prerequisites": "Actual host installation separate from manifest/path/graph checks."
+    },
+    {
+      "id": "remote",
+      "category": "conditional",
+      "page": "integrations/remote.md",
+      "prerequisites": "Real domain, TLS, reachable endpoint, compatible host/authentication."
+    }
+  ]
+}

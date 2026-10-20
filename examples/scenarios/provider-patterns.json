@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "providerId": "patterns",
+  "name": "Illustrative declaration patterns",
+  "version": "1",
+  "description": "Teaching patterns only; authors must verify real software versions and contracts.",
+  "capabilities": [
+    { "id": "sdk.request", "name": "Send an SDK request", "description": "Use an existing SDK to submit a JSON request.", "whenToUse": "An application needs the SDK's documented request operation.", "usage": { "instructions": "Install the actual SDK, create its client and follow its request contract.", "input": "A JSON request accepted by the actual SDK.", "output": "The SDK's documented response.", "examples": ["See the actual SDK request example."], "contract": { "format": "openapi", "uri": "urn:patterns:sdk-request" } } },
+    { "id": "tool.lookup", "name": "Call an existing tool", "description": "Use a host tool to look up a record by its key.", "usage": { "instructions": "Discover the existing tool and pass its documented arguments.", "contract": { "format": "mcp-tool", "uri": "urn:patterns:lookup-tool" } } },
+    { "id": "skill.review", "name": "Follow a review skill", "description": "Follow an existing host skill to review a change.", "usage": { "instructions": "Load the installed skill and follow its review steps; Graph does not install or execute it.", "contract": { "format": "other", "uri": "urn:patterns:review-skill" } } },
+    { "id": "workflow.release", "name": "Prepare a release workflow", "description": "Prepare a release using the team's existing checks.", "usage": { "instructions": "Run the team's documented checks and obtain its release authorization." }, "relations": { "requires": ["skill.review", "sdk.request"] } }
+  ]
+}
