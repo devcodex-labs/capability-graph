@@ -40,6 +40,32 @@ test('MCP defaults apply only to omitted settings; malformed HTTP/auth/limit obj
   }
   const valid = createMcpServer({ graph, transport: 'http', http: {} }); await valid.close();
 }));
+
+test('HTTP request and shutdown timers reject values beyond the Node timer range before listening', async () => fixture(async (_root, graph) => {
+  for (const field of ['requestTimeoutMs', 'shutdownTimeoutMs'] as const) {
+    const maximum = createMcpServer({ graph, transport: 'http', http: { port: 0, limits: { [field]: 2147483647 } } }); await maximum.close();
+    for (const value of [2147483648, Number.MAX_SAFE_INTEGER]) {
+      assert.throws(() => createMcpServer({ graph, transport: 'http', http: { port: 0, limits: { [field]: value } } }), e => e instanceof GraphError && e.code === 'CG_CONFIG_INVALID' && e.phase === 'config' && e.nextAction === 'check_config');
+    }
+  }
+}));
+
+test('model recovery actions agree across SDK, Tool Adapter and actual MCP projection', async () => {
+  for (const [code, nextAction] of [['CG_MODEL_CONTEXT_EXCEEDED', 'narrow_scope'], ['CG_MODEL_OUTPUT_TOO_LARGE', 'narrow_scope'], ['CG_MODEL_REFUSED', 'fix_input'], ['CG_MODEL_INVALID_SELECTION', 'refresh'], ['CG_MODEL_UNAVAILABLE', 'check_config']] as const) {
+    const graph = await CapabilityGraph.open({ providers: [{ definition: p() }], model: { id: 'recovery', async select() { throw new GraphError(code, 'match', 'private upstream detail', nextAction); } } });
+    const server = createMcpServer({ graph, transport: 'http', enableMatch: true, http: { port: 0, limits: { requestTimeoutMs: 65000 } } });
+    const client = new Client({ name: 'recovery-consumer', version: '1' }, { versionNegotiation: { mode: { pin: '2026-07-28' } } });
+    try {
+      let sdkError: unknown;
+      await assert.rejects(graph.match({ input: 'x' }), e => { assert(e instanceof GraphError); assert.equal(e.nextAction, nextAction); assert(!e.message.includes('private')); sdkError = e.toJSON(); return true; });
+      const tool = await createGraphTools(graph, { enableMatch: true }).call('capability_graph_match', { input: 'x' }); assert(!tool.ok); assert.deepEqual(tool.error, sdkError);
+      const address = await server.start(); assert(address.transport === 'http');
+      await client.connect(new StreamableHTTPClientTransport(new URL(address.url)));
+      const mcp = await client.callTool({ name: 'capability_graph_match', arguments: { input: 'x' } }); assert(mcp.isError);
+      const text = mcp.content.find(item => item.type === 'text'); assert(text?.type === 'text'); assert.deepEqual(JSON.parse(text.text), sdkError);
+    } finally { await client.close(); await server.close(); await graph.close(); }
+  }
+});
 test('official modern HTTP publishes standalone schemas and all five real tool calls match the SDK', async () => fixture(async (_root, graph) => {
   const { server, client } = await connected(graph);
   try {

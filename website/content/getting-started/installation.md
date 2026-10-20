@@ -1,6 +1,6 @@
 # 安装
 
-本手册对应 Capability Graph **v2.0.0**。使用 Node.js >=22.12.0，支持 JavaScript/TypeScript 和 ESM。运行条件见[版本与兼容](/resources/compatibility)。
+本手册对应 Capability Graph **v2.0.1**。使用 Node.js >=22.12.0，支持 JavaScript/TypeScript 和 ESM。运行条件见[版本与兼容](/resources/compatibility)。
 
 ## 安装到你的应用
 

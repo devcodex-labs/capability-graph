@@ -1,11 +1,20 @@
 import { GraphError, fail } from './errors.js';
 import { copyJSON, bytes } from './json.js';
-import type { ModelSelection } from './types.js';
+import type { ModelSelection, NextAction } from './types.js';
 
 const modelCodes = new Set(['CG_MODEL_UNAVAILABLE', 'CG_MODEL_TIMEOUT', 'CG_MODEL_CANCELLED', 'CG_MODEL_REFUSED', 'CG_MODEL_OUTPUT_INVALID', 'CG_MODEL_OUTPUT_TOO_LARGE', 'CG_MODEL_INVALID_SELECTION', 'CG_MODEL_CONTEXT_EXCEEDED', 'CG_MODEL_EXECUTOR_UNSAFE']);
+const modelActions = new Set<NextAction>(['fix_input', 'check_config', 'refresh', 'narrow_scope', 'retry', 'contact_admin']);
+const defaultActions: Partial<Record<string, NextAction>> = {
+  CG_MODEL_CONTEXT_EXCEEDED: 'narrow_scope', CG_MODEL_OUTPUT_TOO_LARGE: 'narrow_scope',
+  CG_MODEL_REFUSED: 'fix_input', CG_MODEL_INVALID_SELECTION: 'refresh', CG_MODEL_EXECUTOR_UNSAFE: 'check_config',
+};
 export function modelFailure(error: unknown): GraphError {
-  const code = error instanceof GraphError && modelCodes.has(error.code) ? error.code : 'CG_MODEL_UNAVAILABLE';
-  return new GraphError(code, 'match', code === 'CG_MODEL_EXECUTOR_UNSAFE' ? 'Model executor cannot provide the required isolation' : 'Model selection failed', code === 'CG_MODEL_EXECUTOR_UNSAFE' ? 'check_config' : 'retry');
+  const modelError = error instanceof GraphError && modelCodes.has(error.code) ? error : undefined;
+  const code = modelError?.code ?? 'CG_MODEL_UNAVAILABLE';
+  // Keep validated recovery guidance without forwarding arbitrary executor messages.
+  const action = modelError?.nextAction;
+  const nextAction = action !== undefined && modelActions.has(action) ? action : defaultActions[code] ?? 'retry';
+  return new GraphError(code, 'match', code === 'CG_MODEL_EXECUTOR_UNSAFE' ? 'Model executor cannot provide the required isolation' : 'Model selection failed', nextAction);
 }
 export function validateSelection(value: unknown, candidates: ReadonlySet<string>, maximum: number): ModelSelection {
   const data = copyJSON(value, 'CG_MODEL_OUTPUT_INVALID', 'match') as Record<string, unknown>;

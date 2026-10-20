@@ -56,10 +56,15 @@ export function createOpenAIExecutor(options: OpenAIExecutorOptions): ModelExecu
       try {
         const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}), fetch: boundedFetch, maxRetries: 0, logLevel: 'off' });
         const response = await client.responses.create({ model, instructions: selectionInstructions, input: selectionInput(request), store: false, text: { format: { type: 'json_schema', name: 'capability_selection', strict: true, schema: modelWireSchema } } }, { signal: request.signal });
-        if (!response || !Array.isArray(response.output) || response.output.some(item => !item || item.type === 'message' && !Array.isArray(item.content))) fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model response has an invalid output envelope', 'retry');
-        if (response.output.some(item => item.type === 'message' && item.content.some(part => part.type === 'refusal'))) fail('CG_MODEL_REFUSED', 'match', 'Model refused the selection request', 'fix_input');
-        if (response.status === 'incomplete') fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model response is incomplete', 'retry');
-        const text = response.output.filter(item => item.type === 'message').flatMap(item => item.content).filter(part => part.type === 'output_text').map(part => part.text).join('');
+        // A parsable selection is not final when generation failed or is still running.
+        if (response?.status === 'failed') fail('CG_MODEL_UNAVAILABLE', 'match', 'Model response generation failed', 'retry');
+        if (response?.status === 'cancelled') fail('CG_MODEL_CANCELLED', 'match', 'Model response generation was cancelled', 'retry');
+        if (!response || response.status !== 'completed' || response.error !== null) fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model response must be completed without an error', 'retry');
+        if (!Array.isArray(response.output) || response.output.some(item => !item || typeof item !== 'object' || Array.isArray(item) || item.type === 'message' && !Array.isArray(item.content))) fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model response has an invalid output envelope', 'retry');
+        const content = response.output.filter(item => item.type === 'message').flatMap(item => item.content);
+        if (content.some(part => !part || typeof part !== 'object' || Array.isArray(part) || (part.type === 'output_text' ? typeof part.text !== 'string' : part.type === 'refusal' ? typeof part.refusal !== 'string' : true))) fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model response has invalid message content', 'retry');
+        if (content.some(part => part.type === 'refusal')) fail('CG_MODEL_REFUSED', 'match', 'Model refused the selection request', 'fix_input');
+        const text = content.filter(part => part.type === 'output_text').map(part => part.text).join('');
         if (Buffer.byteLength(text, 'utf8') > maximum) fail('CG_MODEL_OUTPUT_TOO_LARGE', 'match', 'Model output exceeds its byte budget', 'narrow_scope');
         let wire: unknown;
         try { wire = JSON.parse(text); } catch { fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model did not return valid selection JSON', 'retry'); }
@@ -68,6 +73,8 @@ export function createOpenAIExecutor(options: OpenAIExecutorOptions): ModelExecu
       } catch (error) {
         if (error instanceof GraphError) throw error;
         if (request.signal.aborted) throw request.signal.reason instanceof GraphError ? request.signal.reason : new GraphError('CG_MODEL_CANCELLED', 'match', 'Model request cancelled', 'retry');
+        // The SDK decorates output before returning it; malformed content can fail there first.
+        if (error instanceof TypeError) fail('CG_MODEL_OUTPUT_INVALID', 'match', 'Model response could not be decoded', 'retry');
         const details = error as { code?: string; name?: string; cause?: unknown };
         if (details.cause instanceof GraphError) throw details.cause;
         if (details.code === 'context_length_exceeded' || details.code === 'context_window_exceeded') fail('CG_MODEL_CONTEXT_EXCEEDED', 'match', 'Model context limit exceeded', 'narrow_scope');

@@ -95,8 +95,9 @@ const hostEnv = { HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, '.c
 for (const args of [['setup', '--host', 'codex', '--config', path.join(consumer, 'config.json')], ['doctor', '--host', 'codex'], ['clean', '--host', 'codex']]) {
   const result = JSON.parse(run(process.execPath, [path.join(packageRoot, 'dist/cli/main.js'), ...args, '--json'], consumer, hostEnv)); assert.equal(result.status, 'ok');
 }
-const bin = path.join(consumer, 'node_modules', '.bin', 'capability-graph' + (process.platform === 'win32' ? '.cmd' : ''));
-const cli = spawnSync(bin, ['doctor', '--config', path.join(consumer, 'config.json')], { cwd: consumer, encoding: 'utf8', env, timeout: 10000, shell: process.platform === 'win32' });
+// Fixed relative shell arguments keep user-controlled directory names out of cmd parsing.
+const bin = path.join('node_modules', '.bin', 'capability-graph' + (process.platform === 'win32' ? '.cmd' : ''));
+const cli = spawnSync(bin, ['doctor', '--config', 'config.json'], { cwd: consumer, encoding: 'utf8', env, timeout: 10000, shell: process.platform === 'win32' });
 assert.equal(cli.status, 0, cli.stderr); assert.equal(JSON.parse(cli.stdout).toolCount, 5);
 run(process.execPath, [path.join(source, 'scripts/check-doc-examples.mjs')], consumer, {
   CG_DOC_CONSUMER: consumer,

@@ -1,6 +1,6 @@
 # 按任务查能力
 
-从你要完成的任务出发，找到使用指南和可运行示例。这里按当前 2.0.0 的公开功能组织；类型与参数的精确形状见 [SDK](/reference/sdk) 和[公开类型](/reference/types)。
+从你要完成的任务出发，找到使用指南和可运行示例。这里按当前 2.0.1 的公开功能组织；类型与参数的精确形状见 [SDK](/reference/sdk) 和[公开类型](/reference/types)。
 
 首次使用推荐[第一个图谱](/getting-started/quick-start)；本地 Codex 用户可直接走[客户端接入教程](/integrations/codex)。示例路径相对安装包根目录，复制方式见[运行示例](/examples/index)。
 

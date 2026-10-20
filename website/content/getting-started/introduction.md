@@ -14,7 +14,7 @@ Capability Graph 是静态 JSON 声明驱动的能力图谱引擎。Provider 作
 
 Provider 声明、用户请求、模型输出和知识正文都是待校验的数据。Graph 不自动探测项目事实，不做 RAG、Embedding、关键词 Matcher、数据库、Agent Runtime 或能力执行。
 
-本手册对应 **v2.0.0**。运行环境、MCP 协议和各接入方式的条件见[版本与兼容](/resources/compatibility)。
+本手册对应 **v2.0.1**。运行环境、MCP 协议和各接入方式的条件见[版本与兼容](/resources/compatibility)。
 
 ## 完整接入清单
 

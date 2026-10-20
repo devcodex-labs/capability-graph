@@ -42,4 +42,4 @@ jobs:
           CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-artifacts
       - run: npm run smoke:package
         env:
-          CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability-graph-artifacts
+          CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability graph 中文 artifacts

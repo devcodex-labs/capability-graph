@@ -55,11 +55,11 @@ npm test
 npm run smoke:package
 ```
 
-版本、文档和测试提交推送至 main 后，以 2.0.0 为例：
+版本、文档和测试提交推送至 main 后，以 2.0.1 为例：
 
 ```sh
-git tag -a v2.0.0 -m "Release v2.0.0"
-git push origin v2.0.0
+git tag -a v2.0.1 -m "Release v2.0.1"
+git push origin v2.0.1
 ```
 
 仅推送 tag 会触发正式发布；工作流不自行创建 tag。预发布版本 tag 暂不支持，格式错误或版本不一致会在发布前失败。

@@ -73,6 +73,10 @@ try {
 
 SDK只发送本次input、Context、授权精简Catalog、Revision；Responses请求使用text.format的json_schema/strict、store:false并关闭自动重试，不自动读取知识正文。默认遵循系统CA及代理。
 
+选择结果只接受顶层 `status:'completed'` 且 `error:null` 的最终响应；兼容网关也必须提供这两个字段。`failed` 返回 `CG_MODEL_UNAVAILABLE`，`cancelled` 返回 `CG_MODEL_CANCELLED`；排队、生成中、不完整、未知或缺失状态，以及完成响应中的异常错误字段，都返回 `CG_MODEL_OUTPUT_INVALID`。即使输出包含合法选择JSON，也不会把这些响应当作成功匹配；适配器不轮询后台任务。
+
+消息内容还会检查元素及文本类型：畸形内容返回 `CG_MODEL_OUTPUT_INVALID`，合法拒绝返回 `CG_MODEL_REFUSED`。按错误的 `nextAction` 调整输入、配置或决定重试，不能仅因HTTP为200就认为生成成功。
+
 CLI JSON 使用 model:{type:'openai',apiKeyEnv:'CG_MODEL_API_KEY',model:'你可用的模型'}；环境变量名称由配置决定，不把明文 Key 写入 JSON。
 
 baseURL 不能把 Chat Completions 自动变成 Responses。内置适配器不提供 Chat Completions、xAI 预设或格式自动降级，可在[自定义执行器](/models/custom)中对接现有调用。

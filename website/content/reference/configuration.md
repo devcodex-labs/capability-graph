@@ -85,8 +85,8 @@ createMcpServer({graph,transport,enableMatch?,http?}) 的 graph/transport 必填
 | limits.maxBodyBytes | 正安全整数 | 1048576 |
 | limits.maxResponseBytes | 正安全整数 | 20971520 |
 | limits.maxInFlight | 正安全整数 | 32 |
-| limits.requestTimeoutMs | 正安全整数 | 30000；HTTP enableMatch 时必须显式 >=65000，推荐 75000 |
-| limits.shutdownTimeoutMs | 正安全整数 | 5000 |
+| limits.requestTimeoutMs | 整数1–2147483647（毫秒） | 30000；HTTP enableMatch 时必须显式 >=65000，推荐 75000 |
+| limits.shutdownTimeoutMs | 整数1–2147483647（毫秒） | 5000；超出范围在服务监听前报 CG_CONFIG_INVALID |
 
 public-readonly 必须显式 Graph 授权，禁止 enableMatch。HTTP 服务不自行提供 TLS/OAuth。stdio 的 stdout 仅协议；同一 API 的 http 字段不改变 stdio 本身的进程传输。
 

@@ -4,6 +4,8 @@ SDK 使用 GraphError reject，字段 code/phase/message/可选 nextAction，toJ
 
 Tool Adapter 以 ok:false/error 返回；MCP 执行错误 isError:true，文本内容为机器可读 JSON，没有冒充成功的 structuredContent。协议请求错误由 MCP SDK 处理。静态空目录、no_match、unknown、partial 与异常不同。
 
+模型执行器抛出的受支持 `GraphError` 会保留合法 `nextAction`，同时清洗原始错误消息。缺失或非法动作按错误码回退：上下文/输出超限为 `narrow_scope`，拒绝为 `fix_input`，选择ID无效为 `refresh`，隔离前提不足为 `check_config`，其他模型错误为 `retry`。配置错误可显式返回 `check_config`，暂时不可用可返回 `retry`；未知错误码或普通异常不能携带自定义动作穿透到调用方。SDK、Tool与MCP使用同一投影语义。
+
 | 错误码 | 触发与处理 |
 | --- | --- |
 | CG_CONFIG_INVALID | 来源、预算、认证、CLI 配置或服务条件无效；检查完整路径和类型 |

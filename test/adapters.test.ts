@@ -4,6 +4,7 @@ import { CapabilityGraph, GraphError } from '../src/index.js';
 import { createOpenAIExecutor } from '../src/adapters/openai.js';
 import { createCodexExecutor } from '../src/adapters/codex.js';
 import type { ModelExecutor } from '../src/index.js';
+import type { Response as OpenAIResponse } from 'openai/resources/responses/responses';
 
 const graph = (model: ModelExecutor) => CapabilityGraph.open({ providers: [{ definition: { providerId: 'acme', name: 'Acme', version: '1', capabilities: [{ id: 'route', name: 'Route', description: 'HTTP routes' }] } }], model });
 const error = (code: string) => (e: unknown) => e instanceof GraphError && e.code === code;
@@ -48,4 +49,45 @@ test('Codex adapter rejects unsupported platforms or a missing CLI before starti
   const g = await graph(createCodexExecutor({ command: '/definitely-absent-codex-cli', scratchRoot: process.env.CG_TEST_DIR! }));
   await assert.rejects(g.match({ input: 'x' }), error(process.platform === 'linux' ? 'CG_MODEL_UNAVAILABLE' : 'CG_MODEL_EXECUTOR_UNSAFE')); await g.close();
   assert.throws(() => createCodexExecutor({ maxOutputBytes: 0 }), error('CG_CONFIG_INVALID'));
+});
+
+const completeResponse = {
+  id: 'resp_boundary', object: 'response', created_at: 1, access_programs: null,
+  output_text: JSON.stringify(wire), status: 'completed', error: null, incomplete_details: null,
+  instructions: null, metadata: {}, model: 'controlled', parallel_tool_calls: false,
+  temperature: 1, tool_choice: 'auto', tools: [], top_p: 1,
+  output: [{ type: 'message', role: 'assistant', id: 'msg_boundary', status: 'completed', content: [{ type: 'output_text', text: JSON.stringify(wire), annotations: [], logprobs: [] }] }],
+} satisfies OpenAIResponse;
+
+for (const [label, overrides, code] of [
+  ['failed', { status: 'failed', error: { code: 'server_error', message: 'private upstream detail' } }, 'CG_MODEL_UNAVAILABLE'],
+  ['cancelled', { status: 'cancelled' }, 'CG_MODEL_CANCELLED'],
+  ['queued', { status: 'queued' }, 'CG_MODEL_OUTPUT_INVALID'],
+  ['in progress', { status: 'in_progress' }, 'CG_MODEL_OUTPUT_INVALID'],
+  ['incomplete', { status: 'incomplete' }, 'CG_MODEL_OUTPUT_INVALID'],
+  ['unknown status', { status: 'unknown' }, 'CG_MODEL_OUTPUT_INVALID'],
+  ['missing status', { status: undefined }, 'CG_MODEL_OUTPUT_INVALID'],
+  ['completed with error', { error: { code: 'server_error', message: 'private upstream detail' } }, 'CG_MODEL_OUTPUT_INVALID'],
+  ['missing error field', { error: undefined }, 'CG_MODEL_OUTPUT_INVALID'],
+] as const) test(`OpenAI final response rejects ${label} even with valid selection output`, async () => {
+  let calls = 0;
+  const g = await graph(createOpenAIExecutor({ apiKey: 'synthetic', model: 'controlled', fetch: async () => { calls++; return Response.json({ ...completeResponse, ...overrides }); } }));
+  try { await assert.rejects(g.match({ input: 'x' }), e => error(code)(e) && !(e as Error).message.includes('private')); assert.equal(calls, 1); }
+  finally { await g.close(); }
+});
+
+for (const [label, content] of [
+  ['null', [null]], ['primitive', [7]], ['missing type', [{}]],
+  ['invalid text', [{ type: 'output_text', text: 7 }]],
+  ['invalid refusal', [{ type: 'refusal', refusal: null }]],
+  ['unknown type', [{ type: 'unknown', text: JSON.stringify(wire) }]],
+] as const) test(`OpenAI malformed content ${label} is output-invalid`, async () => {
+  const envelope = { ...completeResponse, output: [{ ...completeResponse.output[0], content }] };
+  const g = await graph(createOpenAIExecutor({ apiKey: 'synthetic', model: 'controlled', fetch: async () => Response.json(envelope) }));
+  try { await assert.rejects(g.match({ input: 'x' }), error('CG_MODEL_OUTPUT_INVALID')); } finally { await g.close(); }
+});
+
+test('OpenAI transport TypeError remains unavailable rather than a decoded-output failure', async () => {
+  const g = await graph(createOpenAIExecutor({ apiKey: 'synthetic', model: 'controlled', fetch: async () => { throw new TypeError('private network detail'); } }));
+  try { await assert.rejects(g.match({ input: 'x' }), e => error('CG_MODEL_UNAVAILABLE')(e) && !(e as Error).message.includes('private')); } finally { await g.close(); }
 });

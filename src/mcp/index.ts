@@ -36,6 +36,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   const limits = { ...defaults };
   for (const [key, value] of Object.entries(http.limits ?? {})) {
     if (!Object.hasOwn(limits, key) || !Number.isSafeInteger(value) || value <= 0) fail('CG_CONFIG_INVALID', 'config', 'MCP limits must be known positive safe integers', 'check_config');
+    if ((key === 'requestTimeoutMs' || key === 'shutdownTimeoutMs') && value > 2147483647) fail('CG_CONFIG_INVALID', 'config', 'MCP timeouts must not exceed 2147483647 milliseconds', 'check_config');
     limits[key as keyof typeof limits] = value;
   }
   if (!Number.isInteger(port) || port < 0 || port > 65535 || typeof host !== 'string' || !host || typeof route !== 'string' || !route.startsWith('/') || /[?#]/.test(route) || !['local', 'public-readonly', 'private'].includes(access) || http.publicDocuments !== undefined && typeof http.publicDocuments !== 'boolean') fail('CG_CONFIG_INVALID', 'config', 'Invalid MCP HTTP endpoint or access mode', 'check_config');
@@ -61,7 +62,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   }
   const token = auth.type === 'bearer' ? Buffer.from(auth.token, 'utf8') : undefined;
   const factory = () => {
-    const server = new Server({ name: 'capability-graph', version: '2.0.0' }, { capabilities: { tools: {} }, supportedProtocolVersions: options.transport === 'stdio' ? ['2026-07-28', '2025-06-18'] : ['2026-07-28'] });
+    const server = new Server({ name: 'capability-graph', version: '2.0.1' }, { capabilities: { tools: {} }, supportedProtocolVersions: options.transport === 'stdio' ? ['2026-07-28', '2025-06-18'] : ['2026-07-28'] });
     server.setRequestHandler('tools/list', async () => ({ tools: tools.definitions.map(t => ({ ...t, inputSchema: t.inputSchema as { type: 'object' }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: !t.name.endsWith('_match'), openWorldHint: t.name.endsWith('_match') } })) }));
     server.setRequestHandler('tools/call', async (request, ctx) => {
       const name = request.params.name;

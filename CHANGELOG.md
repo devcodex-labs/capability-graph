@@ -1,5 +1,13 @@
 # Capability Graph
 
+## 2.0.1
+
+- OpenAI Responses 匹配只接受 `status: 'completed'` 且 `error: null` 的最终响应，正确区分失败、取消、非最终状态与畸形消息内容。兼容网关也须提供这两个字段。
+- 保留受支持模型错误中合法的 `nextAction`，继续清洗原始错误消息，并为缺失或非法动作提供按错误码选择的默认值；SDK、Tool Adapter 与 MCP 保持一致。
+- HTTP 请求与关闭超时限制为 1–2147483647 毫秒，在监听前拒绝会导致 Node 定时器溢出的配置。
+- 修复 Windows npm bin 验收对空格及中文目录的处理，CI 持续覆盖该路径。
+- 改进英文 README、文档导航、搜索样式、能力文档索引、本地文档与 URL 示例，以及 Codex 宿主接入教程。
+
 ## 2.0.0
 
 Capability Graph 以静态 JSON 声明为基础，提供供应用和 AI 宿主使用的能力目录、详情、适用条件与依赖图。

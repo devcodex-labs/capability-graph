@@ -36,7 +36,7 @@ export default defineConfig({
     ],
     sidebar: { '/': groups },
     socialLinks: [{ icon: 'github', mode: 'link', content: 'https://github.com/devcodex-labs/capability-graph' }],
-    footer: { message: 'Apache-2.0 · Capability Graph v2.0.0' },
+    footer: { message: 'Apache-2.0 · Capability Graph v2.0.1' },
     lastUpdated: true,
   },
 });

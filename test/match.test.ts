@@ -110,3 +110,26 @@ test('match rejects explicit invalid timeout values before calling a borrowed ex
     assert.equal((await graph.match({ input: 'route' })).status, 'no_match'); assert.equal(calls, 1);
   } finally { await graph.close(); }
 });
+
+for (const [code, expected] of [
+  ['CG_MODEL_CONTEXT_EXCEEDED', 'narrow_scope'], ['CG_MODEL_OUTPUT_TOO_LARGE', 'narrow_scope'],
+  ['CG_MODEL_REFUSED', 'fix_input'], ['CG_MODEL_INVALID_SELECTION', 'refresh'],
+  ['CG_MODEL_EXECUTOR_UNSAFE', 'check_config'], ['CG_MODEL_UNAVAILABLE', 'retry'],
+] as const) test(`model error ${code} preserves valid actions and defaults safely`, async () => {
+  for (const nextAction of [expected, undefined, 'not_an_action']) {
+    const g = await create({ id: 'recovery', async select() { throw new GraphError(code, 'match', 'private prompt and token', nextAction as any); } });
+    try { await assert.rejects(g.match({ input: 'x' }), e => {
+      assert(e instanceof GraphError); assert.equal(e.code, code); assert.equal(e.phase, 'match');
+      assert.equal(e.nextAction, expected); assert(!e.message.includes('private')); return true;
+    }); } finally { await g.close(); }
+  }
+});
+
+test('model unavailable retains configuration guidance while unknown errors cannot supply an action', async () => {
+  for (const [code, supplied, expected] of [['CG_MODEL_UNAVAILABLE', 'check_config', 'check_config'], ['CG_NOT_ALLOWED', 'contact_admin', 'retry']] as const) {
+    const g = await create({ id: 'recovery', async select() { throw new GraphError(code, 'match', 'private upstream detail', supplied); } });
+    try { await assert.rejects(g.match({ input: 'x' }), e => {
+      assert(e instanceof GraphError); assert.equal(e.code, 'CG_MODEL_UNAVAILABLE'); assert.equal(e.nextAction, expected); assert(!e.message.includes('private')); return true;
+    }); } finally { await g.close(); }
+  }
+});
