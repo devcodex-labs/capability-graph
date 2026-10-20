@@ -17,7 +17,18 @@ export const href = (path) => `${base}${path}.html`;
       <p className="cg-lead">用 JSON 描述框架、SDK 和项目已有的能力。让应用与 AI 宿主按需发现能力，读取使用说明，检查适用条件与显式依赖。</p>
       <div className="cg-actions">
         <a className="cg-button cg-primary" href={href('/getting-started/quick-start')}>开始使用 →</a>
-        <a className="cg-button" href={href('/integrations/overview')}>选择接入方式</a>
+        <a className="cg-button" href={href('/getting-started/introduction')}>选择接入方式</a>
+      </div>
+      <div className="cg-install" aria-label="安装 Capability Graph">
+
+        <CodeBlock lang="sh" title="在你的应用项目中安装">
+
+```sh
+npm install @devcodex/capability-graph
+```
+
+        </CodeBlock>
+
       </div>
     </div>
     <aside className="cg-console" aria-label="静态查询示例">

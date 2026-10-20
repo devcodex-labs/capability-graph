@@ -14,6 +14,7 @@ cp -R node_modules/@devcodex/capability-graph/examples ./examples
 | 文件式最小图谱 | node examples/minimal/static.mjs | 无模型/无知识文件；读取 provider.json，输出完整 ResolveResult |
 | 内联式最小图谱 | node examples/minimal/inline.mjs | 无外部文件；同一声明与文件式产生相同完整结果 |
 | 目录、详情与知识正文 | node examples/minimal/details.mjs | 使用 details.provider.json 及随附 knowledge/guide.md；输出完整 catalog/details/document |
+| 本地文档与 URL 引用 | node examples/documents/read.mjs | 读取 knowledge/route.md，取得 URL 引用，并展示 URL 正文读取被拒绝 |
 | 多 Provider | node examples/multi-provider/main.mjs | 无模型；acme::route requires shared::schema，完整两节点子图 |
 | 已有 MCP Server | MCP 客户端启动 node examples/mcp/server.mjs | 另装官方 server SDK；ping、资源、Prompt 保留，Graph 工具可调用 |
 | 自定义模型 | node examples/custom-executor.mjs | 应用已有 HTTPS 模型及环境变量；真实端点由调用方验证 |

@@ -81,7 +81,7 @@ for (const item of manifest.cases) {
     results.push({...evidence, status: 'NOT_RUN', staticSyntax: target ? 'PASS' : 'N/A'});
     continue;
   }
-  if (item.id === 'mcp-http') continue;
+  if (['mcp-http', 'mcp-private'].includes(item.id)) continue;
   if (item.category === 'controlled') {
     const preload = path.join(fixture, 'controlled-fetch.mjs');
     await fs.writeFile(preload, '(' + controlledFetch.toString() + ')();\n');
@@ -105,6 +105,12 @@ for (const item of manifest.cases) {
     await fs.writeFile(path.join(fixture, 'provider.json'), provider);
     await fs.writeFile(path.join(fixture, 'graph.config.json'), quick.find(block => block.title === 'graph.config.json').code);
   }
+  if(item.id==='codex-host'){
+    for(const [title,relative] of [['provider.json','provider.json'],['graph.config.json','graph.config.json'],['knowledge/route.md','knowledge/route.md']]){
+      const literal=codeBlocks.find(block=>block.title===title);assert(literal,'Missing standalone Codex material '+title);
+      await fs.writeFile(path.join(fixture,'examples/codex-host',relative),literal.code.replace(/\r\n/g,'\n')+'\n');
+    }
+  }
   const result = await run(item.id, target ?? path.join(fixture, item.source),
     item.id === 'minimal-file' ? minimalDir : item.id === 'minimal-inline' ? inlineDir : fixture,
     item.category === 'expected-error' ? 1 : 0);
@@ -126,7 +132,49 @@ for (const item of manifest.cases) {
     if (item.id === 'details') {
       assert.equal(value.document.documentId, 'guide'); assert(value.details.items[0].capability.usage);
     }
+    if (item.id === 'document-references') {
+      assert.equal(value.local.text, 'Declare the request schema, then register the endpoint.\n');
+      assert.equal(value.local.source.path, 'knowledge/route.md');
+      assert.deepEqual(value.upstream.source, {type:'url', url:'https://example.com/guide'});
+      assert.deepEqual(value.urlReadError, {code:'CG_DOCUMENT_REFERENCE_ONLY', phase:'document'});
+      const displayed = codeBlocks.filter(block => block.language === 'json').map(block => JSON.parse(block.code));
+      assert(displayed.some(output => JSON.stringify(output) === JSON.stringify(value)), 'Document output drift');
+    }
     if (item.id === 'mcp-stdio') assert.deepEqual(value.structuredContent, minimal);
+    if (item.id === 'codex-host') {
+      assert.deepEqual(value.providerIds, ['acme']);
+      assert.deepEqual(value.catalogIds, ['acme::route','acme::schema']);
+      assert.deepEqual(value.selected, ['acme::route']);
+      assert.deepEqual(value.nodeIds, ['acme::route','acme::schema']);
+      assert.equal(value.completeness, 'complete');
+      assert.equal(value.documentText, await fs.readFile(path.join(fixture,'examples/codex-host/knowledge/route.md'),'utf8'));
+      const displayed=codeBlocks.filter(block=>block.language==='json').map(block=>JSON.parse(block.code));
+      assert(displayed.some(output=>JSON.stringify(output)===JSON.stringify(value)),'Codex summary output drift');
+      const full=JSON.parse((await run('codex-host-full',target,fixture,0,{},[],['--full'])).stdout);
+      assert.deepEqual(full.resolved.selected,value.selected);assert.equal(full.document.text,value.documentText);
+      assert.equal(full.resolved.meta.completeness,'complete');assert(full.details.items[0].capability.usage);
+      const isolatedHome=await fs.mkdtemp(path.join(fixture,'codex-home-'));
+      const isolatedEnv={HOME:isolatedHome,USERPROFILE:isolatedHome,CODEX_HOME:path.join(isolatedHome,'.codex')};
+      const cliFile=path.join(packageRoot,'dist/cli/main.js');
+      const configFile=path.join(fixture,'examples/codex-host/graph.config.json');
+      const invoke=(id,args)=>run(id,cliFile,fixture,0,isolatedEnv,[],[...args,'--json']);
+      const preview=JSON.parse((await invoke('codex-setup-preview',['setup','--host','codex','--config',configFile,'--dry-run'])).stdout);
+      assert.equal(preview.status,'planned');assert.equal(preview.changed,false);
+      assert(preview.paths.every(file=>path.resolve(file).startsWith(isolatedHome+path.sep)),'Host path escaped isolated HOME');
+      try {
+        const setup=JSON.parse((await invoke('codex-setup',['setup','--host','codex','--config',configFile])).stdout);
+        assert.equal(setup.status,'ok');assert.equal(setup.changed,true);
+        const doctor=JSON.parse((await invoke('codex-host-doctor',['doctor','--host','codex'])).stdout);
+        assert.equal(doctor.status,'ok');assert(doctor.checks.some(check=>check.status==='pass'));
+        const plan=JSON.parse((await invoke('codex-clean-preview',['clean','--host','codex','--dry-run'])).stdout);
+        assert.equal(plan.status,'planned');assert.equal(plan.changed,false);
+      } finally {
+        const cleaned=JSON.parse((await invoke('codex-clean',['clean','--host','codex'])).stdout);
+        assert.equal(cleaned.status,'ok');
+      }
+      await assert.rejects(fs.stat(path.join(isolatedHome,'.agents/skills/capability-discovery/SKILL.md')),{code:'ENOENT'});
+      await fs.writeFile(path.join(artifacts,'codex-host-isolation.json'),JSON.stringify({isolatedHome,realHostChanges:0,modelRequests:0,ownedSkillRemoved:true,doctor:'PASS'}));
+    }
   }
   results.push({...evidence, status: 'PASS', exitCode: result.exitCode});
 }
@@ -190,11 +238,50 @@ try {
   assert(released, 'HTTP example service was not released');
 }
 const pluginBlocks = blocks(await readPage('integrations/skill-plugin.md'));
+// Run the exact private-client page code while the service stays on this event loop.
+const privateGraph = await CapabilityGraph.open({providers:[{file:path.join(fixture,'provider.json')}], allowedProviders:['acme']});
+const privateToken = 'local-doc-auth-fixture';
+const privateServer = createMcpServer({graph:privateGraph, transport:'http', http:{port:0, access:'private', auth:{type:'bearer',token:privateToken}}});
+let privatePort;
+try {
+  const address = await privateServer.start(); privatePort = new URL(address.url).port;
+  await fs.writeFile(path.join(artifacts,'private-service.json'), JSON.stringify({command:process.execPath+' scripts/check-doc-examples.mjs',cwd:source,pid:process.pid,port:privatePort,url:address.url}));
+  const outcomes = [];
+  for (const [mode,token,expected] of [['valid',privateToken,0],['missing','',1],['wrong','wrong-local-fixture',1]]) {
+    const output = await new Promise((resolve,reject) => {
+      const child=spawn(process.execPath,[path.join(fixture,'mcp-private.mjs')],{cwd:fixture,env:{...process.env,CG_MCP_URL:address.url,CG_MCP_TOKEN:token},stdio:['ignore','pipe','pipe']});
+      let stdout='',stderr='';
+      const timer=setTimeout(()=>{child.kill();reject(new Error('Private client timed out'));},30000);
+      child.stdout.on('data',bytes=>{stdout+=bytes;});child.stderr.on('data',bytes=>{stderr+=bytes;});
+      child.once('error',error=>{clearTimeout(timer);reject(error);});
+      child.once('close',exitCode=>{clearTimeout(timer);resolve({stdout,stderr,exitCode});});
+    });
+    await fs.writeFile(path.join(artifacts,'private-'+mode+'.stdout.json'),output.stdout);
+    await fs.writeFile(path.join(artifacts,'private-'+mode+'.stderr.txt'),output.stderr);
+    assert.equal(output.exitCode,expected,output.stderr);
+    if (!expected) {
+      assert.deepEqual(JSON.parse(output.stdout).structuredContent,minimal);
+      const toolLine=output.stderr.match(/capability_graph_\w+/g);assert.equal(toolLine?.length,5);
+    } else {
+      assert.equal(output.stdout,'');assert.match(output.stderr,/401|Unauthorized|authentication/i);
+      const response=await fetch(address.url,{method:'POST',headers:{'content-type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:'{}'});
+      assert.equal(response.status,401);await response.body?.cancel();
+    }
+    outcomes.push({mode,exitCode:output.exitCode,...(expected?{httpStatus:401}:{tools:5,resolve:'complete'})});
+  }
+  results.push({id:'mcp-private',category:'required',status:'PASS',outcomes,realHTTPS:'NOT_RUN'});
+} finally {
+  await privateServer.close();await privateGraph.close();
+  const released=!privatePort||await new Promise(resolve=>{const socket=net.connect(Number(privatePort),'127.0.0.1');socket.once('connect',()=>{socket.destroy();resolve(false);});socket.once('error',()=>resolve(true));});
+  await fs.writeFile(path.join(artifacts,'private-cleanup.json'),JSON.stringify({pid:process.pid,port:privatePort,released}));assert(released,'Private service was not released');
+}
 const config = JSON.parse(pluginBlocks.find(block => block.title === 'plugin/graph.config.json').code);
 const marketplace = JSON.parse(pluginBlocks.find(block => block.title === '.agents/plugins/marketplace.json').code);
 assert.equal(marketplace.plugins[0].source.path, './plugin');
 assert.equal(marketplace.plugins[0].policy.installation, 'AVAILABLE');
 assert.equal(marketplace.plugins[0].policy.authentication, 'ON_INSTALL');
+assert.equal(marketplace.name, 'capability-graph-local');
+assert.equal(marketplace.plugins[0].name, 'capability-graph');
 const pluginRoot = path.join(fixture, 'marketplace');
 await fs.cp(path.join(packageRoot, 'plugin'), path.join(pluginRoot, 'plugin'), {recursive: true});
 await fs.mkdir(path.join(pluginRoot, 'providers/acme'), {recursive: true});

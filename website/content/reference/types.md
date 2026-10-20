@@ -1,6 +1,6 @@
 # 公开类型
 
-根入口导出以下类型，与当前新工程保持一致。嵌套字段语义见[方法与结果](/reference/sdk)，默认值见[配置](/reference/configuration)。
+根入口导出以下类型，与当前版本保持一致。嵌套字段语义见[方法与结果](/reference/sdk)，默认值见[配置](/reference/configuration)。
 
 <!-- source:src/types.ts -->
 ```ts

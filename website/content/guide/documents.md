@@ -1,23 +1,140 @@
-# 关联知识文件
+# 本地文档与 URL 引用
 
-Provider JSON 只放引用；长篇指南、规范和示例按需读取。
+长篇使用指南可放在本地 Markdown 文件，外部资料可登记为 HTTPS URL。它们通过能力的 `documents[].source` 关联；能力定义本身仍写在 Provider 的 `capabilities` 数组中。
+
+## 本地文件与 URL 引用的完整示例
+
+先按[安装](/getting-started/installation)准备 Node.js >=22.12.0 的项目。下面三个文件放在同一目录；也可以按[运行示例](/examples/index)复制后运行 `node examples/documents/read.mjs`，无需模型或网络请求。
+
+```text
+documents/
+├── provider.json
+├── read.mjs
+└── knowledge/
+    └── route.md
+```
+
+`provider.json` 声明同一能力的两个文档：guide 是本地文件，upstream 是外部引用。example.com 是示意资料地址，Graph 不会请求它。
+
+<!-- example:examples/documents/provider.json -->
+```json title="provider.json"
+{
+  "providerId": "acme",
+  "name": "Acme documentation",
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "id": "route",
+      "name": "Validated HTTP endpoint",
+      "description": "Create an HTTP endpoint with request validation.",
+      "documents": [
+        { "id": "guide", "title": "Local route guide", "source": { "type": "file", "path": "knowledge/route.md" } },
+        { "id": "upstream", "title": "External reference", "source": { "type": "url", "url": "https://example.com/guide" } }
+      ]
+    }
+  ]
+}
+```
+
+保存本地正文 `knowledge/route.md`：
+
+<!-- example:examples/documents/knowledge/route.md -->
+```md title="knowledge/route.md"
+Declare the request schema, then register the endpoint.
+```
+
+保存 `read.mjs`。它先通过详情取得 URL 引用，再按声明 ID 读本地正文，最后展示误读 URL 正文的明确错误。成功时 stdout 是完整的 `{local, upstream, urlReadError}` 组合对象；local 是原始 DocumentResult，upstream 是原始文档声明；其他 Graph 错误写 stderr 并以 1 退出，finally 关闭 Graph。
+
+<!-- example:examples/documents/read.mjs -->
+```js title="read.mjs"
+import { CapabilityGraph, GraphError } from '@devcodex/capability-graph';
+import { fileURLToPath } from 'node:url';
+
+let graph;
+try {
+  graph = await CapabilityGraph.open({
+    providers: [{ file: fileURLToPath(new URL('./provider.json', import.meta.url)) }]
+  });
+  const details = await graph.getCapabilities({ ids: ['acme::route'] });
+  const upstream = details.items[0].capability.documents.find(doc => doc.id === 'upstream');
+  const local = await graph.readDocument({ capabilityId: 'acme::route', documentId: 'guide' });
+  let urlReadError;
+  try {
+    await graph.readDocument({ capabilityId: 'acme::route', documentId: 'upstream' });
+    throw new Error('Expected URL reference to reject a body read');
+  } catch (error) {
+    if (!(error instanceof GraphError) || error.code !== 'CG_DOCUMENT_REFERENCE_ONLY') throw error;
+    urlReadError = { code: error.code, phase: error.phase };
+  }
+  console.log(JSON.stringify({ local, upstream, urlReadError }, null, 2));
+} catch (error) {
+  if (!(error instanceof GraphError)) throw error;
+  console.error(JSON.stringify({ code: error.code, phase: error.phase, nextAction: error.nextAction }));
+  process.exitCode = 1;
+} finally {
+  await graph?.close();
+}
+```
+
+```sh
+node read.mjs
+```
+
+| 参数 | 读取位置与含义 |
+| --- | --- |
+| `providers[].file` | 脚本旁的 provider.json，其所在目录自动成为文档根 |
+| `source.type: 'file'` 和 `path` | 根内相对文件路径；本例读取 knowledge/route.md，与运行时 cwd 无关 |
+| `source.type: 'url'` 和 `url` | HTTPS 引用，随详情返回；不自动抓取正文 |
+| `capabilityId` | 完整能力 ID acme::route |
+| `documentId` | 能力内的声明 ID guide/upstream；不是任意文件路径或 URL |
+
+以下是这个随包示例的完整 stdout。local 保留原始文档结果，包括原始字节数/哈希；upstream 保留 URL 声明，未发送网络请求。
+
+<details>
+<summary>查看本地读取和 URL 引用的完整结果</summary>
 
 ```json
-{"id":"route","name":"Route","description":"Validated route","documents":[{"id":"guide","title":"使用指南","source":{"type":"file","path":"knowledge/route.md"}},{"id":"upstream","source":{"type":"url","url":"https://example.com/guide"}}]}
+{
+  "local": {
+    "capabilityId": "acme::route",
+    "documentId": "guide",
+    "source": {
+      "type": "file",
+      "path": "knowledge/route.md"
+    },
+    "text": "Declare the request schema, then register the endpoint.\n",
+    "byteLength": 56,
+    "contentHash": "sha256:3e69d0f41c038f4daa4e31cf631cbfceda512eda5cda80127170134f55772692",
+    "meta": {
+      "revision": "sha256:68072b0cf02516d7f652b8db9b9223eaded8a52e12f3bd6022ef309861a6858f",
+      "completeness": "complete",
+      "warnings": []
+    }
+  },
+  "upstream": {
+    "id": "upstream",
+    "title": "External reference",
+    "source": {
+      "type": "url",
+      "url": "https://example.com/guide"
+    }
+  },
+  "urlReadError": {
+    "code": "CG_DOCUMENT_REFERENCE_ONLY",
+    "phase": "document"
+  }
+}
 ```
 
-file 来源的文档根固定为 Provider JSON 所在目录；内联 definition 有本地文档时必须提供 documentRoot。documentId 在所属能力内唯一，可用中文。readDocument 只能传 capabilityId/documentId，不能传任意路径。
+</details>
 
-```js
-const doc = await graph.readDocument({capabilityId:'acme::route', documentId:'guide'});
-console.log(doc.text, doc.byteLength, doc.contentHash);
-```
+本地文件不存在、无权限、不是合法 UTF-8 或超预算时，readDocument 抛相应 document 阶段错误；URL 正文读取固定为 CG_DOCUMENT_REFERENCE_ONLY。处理恢复见[错误与恢复](/reference/errors)。
 
-该片段需要先加载含 guide 声明和实际文件的 Provider，见[独立详情示例](/guide/results#读取目录详情与知识正文)；最小快速开始没有知识文件，不能直接向其 Graph 请求 guide。text 为 UTF-8，去首 BOM、保留 CRLF；byteLength 与 contentHash 依据同一次稳定读取的原始字节。默认 1 MiB，超限显式失败。
+## 本地路径边界
 
-绝对路径、父级越界、设备/驱动器/UNC 等危险形式拒绝。合法根内 symlink 可读，逃逸 symlink 拒绝；正文检查文件身份与稳定性。部署必须控制可信根与祖先目录，完整信任前提见[安全页](/resources/security)。
+文件式文档根固定为 Provider JSON 所在目录。内联 definition 若要读取本地文档，必须给该来源配置 `documentRoot`，完整对照见下方；它不是给单个 capability 配置的 path。默认正文预算 1 MiB，text 去首 BOM、保留 CRLF，byteLength/contentHash 取自同一次稳定读取的原始字节。
 
-URL 仅作引用，readDocument 报 CG_DOCUMENT_REFERENCE_ONLY，不自动抓取。文件存在性与正文合法性在读取阶段校验；不存在、非法 UTF-8、超限等各有错误。修改正文不改变静态 Graph Revision。
+绝对路径、父级越界、设备/驱动器/UNC 等危险形式拒绝。合法根内 symlink 可读，逃逸 symlink 拒绝；部署需控制可信根及祖先目录，见[安全页](/resources/security)。修改正文不改变静态 Graph Revision。
 
 ## 选择正确的文档根与读取阶段
 

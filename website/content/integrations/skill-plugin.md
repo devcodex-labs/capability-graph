@@ -1,5 +1,9 @@
 # Skill 与 Plugin
 
+当你需要通过宿主 Plugin 机制分发 Skill 与 MCP 配置时选择这条路线；只想接入自己的本地 Codex，优先使用[客户端教程](/integrations/codex)。Plugin 不包含业务 Provider，实现能力仍由你自己的软件提供。
+
+## 安装材料与配置
+
 Plugin 目录包含 Agent Plugins 1.0 的 plugin.json/mcp.json/skills 和 Codex 兼容清单。先在你的项目安装并复制 Plugin：
 
 ```sh
@@ -7,12 +11,14 @@ npm install @devcodex/capability-graph
 cp -R node_modules/@devcodex/capability-graph/plugin ./plugin
 ```
 
+PowerShell 用 `Copy-Item -LiteralPath node_modules/@devcodex/capability-graph/plugin -Destination plugin -Recurse`。工作目录为本地安装该包的项目根，复制后确认 `plugin/graph.config.json` 存在。
+
 然后配置服务和宿主：
 
 1. 在当前项目中使用 `npx --no-install capability-graph` 运行 CLI。需要直接使用 `capability-graph` 时，先执行 `npm install --global @devcodex/capability-graph`。
 2. 把包内 plugin 复制到你管理的 Plugin 目录。修改 graph.config.json，配置自己的 Provider 与明确 allowedProviders。初始为空且不暴露任何能力；不要把凭据写入这里。显式运行 `capability-graph serve --config /absolute/plugin/graph.config.json --transport http`，保持服务运行。
 3. 默认 Plugin 连接本机 `http://127.0.0.1:3333/mcp`，不会自动启动服务。便携宿主使用根 mcp.json，Codex 兼容模式使用 .mcp.json。两份文件保持相同 URL；远程部署替换实际 HTTPS 地址。便携 HTTP 声明为 `{type:'streamable-http',url}`，Codex 为 `{url}`。
-4. 将该目录加入宿主的本地 marketplace，再显式安装 Plugin。示例 marketplace 的 plugins 项为 `{name:'capability-graph',source:{source:'local',path:'./plugin'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'},category:'Productivity'}`，name 可为 capability-graph-local。路径相对于 marketplace 根。使用 `codex plugin marketplace add /absolute/marketplace-root`，然后 `codex plugin add capability-graph@capability-graph-local`。只有你显式执行这些命令才修改该宿主配置。
+4. 将该目录加入宿主的本地 marketplace，再显式安装 Plugin。marketplace 顶层 `name` 为 `capability-graph-local`；`plugins[]` 中的 `name` 为 `capability-graph`，与 Plugin 清单一致。例如 plugins 项为 `{name:'capability-graph',source:{source:'local',path:'./plugin'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'},category:'Productivity'}`。路径相对于 marketplace 根。使用 `codex plugin marketplace add /absolute/marketplace-root`，然后 `codex plugin add capability-graph@capability-graph-local`；安装 ID 为 `插件名@marketplace名`。只有你显式执行这些命令才修改该宿主配置。
 5. 用 capability-discovery Skill 执行目录→语义选择→resolve，检查 partial/unknown 和 Revision。Codex CLI 0.163.0 需要 `-c features.mcp_2026_07_28=true`；其他宿主版本请确认其 HTTP 协议配置。宿主需要能只读读取已安装 SKILL.md。默认 server 不调用模型。
 
 Codex Plugin 使用 HTTP。Codex Plugin 的 stdio 模式不在 v2.0.0 支持范围内；需要 stdio 时使用 [setup 登记](/integrations/codex)。其他 MCP 客户端的 stdio 配置见 [MCP](/integrations/mcp)。

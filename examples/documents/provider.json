@@ -1,0 +1,16 @@
+{
+  "providerId": "acme",
+  "name": "Acme documentation",
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "id": "route",
+      "name": "Validated HTTP endpoint",
+      "description": "Create an HTTP endpoint with request validation.",
+      "documents": [
+        { "id": "guide", "title": "Local route guide", "source": { "type": "file", "path": "knowledge/route.md" } },
+        { "id": "upstream", "title": "External reference", "source": { "type": "url", "url": "https://example.com/guide" } }
+      ]
+    }
+  ]
+}

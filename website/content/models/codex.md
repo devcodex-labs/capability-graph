@@ -8,7 +8,7 @@
 
 1. 安装固定版本原生 CLI 与 bubblewrap，准备只含可信 CLI 资源的 runtimeRoot。
 2. 用独立 CODEX_HOME 运行该 CLI 的 login --device-auth，浏览器授权后 login status 检查。authHome 由你管理，不复制登录文件进项目。
-3. 创建独立 scratchRoot，传入 createCodexExecutor，并配置 Graph.open 的 model。完整调用见 match 页。
+3. 创建独立 scratchRoot，传入 createCodexExecutor，并配置 Graph.open 的 model。完整调用与运行命令见本页下方“Linux运行步骤”。
 
 | 字段 | 默认与说明 |
 | --- | --- |

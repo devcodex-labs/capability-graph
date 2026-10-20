@@ -28,11 +28,32 @@ for(const name of ['open','listProviders','listCatalog','getCapabilities','resol
 const types=await fs.readFile(path.join(root,'src/types.ts'),'utf8');for(const [,name]of types.matchAll(/^export (?:interface|type) (\w+)/gm))assert(merged.includes(name),`Missing type ${name}`);
 for(const file of (await walk(path.join(root,'src'))).filter(p=>p.endsWith('.ts'))){const text=await fs.readFile(file,'utf8');for(const [,code]of text.matchAll(/['"](CG_[A-Z_]+)['"]/g))assert(merged.includes(code),`Missing error ${code}`);}
 const pkg=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));assert(!pkg.files.includes('docs'));assert(!pkg.files.includes('website'));await assert.rejects(fs.stat(path.join(root,'docs')),{code:'ENOENT'});
-const readme=await fs.readFile(path.join(root,'README.md'),'utf8');assert(!/\]\(docs\//.test(readme),'README still links to root docs');
-for(const [,href]of readme.replace(/```[^\n]*\n[\s\S]*?```/g,'').matchAll(/\]\(([^\s)]+)\)/g)){
- if(/^(?:https?:|mailto:|#)/.test(href))continue;
- assert(await fs.stat(path.resolve(root,href.split('#')[0])).then(s=>s.isFile(),()=>false),`Broken README link ${href}`);
+const readme=await fs.readFile(path.join(root,'README.md'),'utf8');
+const publicSite=new URL(pkg.homepage),sitePrefix=publicSite.pathname.replace(/\/$/,'')+'/';
+const slug=text=>text.toLowerCase().replace(/[`*]/g,'').replace(/[^\p{L}\p{N}\s_-]/gu,'').trim().replace(/\s+/g,'-');
+let publicReadmeLinks=0;
+async function checkPublicReadmeLink(href){
+ const url=new URL(href);
+ if(url.origin!==publicSite.origin||!url.pathname.startsWith(sitePrefix))return;
+ const route=decodeURIComponent(url.pathname.slice(sitePrefix.length));
+ assert(!route||route.endsWith('.html'),'README must link to a public HTML route: '+href);
+ const relative=(route||'index.html').replace(/\.html$/,'');
+ const target=(await Promise.all(['.md','.mdx'].map(async ext=>{
+  const file=path.join(content,relative+ext);return await fs.stat(file).then(s=>s.isFile()?file:null,()=>null);
+ }))).find(Boolean);
+ assert(target,'Missing public README route '+href);
+ if(url.hash){const body=await fs.readFile(target,'utf8'),anchor=decodeURIComponent(url.hash.slice(1));assert([...body.matchAll(/^#{1,6} (.+)$/gm)].some(m=>slug(m[1])===anchor)||body.includes(`id="${anchor}"`),'Broken public README anchor '+href);}
+ publicReadmeLinks++;
 }
+assert(!/\]\((?:docs|website)\//.test(readme),'README links to an undistributed documentation source');
+for(const [,href]of readme.replace(/```[^\n]*\n[\s\S]*?```/g,'').matchAll(/\]\(([^\s)]+)\)/g)){
+ if(/^https?:/.test(href)){await checkPublicReadmeLink(href);continue;}
+ if(/^(?:mailto:|#)/.test(href))continue;
+ const relative=href.split('#')[0];
+ assert(pkg.files.some(file=>relative===file||relative.startsWith(file+'/')),'README target is not distributed: '+href);
+ assert(await fs.stat(path.resolve(root,relative)).then(s=>s.isFile(),()=>false),`Broken README link ${href}`);
+}
+assert(publicReadmeLinks>0,'README has no public documentation links');
 for(const [,source,code]of readme.matchAll(/<!-- example:([^ ]+) -->\s*```[^\n]*\n([\s\S]*?)\n```/g))assert.equal(normalizeSnippet(code),normalizeSnippet(await fs.readFile(path.join(root,source),'utf8')),`README example drift ${source}`);
 
 const parse=(file,text)=>ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
@@ -85,4 +106,26 @@ for(const method of graphClass.members.filter(node=>ts.isMethodDeclaration(node)
 for(const body of [...all,readme])assert(!/npm install(?: --global)? @devcodex\/capability-graph@/.test(body),'Default tutorial installation must use the package name');
 const navigation=await fs.readFile(path.join(root,'website/rspress.config.ts'),'utf8');
 for(const file of docs.filter(file=>!file.endsWith('index.mdx'))){const route='/'+path.relative(content,file).replace(/\\/g,'/').replace(/\.mdx?$/,'');assert(navigation.includes(`'${route}'`),`Page missing from navigation ${route}`);}
-console.log(JSON.stringify({status:'PASS',pages:docs.length,links,snippets,publicCoverage:'PASS',publicDeclarations:contracts,methodSignatures:methods.size,packageBoundary:'PASS'},null,2));
+// A symbol being mentioned is not a usable task guide. Keep the task inventory traceable.
+const capabilityMap=JSON.parse(await fs.readFile(path.join(root,'website/capability-map.json'),'utf8'));
+assert.equal(capabilityMap.schemaVersion,1);assert.equal(capabilityMap.productVersion,pkg.version);
+const taskPage=await fs.readFile(path.join(content,'guide/capabilities.md'),'utf8');
+const pageTaskIds=[...taskPage.matchAll(/^\| `([a-z][a-z0-9-]+)` \|/gm)].map(match=>match[1]);
+const taskIds=capabilityMap.tasks.map(task=>task.id);
+assert.equal(new Set(taskIds).size,taskIds.length,'Duplicate capability task ID');
+assert.deepEqual([...pageTaskIds].sort(),[...taskIds].sort(),'Task page/inventory coverage drift');
+const mappedSymbols=new Set();
+for(const task of capabilityMap.tasks){
+ for(const field of ['id','name','whenToUse','input','output','prerequisites','source','example','guide'])assert(typeof task[field]==='string'&&task[field].trim(),'Missing task field '+task.id+': '+field);
+ assert(/^[a-z][a-z0-9-]+$/.test(task.id),'Invalid task ID '+task.id);
+ for(const relative of [task.source,task.example]){
+  const file=path.resolve(root,relative);assert(file.startsWith(root),'Task path escaped source');
+  assert(await fs.stat(file).then(s=>s.isFile(),()=>false),'Missing task evidence '+relative);
+ }
+ assert(Array.isArray(task.symbols),'Missing symbol mapping '+task.id);
+ for(const symbol of task.symbols){assert(merged.includes(symbol),'Unknown task symbol '+symbol);mappedSymbols.add(symbol);}
+ assert(taskPage.includes(`[${task.name}](${task.guide})`),'Task guide differs from inventory '+task.id);
+}
+for(const symbol of [...methods.keys(),'createGraphTools','createMcpServer','createOpenAIExecutor','createCodexExecutor'])assert(mappedSymbols.has(symbol),'Public operation missing task guide '+symbol);
+assert(merged.includes(']('+capabilityMap.failureGuide+')'),'Missing shared task failure guide');
+console.log(JSON.stringify({status:'PASS',pages:docs.length,links,snippets,publicReadmeLinks,publicCoverage:'PASS',publicDeclarations:contracts,methodSignatures:methods.size,capabilityTasks:taskIds.length,packageBoundary:'PASS'},null,2));

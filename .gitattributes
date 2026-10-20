@@ -1,0 +1,3 @@
+# Keep the document example's published byteLength/contentHash stable on every OS.
+examples/documents/knowledge/route.md text eol=lf
+examples/codex-host/knowledge/route.md text eol=lf

@@ -1,25 +1,60 @@
 # 关系与多个 Provider
 
-一个 Graph 的 providers 数组可配置多个 file 或 definition；每个 Provider 的关系进入统一索引。授权由 open.allowedProviders 固定，查询只能缩小范围。
+当一项能力需要另一项能力，或你要查找它的分类、特化和引用者时，用关系把它们连接起来。一个 Graph 可以加载多个 Provider，跨来源的能力也能一起解析。
+
+先声明关系，再调用 `resolve` 取得子图。Graph 返回节点与边，实际如何使用能力仍由你的应用决定。
+
+## 选择关系类型
 
 | 声明方向 | 反向查询名 | 含义 |
 | --- | --- | --- |
-| parents | children | `route → http-group`：子能力指向父分类 |
-| specializes | specializedBy | `validated-route → base-route`：特化能力指向基础能力 |
-| related | relatedBy | `route → logging`：有向相关，不自动对称，也不隐含依赖 |
-| requires | requiredBy | `validated-route → schema`：依赖者指向作者声明的前置能力 |
+| `parents` | `children` | `route → http-group`：子能力指向父分类 |
+| `specializes` | `specializedBy` | `validated-route → base-route`：特化能力指向基础能力 |
+| `related` | `relatedBy` | `route → logging`：有向相关，不自动对称，也不隐含依赖 |
+| `requires` | `requiredBy` | `validated-route → schema`：依赖者指向作者声明的前置能力 |
 
-反向关系由索引构建，不能写入 JSON。parents、specializes、requires 各自禁止环；related 可有环。已加载 Provider 内不存在的目标会导致加载失败；未加载外部 Provider 的引用可保留。
+反向关系由索引构建，不能写入 JSON。`parents`、`specializes`、`requires` 各自禁止环；`related` 可有环。已加载 Provider 内不存在的目标会导致加载失败；未加载外部 Provider 的引用可保留。
 
-## 解析范围
+## 跨 Provider 的最小例子
 
-resolve 默认 relations:['requires']，展开根的 requires 传递闭包。显式 [] 只取根；其他正/反向关系从根一跳，不自动展开所到关联节点的依赖。null 不是省略，会报 CG_INPUT_INVALID。
+按[运行示例](/examples/index)安装 npm 包并复制 examples/，执行 `node examples/multi-provider/main.mjs`。该例用内联 JSON，等价的 file 来源可在配置中分别填写路径。
+
+<!-- example:examples/multi-provider/main.mjs -->
+```js
+import {CapabilityGraph} from '@devcodex/capability-graph';
+const graph=await CapabilityGraph.open({providers:[
+  {definition:{providerId:'acme',name:'Acme endpoints',version:'1',capabilities:[{id:'route',name:'Validated endpoint',description:'Create a validated endpoint.',relations:{requires:['shared::schema']}}]}},
+  {definition:{providerId:'shared',name:'Shared validation',version:'1',capabilities:[{id:'schema',name:'Schema',description:'Declare request validation.'}]}}
+],allowedProviders:['acme','shared']});
+try {
+  const result=await graph.resolve({ids:['acme::route']});
+  console.log(JSON.stringify(result,null,2));
+} finally {await graph.close();}
+```
+
+脚本输出完整 ResolveResult。selected 为 acme::route，nodes[].capability.id 为 acme::route 与 shared::schema，边为 acme::route requires shared::schema，meta.completeness 为 complete；不是 nodes 字符串数组。[结果指南](/guide/results)解释所有字段。requires 是作者明确声明的依赖，Graph 不自动执行它。
+
+如果只授权 acme，外部 shared 目标不能展开，返回 target_unavailable 与 partial；显式直接查询越权根则整次失败。Context 不能扩大授权。
+
+<a id="解析范围"></a>
+
+## 选择展开范围
+
+`resolve` 的 `relations` 决定展开范围：
+
+| 你要取得什么 | 参数 | 展开结果 |
+| --- | --- | --- |
+| 根能力和全部前置依赖 | 省略，或 `['requires']` | 沿依赖逐层展开，直到没有新依赖 |
+| 只查看选中的能力 | `[]` | 只返回根节点 |
+| 查分类、特化、相关项或引用者 | 例如 `['children']` | 从根走一跳，不继续展开所到节点的依赖 |
+
+可组合多个关系名；`null` 不是省略，会报 `CG_INPUT_INVALID`。节点详情仍保留原声明，不代表本次子图已展开其中所有关系。
 
 selected 保留根顺序，输出节点/边稳定排序去重。节点 origin 优先级 selected > dependency > relation。边总是原始正向方向。
 
 跨 Provider 目标已加载且授权时正常展开；未加载或无权限统一为 target_unavailable，放入 unresolved，meta.completeness 为 partial。隐藏反向来源不产生可探测计数或 partial。显式查询越权根整次失败。
 
-完整跨 Provider 代码见[多个 Provider 示例](/examples/multi-provider)。关系是作者的声明，不是框架扫描或模型推测的事实。
+上面的最小例子展示跨 Provider 依赖；下面的对照进一步验证反向关系和授权。关系是作者的声明，不是框架扫描或模型推测的事实。
 
 ## 区分三种范围
 
@@ -41,17 +76,18 @@ selected 保留根顺序，输出节点/边稳定排序去重。节点 origin �
 
 只有隐藏未授权来源指向公开节点时，反向查询不会泄露它的节点、数量、警告或partial；仅更新隐藏声明也不改变公开revision。公开作者主动写下的外部ID只是公开声明，不证明隐藏目标实际存在。
 
-## 可运行的闭包、反向与授权对照
+<a id="可运行的闭包反向与授权对照"></a>
 
-按[运行示例](/examples/index)复制后，在项目根运行 `node examples/scenarios/relations.mjs`。该程序无模型网络请求；其中的固定executor只用于验证候选范围。它输出各次完整ResolveResult/MatchResult，并断言：
+## 查找引用者并理解结果
 
-- 多根selected去重保序，两个根共享的依赖只出现一次；已经选中的共享节点origin保持selected。
-- requires会到达两级依赖；parents/children、specializes/specializedBy、related/relatedBy、requiredBy仅根一跳，不自动展开关联节点的requires。
-- 反向查询的edge依然是原始正向；related的相反方向必须另写一条边。
-- parents/specializes/requires各自成环时CG_RELATION_CYCLE；related环合法。跨不同类型构成的路径不被当作统一关系环。
-- 模型候选仅a时仍展开授权b依赖；未加载/未授权为generic partial；已加载错ID在load拒绝；隐藏更新不改公开revision。
+对分类查询 `children`，会返回该分类以及声明它为父分类的能力。例如 `a::route` 声明了 `parents: ['group']`，查询 `a::group` 的子项即可找到它。
 
-例如对 `a::group` 查询children，实际完整结果为：
+按[运行示例](/examples/index)复制后，在项目根运行 `node examples/scenarios/relations.mjs`。它输出所有关系查询的完整结果，无需模型网络请求；固定执行器仅用于验证候选范围。
+
+先看三个字段：`selected` 是传入的根，`origin: 'relation'` 表示通过关系加入，`edges` 始终保留声明的正向方向。`group` 自己的 `requires` 只留在详情里，本次 `children` 查询不会沿它继续展开。
+
+<details>
+<summary>查看 a::group 查询 children 的完整返回</summary>
 
 ```json
 {
@@ -131,10 +167,28 @@ selected 保留根顺序，输出节点/边稳定排序去重。节点 origin �
 }
 ```
 
-其中edge是route parents group，没有翻成children边。group自己的requires仍保留在详情里，但本次没有沿它继续展开，这与子图edges是两个层次。
+</details>
+
+## 处理缺失依赖与非法关系
+
+`meta.completeness: 'partial'` 时，先读 `unresolved`，检查来源配置和授权。已加载来源中的错 ID 在加载时拒绝，不会等到查询才报告缺失。
+
+`parents`、`specializes`、`requires` 各自成环报 `CG_RELATION_CYCLE`，需要修正声明；`related` 环合法。不同类型组成的路径不作为统一关系环。见[错误与恢复](/reference/errors)。
+
+## 深入验证排序与授权
+
+首次使用可以先看上面的范围表和结果解释；需要核对精确语义时，再运行以下完整对照。
 
 <details>
-<summary>查看完整关系与授权验证脚本</summary>
+<summary>查看验证要点与完整关系脚本</summary>
+
+| 检查项 | 验证的行为 |
+| --- | --- |
+| 多根与共享依赖 | `selected` 去重保序；共享依赖只有一个节点；根的 `origin` 保持 `selected` |
+| 展开深度 | `requires` 传递展开；其余正/反向关系从根一跳 |
+| 边方向 | 反向查询仍返回正向边；`related` 反向须另行声明 |
+| 候选与授权 | 候选仅 a 时仍可展开已授权 b 的依赖；隐藏更新不改变公开 Revision |
+| 错误 | 未加载/未授权目标为 `partial`；已加载错 ID 在加载时拒绝 |
 
 <!-- example:examples/scenarios/relations.mjs -->
 ```js title="relations.mjs"

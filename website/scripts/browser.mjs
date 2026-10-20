@@ -12,13 +12,25 @@ assert(artifacts!==repo&&!artifacts.startsWith(repo+path.sep)&&!repo.startsWith(
 const base=process.env.CG_SITE_BASE??'/capability-graph/';
 const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.txt':'text/plain','.woff2':'font/woff2'};
 const server=createServer(async(req,res)=>{
- try{const url=new URL(req.url,'http://localhost');if(!url.pathname.startsWith(base)){res.writeHead(404);return res.end();}let rel=decodeURIComponent(url.pathname.slice(base.length));if(!rel||rel.endsWith('/'))rel+='index.html';const file=path.resolve(output,rel);assert(file.startsWith(output+path.sep));const data=await fs.readFile(file);res.writeHead(200,{'content-type':types[path.extname(file)]??'application/octet-stream'});res.end(data);}catch{res.writeHead(404);res.end('Not found');}
+ try{const url=new URL(req.url,'http://localhost');if(!url.pathname.startsWith(base)){res.writeHead(404);return res.end();}let rel=decodeURIComponent(url.pathname.slice(base.length));if(!rel||rel.endsWith('/'))rel+='index.html';else if(!path.extname(rel))rel+='.html';const file=path.resolve(output,rel);assert(file.startsWith(output+path.sep));const data=await fs.readFile(file);res.writeHead(200,{'content-type':types[path.extname(file)]??'application/octet-stream'});res.end(data);}catch{res.writeHead(404);res.end('Not found');}
 });
 let browser, page, port;
 const errors = [], badResponses = [], checks = [], screenshots = [], contrast = [];
+const captureRetries=[];
+async function capture(options){
+  try {return await page.screenshot(options);}
+  catch(error){
+    // Chrome can fail its first capture before compositing a newly loaded page.
+    if(!String(error).includes('Unable to capture screenshot'))throw error;
+    captureRetries.push({url:page.url(),path:options.path,error:String(error)});
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    return await page.screenshot(options);
+  }
+}
 const normalize = text => text.replace(/\r\n/g, '\n').trimEnd();
 const keyRoutes = ['', 'getting-started/quick-start.html', 'guide/results.html',
-  'reference/configuration.html', 'integrations/codex.html'];
+  'reference/configuration.html', 'integrations/codex.html', 'getting-started/introduction.html',
+  'guide/documents.html', 'guide/relations.html', 'guide/capabilities.html', 'integrations/remote.html'];
 async function contentRoutes(dir, prefix = '') {
   const routes = [];
   for (const item of await fs.readdir(dir, {withFileTypes: true})) {
@@ -62,21 +74,29 @@ try {
       anchors.set(pathname.replace(/\.html$/, ''), new Set(documentLinks.ids));
       links.push(...documentLinks.links);
       if (keyRoutes.includes(route)) {
+        const firstSection=page.locator('.rp-doc h2').first();
+        if(await firstSection.count())assert.equal(await firstSection.evaluate(node=>getComputedStyle(node,'::before').display),'none','Duplicate native heading separator');
         const name = (route ? route.replace(/\.html$/, '').replaceAll('/', '-') : 'home') + '-' + theme + '-' + viewport.width;
-        await page.screenshot({path: path.join(artifacts, name + '.png'), fullPage: true});
-        await page.screenshot({path: path.join(artifacts, name + '-viewport.png')});
+        await capture({path: path.join(artifacts, name + '.png'), fullPage: true});
+        await capture({path: path.join(artifacts, name + '-viewport.png')});
         screenshots.push(name + '.png');
         const code = page.locator('pre code').first();
         if (await code.count()) {
-          const colors = await page.locator('pre code span[style]').evaluateAll(nodes =>
+          const colors = await page.locator((route ? '' : '.cg-console ') + 'pre code span[style]').evaluateAll(nodes =>
             [...new Set(nodes.filter(node => node.textContent.trim()).map(node => getComputedStyle(node).color))]);
           assert(colors.length >= 2, 'Missing syntax colors: ' + route);
           const copy = page.getByRole('button', {name: '复制代码', exact: true}).first();
           await copy.click();
           const copied = await page.evaluate(() => navigator.clipboard.readText());
           assert.equal(normalize(copied), normalize(await code.textContent()), 'Copy changed rendered code: ' + route);
-          if (!route) assert.equal(normalize(copied),
-            normalize(await fs.readFile(path.join(repo, 'examples/minimal/static.mjs'), 'utf8')), 'Home copy drift');
+          if (!route) {
+            assert.equal(normalize(copied),'npm install @devcodex/capability-graph','Home install copy drift');
+            const consoleCode=page.locator('.cg-console pre code').first();
+            await page.locator('.cg-console').getByRole('button',{name:'复制代码',exact:true}).first().click();
+            assert.equal(normalize(await page.evaluate(()=>navigator.clipboard.readText())),
+              normalize(await fs.readFile(path.join(repo,'examples/minimal/static.mjs'),'utf8')),'Home static copy drift');
+            assert.equal(normalize(await consoleCode.textContent()),normalize(await fs.readFile(path.join(repo,'examples/minimal/static.mjs'),'utf8')));
+          }
         }
         const samples = await page.evaluate(() => {
           const rgb = value => value.match(/[\d.]+/g)?.map(Number);
@@ -106,6 +126,14 @@ try {
         for (const sample of samples) if (sample.ratio !== undefined) assert(sample.ratio >= 4.5,
           'Text contrast below 4.5: ' + JSON.stringify({route, theme, ...sample}));
         contrast.push({route, theme, width: viewport.width, samples});
+        if(route==='guide/relations.html'){
+          await page.getByRole('heading',{name:'查找引用者并理解结果',exact:true}).evaluate(node=>node.scrollIntoView({block:'start'}));
+          const name=`relations-task-${theme}-${viewport.width}.png`;
+          await capture({path:path.join(artifacts,name)});screenshots.push(name);
+          const disclosure=page.locator('.rp-doc details').first();
+          await disclosure.locator('summary').click();
+          assert(await disclosure.locator('pre code').textContent(),'Folded complete result is unavailable');
+        }
       }
       checks.push({route, theme, width: viewport.width, horizontalOverflow: false});
     }
@@ -135,12 +163,29 @@ try {
     await search.focus(); await page.keyboard.press('Enter');
     const input = page.locator('input').filter({visible:true}).first();
     await input.waitFor({state:'visible'});
+    const searchStyle = await input.evaluate(node => {
+      const style=getComputedStyle(node),form=node.closest('.rp-search-panel__input-form');
+      const formStyle=getComputedStyle(form),kbd=document.querySelector('.cg-search-button kbd');
+      return {inputOutline:style.outlineStyle,formBorder:formStyle.borderTopWidth,formShadow:formStyle.boxShadow,
+        kbdFont:getComputedStyle(kbd).fontFamily,labelFont:getComputedStyle(document.querySelector('.cg-search-label')).fontFamily};
+    });
+    assert.equal(searchStyle.inputOutline,'none','Duplicate search input focus frame');
+    assert.equal(searchStyle.formBorder,'1px');assert.notEqual(searchStyle.formShadow,'none','Missing form focus indicator');
+    assert.equal(searchStyle.kbdFont,searchStyle.labelFont,'Shortcut typography differs from UI');
+    const cancel=page.locator('.rp-search-panel__cancel');
+    if(await cancel.isVisible())assert.equal(await cancel.evaluate(node=>getComputedStyle(node).whiteSpace),'nowrap','Mobile cancel label wraps');
+    const searchShot=async state=>{
+      const name=`search-${state}-${theme}-${viewport.width}.png`;
+      await capture({path:path.join(artifacts,name)});screenshots.push(name);
+    };
+    await searchShot('open');
     await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
     assert(await input.isVisible(), 'Empty search should remain open without selecting a result');
     await input.fill('reload');
     const modal = page.locator('#__rspress_modal_container');
     const lifecycleResult = modal.locator('a[href*="/guide/lifecycle"]').first();
     await lifecycleResult.waitFor({state:'visible'}); await lifecycleResult.hover();
+    await searchShot('results');
     await page.keyboard.press('Enter');
     await page.getByRole('heading', {name:'Revision、重载与关闭', exact:true}).waitFor();
     await page.keyboard.press('Control+k'); await input.fill('原子');
@@ -151,6 +196,19 @@ try {
     const result = modal.locator('a[href*="/guide/results"]').first();
     await result.waitFor({state:'visible'}); await result.click();
     await page.getByRole('heading', {name:'读取解析结果', exact:true}).waitFor();
+    await page.keyboard.press('Control+k');await input.fill('cg-no-result-92871');
+    await page.locator('.rp-no-search-result').waitFor({state:'visible'});
+    assert((await page.locator('.rp-no-search-result').textContent()).includes('cg-no-result-92871'),'No-result state is stale');
+    await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+    assert(await input.isVisible(),'No-result Enter should keep search open');
+    await searchShot('no-results');await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>document.activeElement?.matches('.cg-search-button'));
+    await searchShot('closed');
+    // Test the macOS hint against the same actual Meta+K handler without a macOS support claim.
+    await page.addInitScript(()=>Object.defineProperty(navigator,'platform',{get:()=> 'MacIntel'}));
+    await page.reload();await page.waitForFunction(()=>document.querySelector('.cg-search-button kbd')?.textContent==='⌘ K');
+    await page.keyboard.press('Meta+k');await input.waitFor({state:'visible'});
+    await page.keyboard.press('Escape');
     if (viewport.width === 390) {
       const menu = page.getByRole('button', {name:'菜单', exact:true});
       await menu.focus(); await page.keyboard.press('Enter');
@@ -161,7 +219,7 @@ try {
   }
   assert.deepEqual(errors, []); assert.deepEqual(badResponses, []);
   const report = {status:'PASS', engine:await browser.version(), routes:routes.length,
-    checks, screenshots, contrast, errors, badResponses};
+    checks, screenshots, contrast, errors, badResponses, captureRetries};
   await fs.writeFile(path.join(artifacts, 'browser.json'), JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify({status:'PASS', routes:routes.length, combinations:checks.length, keyScreenshots:screenshots.length, artifacts}));
 } catch (error) {

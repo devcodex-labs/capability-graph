@@ -2,6 +2,10 @@
 
 已有 Agent 不必经 MCP 或启动 HTTP 服务。应用创建 Graph 后，导入 @devcodex/capability-graph/tools 的 createGraphTools，将 definitions 转为宿主工具格式，将调用转发给 call。
 
+前置是你已有一个能发送工具定义、接收调用、回送结果的 Agent。只有模型 API 客户端、还没有工具循环时，先实现宿主自己的循环；本包不提供 Agent 运行时。
+
+## 完成第一次工具调用
+
 ```js
 import {createGraphTools} from '@devcodex/capability-graph/tools';
 const tools = createGraphTools(graph);
@@ -43,3 +47,14 @@ else console.error(JSON.stringify(outcome.error));
 这里的name/arguments_是本例一次调用，不是自动执行能力。实际Agent应将已校验的工具名和参数传给call，并把outcome按宿主要求回送。outputSchema由需要它的宿主另行采用，不能把GraphTools的{ok,data/error}外壳说成原始ResolveResult。
 
 未知/禁用工具会得到 `ok:false,error.code:'CG_INPUT_INVALID'`；创建时enableMatch:true却无executor会同步抛CG_MODEL_NOT_CONFIGURED/config。definitions不是Provider能力列表，模型从Catalog选择能力后仍调用同一个resolve工具。
+
+## 验证接线与处理失败
+
+| 检查 | 预期 | 不符合时 |
+| --- | --- | --- |
+| 注册 definitions | 默认五个 Graph 工具，名称不与原工具冲突 | 保留原工具，修正命名/分发；不把能力 ID 当工具名 |
+| 调用目录再解析 | 目录有真实 ID；resolve 的 `data` 为完整结果 | 检查声明与授权，再检查 Adapter 的 `{ok,data/error}` 外壳 |
+| 回送宿主 | 按宿主协议回送结果并让模型继续 | 不以控制台打印成功代替模型真正收到结果 |
+| 失败 | `ok:false` 分支保留 code/phase/nextAction | 输入错误先改参数；不把所有失败转空数组 |
+
+结束时由应用关闭 Graph；Adapter 没有独立服务或端口。工具定义转换只是格式映射，真实宿主的工具调用与多轮继续需在对应框架验证。

@@ -9,6 +9,8 @@
 
 ## 完整可运行案例
 
+本例是一个保留 `ping`、资源和 Prompt 的完整服务，不是向任何现有 SDK 自动注入工具的补丁。先在独立目录验证，再把定义合并和调用分发移入你的服务。
+
 在你的项目安装依赖并复制示例：
 
 ```sh
@@ -61,3 +63,13 @@ process.once('SIGTERM',()=>void close());process.once('SIGINT',()=>void close())
 ```
 
 stdout 只传协议。客户端应仍能调用 ping、读取 note://welcome、取得 welcome Prompt，并通过 capability_graph_resolve 解析 acme::route 的 schema 依赖。默认无服务端模型调用。不同 SDK 按同样的定义/调用映射，具体接入由应用维护，不增加专有 Agent 框架包。
+
+## 验证原功能与 Graph 同时可用
+
+在你的 MCP 客户端将启动命令设为 `node` 的绝对路径，参数设为 `examples/mcp/server.mjs` 的绝对路径。Windows 复制示例可用 `Copy-Item -LiteralPath node_modules/@devcodex/capability-graph/examples -Destination examples -Recurse`；Bash 使用上面的 `cp`。脚本用 `import.meta.url` 定位 Provider，不依赖客户端 cwd。
+
+按顺序检查：`tools/list` 应有 `ping` 和五个 Graph 工具；调用 `ping` 得 `pong`；`resources/read` 读取 `note://welcome`；`prompts/get` 取得 `welcome`；最后读 Catalog 并用真实 `acme::route` 调用 Resolve。Graph 的业务结果字段见[结果指南](/guide/results)。
+
+若原工具消失，检查合并时是否覆盖原列表；若有名称冲突，先解决冲突再启动；若列表有工具但调用失败，检查分发条件和协议投影。不要把 Graph 的错误 JSON 当 MCP 成功结果回送。
+
+客户端断开会关闭示例传输并释放 Graph；手动运行时用 Ctrl+C 退出。移入已有服务后，借用的 Graph 由创建方关闭；原服务的资源、Prompt、认证和关闭流程继续由原应用管理。

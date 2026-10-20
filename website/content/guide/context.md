@@ -1,6 +1,10 @@
 # Context 与适用条件
 
-Context 是调用方明确提供的环境事实，不是授权。Graph 不扫描仓库补齐事实。
+同一项能力可能只适用于特定框架、运行时或版本。用 `appliesTo` 声明条件，再把已知环境放进查询的 `context.facts`，即可判断适用、不适用或信息不足。
+
+Context 由调用方提供，不授予访问权限，也不会触发仓库扫描。
+
+## 提供环境事实
 
 ```json
 {"facts":{"framework":"vextjs","framework.version":"2.0.0","production":true},"notes":"Only the supplied facts are known."}
@@ -38,7 +42,10 @@ getCapabilities 与 resolve 都保留不适用或未知节点。match.status、�
 
 以上三个数组都是**去重并稳定排序的字段名**，不是失败规则、条件对象或规则ID。已知失败优先：即使还有缺失字段，仍为inapplicable；没有已知失败才因缺失/非法版本值变unknown。
 
-例如 `invalid-version` 的完整getCapabilities结果为：
+例如 `invalid-version` 的结果为 `unknown`，非法事实字段为 `framework.version`。完整返回保留输入条件与诊断：
+
+<details>
+<summary>查看 invalid-version 的完整 getCapabilities 返回</summary>
 
 ```json
 {
@@ -102,7 +109,11 @@ getCapabilities 与 resolve 都保留不适用或未知节点。match.status、�
 }
 ```
 
-`2` 是合法Context数字，所以请求不因结构报错；它不符合版本比较需要的稳定版本字符串，故记录invalidFacts。反之，`{facts:{framework:{name:'acme'}}}` 是非法嵌套结构，整次reject为 `CG_CONTEXT_INVALID/query`，不会返回unknown。
+</details>
+
+## 处理信息不足与错误输入
+
+`2` 是合法 Context 数字，不因结构报错；它不是版本比较需要的稳定版本字符串，因此记录在 `invalidFacts`。反之，`{facts:{framework:{name:'acme'}}}` 是非法嵌套结构，整次拒绝为 `CG_CONTEXT_INVALID/query`，不会返回 `unknown`。
 
 `in:[]` 定义合法，但已提供的任何事实都不在空集合中，返回inapplicable；该事实缺失时仍是unknown。`range:'^2.0.0'` 等当前不支持的范围在声明加载时为 `CG_DEFINITION_INVALID/load`；不要套用npm版本范围的全部语法。
 

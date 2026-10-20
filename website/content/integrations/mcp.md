@@ -1,6 +1,20 @@
 # MCP stdio 与 HTTP
 
-通用 Agent Tool Adapter 借用 Graph，返回 definitions 和 call，不关闭 Graph：
+让已有 MCP 宿主查询能力时，先选择传输，再准备 Provider 和启动配置。宿主模型负责从目录选择 ID，本服务负责确定性查询；默认不会再调用服务端模型。
+
+| 你的场景 | 推荐路线 | 谁启动和关闭 |
+| --- | --- | --- |
+| 本地 Codex CLI、桌面或 IDE | [完整 Codex 教程](/integrations/codex)，stdio | 宿主启动子进程；会话/连接结束时关闭 |
+| 其他支持 stdio 的本地 MCP 客户端 | 下文 stdio 配置，使用 Node/CLI/配置绝对路径 | 客户端管理子进程，stdout 仅传协议 |
+| 本机多个客户端共享服务 | 下文 HTTP 完整脚本 | 你显式启动服务，结束后停止该进程 |
+| 远程客户端或 ChatGPT Work | [远程 HTTPS](/integrations/remote) | 部署方管理进程、TLS 与认证 |
+| 已经有 MCP Server | [合入现有服务](/integrations/existing-server) | 保留原服务所有权，不再新开端口 |
+
+首次使用先按[第一个图谱](/getting-started/quick-start)准备声明，或复用 Codex 教程的 `examples/codex-host` 全套材料。不要只安装 Skill 后等待工具自动出现。
+
+## 理解工具与调用结果
+
+下面是已创建 `graph` 后的嵌入片段；要写完整 Agent 工具循环，见[Tool Adapter](/integrations/tools)。Adapter 借用 Graph，返回 `definitions` 和 `call`，不关闭 Graph：
 
 ```js
 import { createGraphTools } from '@devcodex/capability-graph/tools';
@@ -146,7 +160,7 @@ try {
 }
 ```
 
-CG_MCP_URL由此示例读取以选择已有服务，Graph不自动采用该变量。HTTP客户端close仅关闭自己的连接；验证结束后回终端A按Ctrl+C，由服务依次关闭传输和Graph。共享服务由其部署方管理，不因某个客户端退出就停止。
+CG_MCP_URL由此示例读取以选择已有服务，Graph不自动采用该变量。本例连接默认本地无认证服务；私有服务请使用[带 Bearer 的完整客户端](/integrations/remote#用-bearer-客户端验证私有服务)。HTTP客户端close仅关闭自己的连接；验证结束后回终端A按Ctrl+C，由服务依次关闭传输和Graph。共享服务由其部署方管理，不因某个客户端退出就停止。
 
 ## 工具参数与结果
 

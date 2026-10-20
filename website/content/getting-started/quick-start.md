@@ -72,7 +72,8 @@ node static.mjs
 | `model` | 未配置 | 静态解析无需模型；不会调用付费服务 |
 | `close()` | `finally` 中调用 | 用完即关闭，关闭后不要继续查询 |
 
-### 完整解析结果
+<details>
+<summary>查看完整解析结果</summary>
 
 以下为随包文件式示例的实际完整 stdout，未投影、未删字段。该稳定声明与内联版本输出相同；修改声明或授权后 Revision 可能改变，不要把这个哈希写死到业务代码。
 
@@ -151,7 +152,22 @@ node static.mjs
 
 `selected` 只有你请求的根，`nodes` 同时包含根及依赖。真正的能力 ID 在 `nodes[].capability.id`；`origin` 解释节点为何进入结果。`edges` 保留原始方向，`unresolved:[]` 表示没有未展开的目标，`meta.completeness` 为 `complete`。完整不等于已经执行或已具备运行条件；本例没有声明附加静态条件。
 
-## 3. 可选：将声明直接放进程序
+</details>
+
+## 3. 使用结果，处理缺省说明
+
+下面是结果消费片段：放在上面脚本取得 `result` 之后、`finally` 之前。它不是另一个独立脚本，且会增加 stdout 的人读信息。
+
+```js
+for (const { capability, origin, applicability } of result.nodes) {
+  console.log(`${capability.id} (${origin}, ${applicability.status})`);
+  console.log(capability.usage?.instructions ?? '该能力没有提供使用说明');
+}
+```
+
+`schema` 没有 `usage`，可选链避免读取异常。不要把摘要对象当成原始 `ResolveResult`。进一步了解 [结果字段与下一步判断](/guide/results)，需要目录、详情或长文时再看[独立详情示例](/guide/results#读取目录详情与知识正文)。
+
+## 4. 可选：将声明直接放进程序
 
 已有内存对象时，在项目根目录保存 `inline.mjs` 并运行 `node inline.mjs`。它不读取 `provider.json` 或任何知识文件，直接将纯 JSON 对象交给 `definition`。下面是完整可运行脚本；调用和结果结构与文件式相同，选择其中一种即可。
 
@@ -191,19 +207,6 @@ try {
 ```
 
 文件与内联互斥，不能在同一个来源同时填写 `file` 和 `definition`。内联对象按值加载；后续改变原对象不会直接改变已发布快照，见[生命周期](/guide/lifecycle)。
-
-## 4. 使用结果，处理缺省说明
-
-下面是结果消费片段：放在上面脚本取得 `result` 之后、`finally` 之前。它不是另一个独立脚本，且会增加 stdout 的人读信息。
-
-```js
-for (const { capability, origin, applicability } of result.nodes) {
-  console.log(`${capability.id} (${origin}, ${applicability.status})`);
-  console.log(capability.usage?.instructions ?? '该能力没有提供使用说明');
-}
-```
-
-`schema` 没有 `usage`，可选链避免读取异常。不要把摘要对象当成原始 `ResolveResult`。进一步了解 [结果字段与下一步判断](/guide/results)，需要目录、详情或长文时再看[独立详情示例](/guide/results#读取目录详情与知识正文)。
 
 ## 5. 可选：用 CLI 检查同一份声明
 

@@ -2,6 +2,20 @@
 
 远程宿主不能访问开发机 localhost 或你的本地文件树。先在部署环境加载已批准 Provider 和文档，再提供宿主真正可访问的 HTTPS MCP。
 
+## 先分清服务端与客户端
+
+服务端需要 Node、批准的 Provider/知识文件、进程管理、TLS 与认证；客户端只需要可达的 HTTPS URL、兼容协议与相应凭据。下文先在 MCP 客户端脚本验证，再按宿主实际连接流程接入。默认不启用服务端模型。
+
+| 阶段 | 成功证据 | 失败先看哪里 |
+| --- | --- | --- |
+| 服务启动 | 部署环境的 `/mcp` 实际监听 | 进程日志、配置路径、文件权限 |
+| 网络与认证 | HTTPS 可达，正确凭据可连接，缺失/错误凭据被拒绝 | DNS/TLS/代理、Host、凭据与认证模式 |
+| MCP | 协商 `2026-07-28`，发现五个查询工具 | 协议支持与客户端开关，不能只看 HTTP 200 |
+| 业务任务 | Catalog 有真实 ID；Resolve/按需正文读取成功 | Provider 授权、ID 与文档声明 |
+| 真实宿主 | 宿主聊天中有工具调用记录和正确结果 | 安装/连接状态、宿主认可的认证及任务指令 |
+
+本地 Bearer 客户端验证不能替代真实 TLS、OAuth 或宿主账号验收。公网 URL 与客户端界面以实际部署为准，不将示意域名视为已部署服务。
+
 ## 私有服务
 
 CLI JSON 的 http.access 为 private，非回环监听必须配置 bearer/tokenEnv；SDK 直接传可信 token。反向代理负责 TLS，保留正确 Host 并限制直达端口。宿主需要用户级 OAuth 时使用其支持的网关；本项目不新增 OAuth/RBAC 服务。
@@ -15,6 +29,72 @@ CLI JSON 的 http.access 为 private，非回环监听必须配置 bearer/tokenE
 ## 公开只读服务
 
 access:public-readonly 必须显式 allowedProviders，仅批准公开内容。默认禁正文；publicDocuments:true 才明确批准所有已声明正文。公开匿名始终禁止 enableMatch。Host/Origin 检查与响应/并发/请求预算仍生效。
+
+## 用 Bearer 客户端验证私有服务
+
+先完成下方服务部署，或使用你已运行的私有 MCP 服务。本节使用官方客户端 2.3.1，支持服务要求的 2026-07-28 协议。在客户端项目安装：
+
+```sh
+npm install @modelcontextprotocol/client@2.3.1
+```
+
+将以下完整脚本保存为 `mcp-private.mjs`。它传入 Bearer 认证、发现工具、读取 Catalog，并从返回目录确认真实的 acme::route 后 Resolve；stdout 只输出完整 MCP 结果，工具名和错误写 stderr。示例使用已知案例 ID，换成你的声明时同步调整它。
+
+```js title="mcp-private.mjs"
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+
+const client = new Client({ name: 'graph-private-reader', version: '1' }, {
+  versionNegotiation: { mode: { pin: '2026-07-28' } }
+});
+try {
+  const url = process.env.CG_MCP_URL;
+  if (!url) throw new Error('请设置 CG_MCP_URL 为私有服务的完整 MCP URL');
+  const token = process.env.CG_MCP_TOKEN;
+  await client.connect(new StreamableHTTPClientTransport(new URL(url), {
+    requestInit: { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  }));
+  const tools = await client.listTools();
+  console.error('工具：', tools.tools.map(tool => tool.name));
+  const catalog = await client.callTool({ name: 'capability_graph_list_catalog', arguments: {} });
+  if (catalog.isError) throw new Error(JSON.stringify(catalog));
+  const entry = catalog.structuredContent?.items?.find(item => item.id === 'acme::route');
+  if (!entry) throw new Error('Catalog中没有acme::route，请检查声明与授权');
+  const result = await client.callTool({ name: 'capability_graph_resolve', arguments: { ids: [entry.id] } });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.isError) process.exitCode = 1;
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+} finally {
+  await client.close();
+}
+```
+
+在客户端进程中设置以下变量。地址和凭据是待替换示意；凭据值必须与服务端配置相同。Bash：
+
+```sh
+export CG_MCP_URL='https://graph.example.com/mcp'
+export CG_MCP_TOKEN='你的服务凭据'
+node mcp-private.mjs
+```
+
+PowerShell：
+
+```powershell
+$env:CG_MCP_URL='https://graph.example.com/mcp'
+$env:CG_MCP_TOKEN='你的服务凭据'
+node mcp-private.mjs
+```
+
+| 变量 / 配置 | 谁读取 | 含义 |
+| --- | --- | --- |
+| 服务端 `http.auth.tokenEnv: "CG_HTTP_TOKEN"` | Graph CLI | 从服务进程环境读取期望的 token；JSON 中不存 token 值 |
+| 客户端 `CG_MCP_URL` | 本页脚本 | 完整 HTTPS MCP 端点，Graph 不自动采用该变量 |
+| 客户端 `CG_MCP_TOKEN` | 本页脚本 | 通过 requestInit.headers 发送为 Authorization: Bearer；Graph 不自动读取该变量 |
+
+认证参数依据官方 [StreamableHTTPClientTransportOptions](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/packages/client/src/client/streamableHttp.ts)，并按本项目安装的 2.3.1 类型与客户端执行验证。缺失或错误的 token 会被私有服务以 HTTP 401 拒绝，脚本以 1 退出；请核对客户端环境与代理是否转发 Authorization。固定 Bearer 不会自动完成 OAuth。
+
+成功时五工具可发现，stdout 的 structuredContent 与[快速开始的完整结果](/getting-started/quick-start)相同（前提是使用同一 Provider 与授权）。client.close() 只关闭本客户端连接；私有服务仍由部署方管理。本地回环验证不等于公网 TLS 或真实宿主连接已验收。
 
 ## 添加宿主连接
 

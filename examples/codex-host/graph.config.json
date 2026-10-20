@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "providers": [{ "file": "./provider.json" }],
+  "allowedProviders": ["acme"]
+}

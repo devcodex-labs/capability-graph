@@ -51,7 +51,10 @@ MCP Server 与 Tool Adapter 借用 Graph：先关闭服务/连接，再由创建
 4. 一个候选有效但另一来源损坏时reload.ok:false，旧快照保留；修复后重试发布。合并后出现跨来源requires环同样整次不提交。
 5. 分别触发close、外部abort、timeout，核对code/phase及executor收到的signal；重复close合法。
 
-其中一次更新和一次失败的实际完整reload结果：
+成功时检查 `ok` 与来源状态；失败时继续使用旧快照，修正声明后再重试。下面保留一次成功和失败的完整返回。
+
+<details>
+<summary>查看 reload 成功与失败的完整结果</summary>
 
 ```json
 {
@@ -112,7 +115,9 @@ MCP Server 与 Tool Adapter 借用 Graph：先关闭服务/连接，再由创建
 }
 ```
 
-`updated`只在实际发布后出现；`unchanged`内容相同；`failed`是来源本身失败；`not_applied`是候选已通过但整个事务未提交。合并图失败时可能没有来源标failed，要同时检查顶层ok/error。
+</details>
+
+`updated` 仅表示 Graph 新快照已生效；`unchanged` 为内容相同；`failed` 是来源本身失败；`not_applied` 是候选已通过但本次事务未提交。合并图失败时可能没有来源标 `failed`，要同时检查顶层 `ok/error`。
 
 终止实际结果为：
 

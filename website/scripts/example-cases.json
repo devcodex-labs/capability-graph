@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "cases": [
     {
+      "id": "codex-host",
+      "category": "required",
+      "page": "integrations/codex.md",
+      "title": "verify.mjs",
+      "source": "examples/codex-host/verify.mjs",
+      "assertions": ["five static tool calls", "literal summary and full output", "isolated setup doctor clean"],
+      "prerequisites": "Node >=22.12.0; isolated HOME only; no real model or client configuration changes."
+    },
+    {
       "id": "minimal-file",
       "category": "required",
       "page": "getting-started/quick-start.md",
@@ -87,11 +96,19 @@
     {
       "id": "multi-provider",
       "category": "required",
-      "page": "examples/multi-provider.md",
+      "page": "guide/relations.md",
       "source": "examples/multi-provider/main.mjs",
       "assertions": [
         "complete cross-provider result"
       ]
+    },
+    {
+      "id": "document-references",
+      "category": "required",
+      "page": "guide/documents.md",
+      "title": "read.mjs",
+      "source": "examples/documents/read.mjs",
+      "assertions": ["local document body", "URL reference", "CG_DOCUMENT_REFERENCE_ONLY"]
     },
     {
       "id": "vextjs-graph",
@@ -121,6 +138,13 @@
         "real HTTP client",
         "server cleanup"
       ]
+    },
+    {
+      "id": "mcp-private",
+      "category": "required",
+      "page": "integrations/remote.md",
+      "title": "mcp-private.mjs",
+      "assertions": ["private Bearer HTTP client", "valid token succeeds", "missing/wrong token rejected", "server cleanup"]
     },
     {
       "id": "graph-error",

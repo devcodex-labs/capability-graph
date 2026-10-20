@@ -26,6 +26,7 @@ export function SwitchAppearance({ onClick }: { onClick?: () => void }) {
 /** Native search owns indexing and keyboard commands; restore its trigger on dismissal. */
 export function Search() {
   const [focused, setFocused] = useState(false);
+  const [shortcutLabel, setShortcutLabel] = useState('Ctrl K');
   const trigger = useRef<HTMLButtonElement>(null);
   const changeFocus = (next: boolean) => {
     setFocused(next);
@@ -34,6 +35,7 @@ export function Search() {
   // Rspress 2.0.19 handles Enter even when its panel is closed/has no result.
   // Mount it only while open; retain the documented shortcut in this trigger.
   useEffect(() => {
+    setShortcutLabel(/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K');
     const shortcut = (event: KeyboardEvent) => {
       if (event.code === 'KeyK' && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
@@ -63,7 +65,7 @@ export function Search() {
       <button type="button" ref={trigger} className="cg-search-button" aria-label="搜索文档" aria-haspopup="dialog" aria-expanded={focused} onClick={() => changeFocus(true)}>
         <SvgWrapper icon={IconSearch} />
         <span className="cg-search-label">搜索</span>
-        <kbd>Ctrl K</kbd>
+        <kbd>{shortcutLabel}</kbd>
       </button>
       <NoSSR>{focused && <SearchPanel focused={focused} setFocused={changeFocus} />}</NoSSR>
     </span>
