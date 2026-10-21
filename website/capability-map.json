@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "productVersion": "2.0.1",
+  "productVersion": "2.1.0",
   "failureGuide": "/reference/errors",
   "tasks": [
     {"id":"declare-provider","name":"声明已有能力","guide":"/guide/providers","example":"examples/minimal/provider.json","source":"src/schema.ts","symbols":[],"whenToUse":"让真实功能可被发现","input":"ProviderDefinition","output":"静态能力声明","prerequisites":"稳定 ID；由作者确认功能与限制"},
@@ -22,6 +22,6 @@
     {"id":"codex-host","name":"接入本地 Codex 客户端","guide":"/integrations/codex","example":"examples/codex-host/verify.mjs","source":"src/cli/maintenance.ts","symbols":[],"whenToUse":"本地 CLI、桌面或 IDE 查询能力","input":"setup 配置及宿主任务","output":"登记、发现与解析","prerequisites":"同一 host 共享配置；真实模型任务单独核验"},
     {"id":"plugin-host","name":"通过 Skill 与 Plugin 接入","guide":"/integrations/skill-plugin","example":"plugin/mcp.json","source":"plugin/plugin.json","symbols":[],"whenToUse":"宿主支持 Plugin 安装与 Skill 加载","input":"显式安装与业务配置","output":"Skill 和 Graph 工具","prerequisites":"按宿主实际支持范围安装"},
     {"id":"remote-host","name":"连接远程 HTTPS 服务","guide":"/integrations/remote","example":"website/content/integrations/remote.md","source":"src/mcp/index.ts","symbols":[],"whenToUse":"多客户端访问受控远程 Graph","input":"域名、认证及兼容宿主","output":"受认证 MCP 连接","prerequisites":"分别验证 TLS、协议和认证"},
-    {"id":"cli-operations","name":"校验配置与维护登记","guide":"/integrations/cli","example":"examples/minimal/graph.config.json","source":"src/cli/main.ts","symbols":[],"whenToUse":"validate、serve、setup、doctor、clean","input":"命令与显式路径","output":"JSON 报告与退出码","prerequisites":"Node >=22.12.0；安装不自动登记"}
+    {"id":"cli-operations","name":"校验配置与维护登记","guide":"/integrations/cli","example":"examples/minimal/graph.config.json","source":"src/cli/main.ts","symbols":[],"whenToUse":"validate、serve、setup、doctor、clean","input":"命令与显式路径","output":"JSON 报告与退出码","prerequisites":"Node ^20.19.0 || >=22.12.0；Node20使用本库2.1.0起的版本；安装不自动登记"}
   ]
 }

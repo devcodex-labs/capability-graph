@@ -21,7 +21,7 @@ PowerShell 用 `Copy-Item -LiteralPath node_modules/@devcodex/capability-graph/p
 4. 将该目录加入宿主的本地 marketplace，再显式安装 Plugin。marketplace 顶层 `name` 为 `capability-graph-local`；`plugins[]` 中的 `name` 为 `capability-graph`，与 Plugin 清单一致。例如 plugins 项为 `{name:'capability-graph',source:{source:'local',path:'./plugin'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'},category:'Productivity'}`。路径相对于 marketplace 根。使用 `codex plugin marketplace add /absolute/marketplace-root`，然后 `codex plugin add capability-graph@capability-graph-local`；安装 ID 为 `插件名@marketplace名`。只有你显式执行这些命令才修改该宿主配置。
 5. 用 capability-discovery Skill 执行目录→语义选择→resolve，检查 partial/unknown 和 Revision。Codex CLI 0.163.0 需要 `-c features.mcp_2026_07_28=true`；其他宿主版本请确认其 HTTP 协议配置。宿主需要能只读读取已安装 SKILL.md。默认 server 不调用模型。
 
-Codex Plugin 使用 HTTP。Codex Plugin 的 stdio 模式不在 v2.0.1 支持范围内；需要 stdio 时使用 [setup 登记](/integrations/codex)。其他 MCP 客户端的 stdio 配置见 [MCP](/integrations/mcp)。
+Codex Plugin 使用 HTTP。Codex Plugin 的 stdio 模式不在 v2.1.0 支持范围内；需要 stdio 时使用 [setup 登记](/integrations/codex)。其他 MCP 客户端的 stdio 配置见 [MCP](/integrations/mcp)。
 
 可单独把 `plugin/skills/capability-discovery` 复制到宿主支持的 Skill 位置；安装 Skill 不会自动接通 MCP。不要把临时验证环境的登录文件或安装缓存纳入 Plugin。
 
@@ -125,7 +125,7 @@ plugin/plugin.json：
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "capability-graph",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Discover declared capabilities and resolve their dependency graph before using them.",
   "license": "Apache-2.0"
 }
@@ -147,7 +147,7 @@ plugin/.codex-plugin/plugin.json与plugin/.mcp.json（兼容格式）：
 ```json
 {
   "name": "capability-graph",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Discover declared capabilities and resolve their dependency graph before using them.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json"

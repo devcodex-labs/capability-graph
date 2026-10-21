@@ -9,11 +9,15 @@ const base = path.resolve(process.env.CG_ARTIFACTS_DIR ?? path.join(source, '../
 await fs.mkdir(base, { recursive: true });
 const root = await fs.mkdtemp(path.join(base, 'package-'));
 const build = path.join(root, 'build'), stage = path.join(root, 'stage'), consumer = path.join(root, 'consumer');
-const env = { ...process.env, PATH: path.dirname(process.execPath) + path.delimiter + process.env.PATH, npm_config_cache: path.join(base, 'npm-cache'), CG_BUILD_DIR: build };
+const env = { ...process.env, PATH: path.dirname(process.execPath) + path.delimiter + process.env.PATH, npm_config_cache: process.env.npm_config_cache ?? path.join(base, 'npm-cache'), CG_BUILD_DIR: build };
 function run(command, args, cwd = source, extra = {}) {
-  const result = spawnSync(command, args, { cwd, env: { ...env, ...extra }, encoding: 'utf8', timeout: 120000, shell: process.platform === 'win32' && command === 'npm' });
+  // Bypass host shims (for example Volta) when HOME is isolated; keep this exact Node.
+  if (command === 'npm') assert(process.env.npm_execpath, 'Run package checks through an npm script.');
+  const executable = command === 'npm' ? process.execPath : command;
+  const parameters = command === 'npm' ? [process.env.npm_execpath, ...args] : args;
+  const result = spawnSync(executable, parameters, { cwd, env: { ...env, ...extra }, encoding: 'utf8', timeout: 120000 });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed\n${result.stdout}\n${result.stderr}`);
+  if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed (exit=${result.status}, signal=${result.signal})\n${result.stdout}\n${result.stderr}`);
   return result.stdout;
 }
 run(process.execPath, ['scripts/build.mjs']);
@@ -25,9 +29,9 @@ const pack = JSON.parse(run('npm', ['pack', '--json'], stage))[0]; const tarball
 assert(!pack.files.some(f => /(^|\/)(?:auth\.json|node_modules|src|test|website|docs|\.env)(?:\/|$)/.test(f.path)));
 assert(!Object.keys(manifest.scripts).some(key => /^(?:preinstall|install|postinstall|prepare)$/.test(key)));
 await fs.mkdir(consumer); const home = path.join(root, 'home'); await fs.mkdir(home);
-const consumerManifest = { name: 'independent-capability-graph-consumer', version: '0.0.0', private: true, type: 'module', dependencies: { [manifest.name]: `file:${tarball}`, '@modelcontextprotocol/client': '2.3.1', typescript: '5.9.2', '@types/node': '24.0.0' } };
+const consumerManifest = { name: 'independent-capability-graph-consumer', version: '0.0.0', private: true, type: 'module', dependencies: { [manifest.name]: `file:${tarball}`, '@modelcontextprotocol/client': '2.3.1', typescript: '5.9.2', '@types/node': '20.19.0' } };
 await fs.writeFile(path.join(consumer, 'package.json'), JSON.stringify(consumerManifest));
-run('npm', ['install', '--omit=optional', '--no-audit', '--no-fund'], consumer, { HOME: home, USERPROFILE: home });
+run('npm', ['install', '--omit=optional', '--engine-strict', '--no-audit', '--no-fund'], consumer, { HOME: home, USERPROFILE: home });
 for (const name of ['openai', '@openai/codex-sdk']) await assert.rejects(fs.stat(path.join(consumer, 'node_modules', name)), { code: 'ENOENT' });
 for (const name of ['.codex', '.agents']) await assert.rejects(fs.stat(path.join(home, name)), { code: 'ENOENT' });
 const packageRoot = path.join(consumer, 'node_modules', '@devcodex/capability-graph');
@@ -97,14 +101,53 @@ for (const args of [['setup', '--host', 'codex', '--config', path.join(consumer,
 }
 // Fixed relative shell arguments keep user-controlled directory names out of cmd parsing.
 const bin = path.join('node_modules', '.bin', 'capability-graph' + (process.platform === 'win32' ? '.cmd' : ''));
-const cli = spawnSync(bin, ['doctor', '--config', 'config.json'], { cwd: consumer, encoding: 'utf8', env, timeout: 10000, shell: process.platform === 'win32' });
+const binStarted = Date.now();
+const cli = spawnSync(bin, ['doctor', '--config', 'config.json'], { cwd: consumer, encoding: 'utf8', env, timeout: 90000, shell: process.platform === 'win32' });
+assert.equal(cli.error, undefined, `CLI bin doctor after ${Date.now() - binStarted}ms (pid=${cli.pid}, status=${cli.status}, signal=${cli.signal})\n${cli.stdout}\n${cli.stderr}`);
 assert.equal(cli.status, 0, cli.stderr); assert.equal(JSON.parse(cli.stdout).toolCount, 5);
 run(process.execPath, [path.join(source, 'scripts/check-doc-examples.mjs')], consumer, {
   CG_DOC_CONSUMER: consumer,
   CG_DOC_ARTIFACTS_DIR: path.join(root, 'docs-examples'),
   CG_DOC_PACKAGE_INTEGRITY: pack.integrity
 });
-const evidence = { status: 'PASS', node: process.version, platform: process.platform, tarball, integrity: pack.integrity, files: pack.files, consumer, optionalSDKsAbsent: true, types: 'PASS (skipLibCheck=false)', runtime: runtime.trim(), bin: 'PASS', examples: 'PASS minimal/multi-provider/embedded MCP', maintenance: 'PASS installed setup/doctor/clean' };
+// Keep the no-SDK consumer intact; each SDK gets its own valid manifest and dependency tree.
+const [major, minor] = process.versions.node.split('.').map(Number);
+const sdkVersions = ['6.49.0', ...(major > 22 || major === 22 && minor >= 12 ? ['7.39.0'] : [])];
+const sdkConsumers = [];
+for (const sdk of sdkVersions) {
+  const directory = path.join(root, 'consumer-openai-' + sdk);
+  await fs.mkdir(directory);
+  await fs.writeFile(path.join(directory, 'package.json'), JSON.stringify({name: 'packed-openai-consumer', version: '0.0.0', private: true, type: 'module', dependencies: {[manifest.name]: `file:${tarball}`, openai: sdk, typescript: '5.9.2', '@types/node': '20.19.0'}}));
+  run('npm', ['install', '--engine-strict', '--no-audit', '--no-fund'], directory);
+  run('npm', ['ls', 'openai', '@types/node'], directory);
+  assert.equal(JSON.parse(await fs.readFile(path.join(directory, 'node_modules/openai/package.json'), 'utf8')).version, sdk);
+  assert(!(await fs.lstat(path.join(directory, 'node_modules', manifest.name))).isSymbolicLink());
+  await fs.writeFile(path.join(directory, 'adapter.ts'), `import {CapabilityGraph, type ModelExecutor} from '@devcodex/capability-graph';
+import {createOpenAIExecutor, type OpenAIExecutorOptions} from '@devcodex/capability-graph/adapters/openai';
+const options:OpenAIExecutorOptions={apiKey:'controlled',model:'controlled'};
+const model:ModelExecutor=createOpenAIExecutor(options);void [CapabilityGraph,model];\n`);
+  await fs.writeFile(path.join(directory, 'tsconfig.json'), JSON.stringify({compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',strict:true,noEmit:true,skipLibCheck:false},files:['adapter.ts']}));
+  run(process.execPath, ['node_modules/typescript/bin/tsc', '--pretty', 'false'], directory);
+  await fs.writeFile(path.join(directory, 'adapter.mjs'), `import assert from 'node:assert/strict';
+import {CapabilityGraph,GraphError} from '@devcodex/capability-graph';
+import {createOpenAIExecutor} from '@devcodex/capability-graph/adapters/openai';
+let calls=0,status='completed';
+const model=createOpenAIExecutor({apiKey:'synthetic-never-sent',model:'controlled',fetch:async(url,init)=>{
+  calls++;assert.equal(String(url),'https://api.openai.com/v1/responses');
+  const body=JSON.parse(init.body);assert.equal(body.store,false);assert.equal(body.text.format.strict,true);
+  return Response.json({id:'resp_packed',object:'response',created_at:1,status,error:null,model:'controlled',output:[{type:'message',role:'assistant',id:'msg_packed',status:'completed',content:[{type:'output_text',annotations:[],text:JSON.stringify({decision:'selected',ids:['packed::route'],reason:null,missingInformation:[]})}]}]});
+}});
+const graph=await CapabilityGraph.open({providers:[{definition:{providerId:'packed',name:'Packed',version:'1',capabilities:[{id:'route',name:'Route',description:'A route'}]}}],model});
+try{
+  const result=await graph.match({input:'Choose the route'});assert.equal(result.status,'matched');assert.equal(calls,1);
+  status='failed';await assert.rejects(graph.match({input:'Choose the route'}),e=>e instanceof GraphError&&e.code==='CG_MODEL_UNAVAILABLE');assert.equal(calls,2);
+  status='in_progress';await assert.rejects(graph.match({input:'Choose the route'}),e=>e instanceof GraphError&&e.code==='CG_MODEL_OUTPUT_INVALID');assert.equal(calls,3);
+}finally{await graph.close();}
+console.log('PASS packed OpenAI SDK ${sdk}: strict Responses, final status, no retries, types20 and cleanup');\n`);
+  const runtime = run(process.execPath, ['adapter.mjs'], directory).trim();
+  sdkConsumers.push({sdk, directory, types:'PASS (Node20.19; skipLibCheck=false)', runtime});
+}
+const evidence = { status: 'PASS', node: process.version, platform: process.platform, tarball, integrity: pack.integrity, files: pack.files, consumer, optionalSDKsAbsent: true, sdkConsumers, types: 'PASS (Node20.19; skipLibCheck=false)', runtime: runtime.trim(), bin: 'PASS', examples: 'PASS minimal/multi-provider/embedded MCP', maintenance: 'PASS installed setup/doctor/clean' };
 await fs.writeFile(path.join(root, 'evidence.json'), JSON.stringify(evidence, null, 2));
 if (process.env.CG_RELEASE_DIR) {
   const output = path.resolve(process.env.CG_RELEASE_DIR), repository = await fs.realpath(source);

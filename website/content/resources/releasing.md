@@ -7,7 +7,7 @@
 推送 `vMAJOR.MINOR.PATCH` 稳定版本 tag 后，`release.yml` 自动完成以下步骤：
 
 1. 检查 tag、包版本、锁文件、Plugin、站点与 MCP 身份版本，并确认该提交属于 main。
-2. 运行 Linux/Windows × Node 22/24 的测试与独立消费者，以及文档构建、浏览器检查和发版保护测试。
+2. 运行 Linux/Windows × Node 20.19.0/22.12.0/24 的基础测试与独立消费者；22.12/24还需SDK7完整测试。再完成文档构建、浏览器检查和发版保护测试，不能将本地Windows结果当成远端六格CI通过。
 3. 构建一个经过独立消费者验证的 npm 包，生成 SHA256SUMS，查询 Registry 是否已有相同版本。
 4. 发布该包并附 npm provenance，再下载 Registry 包核对字节，检查精确版本和默认安装、公开入口与 CLI。
 5. 创建或恢复同名 GitHub Release，上传同一个包与 SHA256SUMS。
@@ -55,11 +55,11 @@ npm test
 npm run smoke:package
 ```
 
-版本、文档和测试提交推送至 main 后，以 2.0.1 为例：
+版本、文档和测试提交推送至 main 后，以 2.1.0 为例：
 
 ```sh
-git tag -a v2.0.1 -m "Release v2.0.1"
-git push origin v2.0.1
+git tag -a v2.1.0 -m "Release v2.1.0"
+git push origin v2.1.0
 ```
 
 仅推送 tag 会触发正式发布；工作流不自行创建 tag。预发布版本 tag 暂不支持，格式错误或版本不一致会在发布前失败。

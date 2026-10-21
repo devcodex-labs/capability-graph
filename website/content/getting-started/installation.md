@@ -1,6 +1,10 @@
 # 安装
 
-本手册对应 Capability Graph **v2.0.1**。使用 Node.js >=22.12.0，支持 JavaScript/TypeScript 和 ESM。运行条件见[版本与兼容](/resources/compatibility)。
+本手册对应 Capability Graph **v2.1.0**。使用 Node.js 20.19+（20.x）或 >=22.12.0，支持 JavaScript/TypeScript 和 ESM。运行条件见[版本与兼容](/resources/compatibility)。
+
+:::tip 版本条件
+Node 20 与 SDK 6 支持从 v2.1.0 开始。若仍使用 v2.0.1，请使用 Node >=22.12.0 和 SDK 7。在应用中执行 npm ls @devcodex/capability-graph 核对实际安装版本；站点随 main 更新。
+:::
 
 ## 安装到你的应用
 
@@ -34,6 +38,15 @@ capability-graph doctor --config /absolute/path/graph.config.json
 
 GUI 宿主使用已安装 bin 的绝对路径；[Codex setup](/integrations/codex) 会保存当前 Node、CLI 和配置的绝对路径。
 
-安装不启动服务、不调用模型、不登记宿主。静态 SDK 不要求 OpenAI SDK、Codex SDK 或模型凭据。主动 OpenAI 匹配另装 openai@7.39.0；独立 Codex adapter 使用原生 CLI，不使用 Codex SDK。
+安装不启动服务、不调用模型、不登记宿主。静态 SDK、CLI、Tool 和 MCP 不要求模型 SDK 或凭据。独立 Codex adapter 使用原生 CLI，不使用 Codex SDK。
+
+应用主动使用 OpenAI 匹配时，再按运行环境选择一个可选 SDK，命令在应用项目中执行：
+
+| 运行环境 | 可选 SDK | 安装命令 |
+| --- | --- | --- |
+| Node 20.19+（20.x） | 6.49.0 | `npm install @devcodex/capability-graph openai@6.49.0` |
+| Node 22.12+ / 24 | 7.39.0；也兼容 6.49.0 | `npm install @devcodex/capability-graph openai@7.39.0` |
+
+不要在 Node 20 安装 SDK 7。安装完成后按 [OpenAI 调用说明](/models/openai)显式配置 API Key 和有权限的模型；安装成功不代表模型账号已验证。
 
 安装后可运行[第一个图谱](/getting-started/quick-start)，或选择[宿主接入方式](/integrations/overview)。源码贡献者的构建和测试见[开发说明](/resources/development)。

@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registration, replaceRegistration } from '../src/cli/registration.js';
+import { diagnose } from '../src/cli/diagnose.js';
 
 const cli = fileURLToPath(new URL('../src/cli/main.js', import.meta.url));
 async function fixture(run: (f: { root: string; config: string; toml: string; skill: string; state: string; call: (...args: string[]) => { code: number | null; report: any; stdout: string } }) => Promise<void>) {
@@ -15,11 +16,23 @@ async function fixture(run: (f: { root: string; config: string; toml: string; sk
   await writeFile(config, JSON.stringify({ providers: [{ file: './provider.json' }], allowedProviders: ['demo'] }));
   const env = { ...process.env, HOME: root, USERPROFILE: root, CODEX_HOME: path.join(root, '.codex') };
   const call = (...args: string[]) => {
-    const result = spawnSync(process.execPath, [cli, ...args, '--json'], { cwd: path.dirname(root), env, encoding: 'utf8', timeout: 20000 });
-    assert.ifError(result.error); assert(result.stdout.trim(), result.stderr); return { code: result.status, report: JSON.parse(result.stdout), stdout: result.stdout };
+    const started = Date.now();
+    // The test envelope includes cold Node loading, MCP discovery and process cleanup.
+    const result = spawnSync(process.execPath, [cli, ...args, '--json'], { cwd: path.dirname(root), env, encoding: 'utf8', timeout: 90000 });
+    const diagnostics = `CLI ${JSON.stringify(args)} after ${Date.now() - started}ms (status=${result.status}, signal=${result.signal}, error=${result.error?.message ?? 'none'})\nstdout: ${result.stdout}\nstderr: ${result.stderr}`;
+    assert.equal(result.error, undefined, diagnostics); assert(result.stdout.trim(), diagnostics); return { code: result.status, report: JSON.parse(result.stdout), stdout: result.stdout };
   };
   try { await run({ root, config, toml, skill, state, call }); } finally { await rm(root, { recursive: true, force: true }); }
 }
+test('diagnostic accepts delayed MCP readiness and reaps the service process', async () => fixture(async f => {
+  const entry = path.join(f.root, 'slow-service.mjs'), pidFile = path.join(f.root, 'service.pid');
+  const graphModule = new URL('../src/index.js', import.meta.url).href, mcpModule = new URL('../src/mcp/index.js', import.meta.url).href;
+  await writeFile(entry, `import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));const {CapabilityGraph}=await import(${JSON.stringify(graphModule)});const {createMcpServer}=await import(${JSON.stringify(mcpModule)});await new Promise(r=>setTimeout(r,11000));const graph=await CapabilityGraph.open({providers:[]});const server=createMcpServer({graph,transport:'stdio'});try{await server.start();await server.waitUntilClosed();}finally{await graph.close();}`);
+  assert.equal(await diagnose(process.execPath, [entry]), 5);
+  const pid = Number(await readFile(pidFile, 'utf8')); assert(Number.isSafeInteger(pid) && pid > 0);
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+}));
+
 test('maintenance preview does not create home files or start an invalid Provider source', async () => fixture(async f => {
   await writeFile(f.config, JSON.stringify({ providers: [{ file: './missing.json' }] }));
   const preview = f.call('setup', '--host', 'codex', '--config', f.config, '--dry-run');
@@ -61,7 +74,9 @@ test('TOML layout protection covers inline, dotted, nested, array and malformed 
 });
 test('maintenance validates argument combinations and absolute JSON paths without changing old doctor', async () => fixture(async f => {
   for (const args of [['setup', '--host', 'other', '--config', f.config], ['setup', '--host', 'codex'], ['setup', '--host', 'codex', '--config', 'relative.json'], ['doctor', '--host', 'codex', '--dry-run'], ['clean', '--host', 'codex', '--repair'], ['doctor', '--host', 'codex', '--config', f.config], ['setup', '--host', 'codex', '--config', f.config, '--host', 'codex']]) assert.equal(f.call(...args).code, 2, args.join(' '));
-  const old = spawnSync(process.execPath, [cli, 'doctor', '--config', f.config], { encoding: 'utf8' }); assert.equal(old.status, 0, old.stderr); assert.equal(JSON.parse(old.stdout).toolCount, 5); assert(!('command' in JSON.parse(old.stdout)));
+  const old = spawnSync(process.execPath, [cli, 'doctor', '--config', f.config], { encoding: 'utf8', timeout: 90000 });
+  assert.equal(old.error, undefined, `doctor (pid=${old.pid}, status=${old.status}, signal=${old.signal})\n${old.stdout}\n${old.stderr}`);
+  assert.equal(old.status, 0, old.stderr); assert.equal(JSON.parse(old.stdout).toolCount, 5); assert(!('command' in JSON.parse(old.stdout)));
 }));
 test('symbolic maintenance directories cannot redirect writes', async () => fixture(async f => {
   const target = path.join(f.root, 'elsewhere'); await mkdir(target); await symlink(target, path.join(f.root, '.codex'), process.platform === 'win32' ? 'junction' : 'dir');
@@ -72,7 +87,8 @@ test('interrupted owned transaction can recover without storing or overwriting u
   const faultyCli = path.join(f.root, 'faulty.mjs'), launcher = path.join(f.root, 'launch.mjs');
   await writeFile(faultyCli, `import {mkdir} from 'node:fs/promises';await mkdir(${JSON.stringify(f.state)},{recursive:true});await import(${JSON.stringify(new URL('../src/cli/main.js', import.meta.url).href)});`);
   await writeFile(launcher, `import {maintain} from ${JSON.stringify(new URL('../src/cli/maintenance.js', import.meta.url).href)};const x=await maintain({command:'setup',config:${JSON.stringify(f.config)},cli:${JSON.stringify(faultyCli)},skillSource:${JSON.stringify(path.join(process.cwd(), 'plugin/skills/capability-discovery/SKILL.md'))},dryRun:false,repair:false});console.log(JSON.stringify(x));`);
-  const fail = spawnSync(process.execPath, [launcher], { encoding: 'utf8', timeout: 20000, env: { ...process.env, HOME: f.root, USERPROFILE: f.root, CODEX_HOME: path.dirname(f.toml) } }); assert.ifError(fail.error);
+  const fail = spawnSync(process.execPath, [launcher], { encoding: 'utf8', timeout: 90000, env: { ...process.env, HOME: f.root, USERPROFILE: f.root, CODEX_HOME: path.dirname(f.toml) } });
+  assert.equal(fail.error, undefined, `recovery launcher (pid=${fail.pid}, status=${fail.status}, signal=${fail.signal})\n${fail.stdout}\n${fail.stderr}`);
   const report = JSON.parse(fail.stdout); assert.equal(report.exitCode, 3, fail.stderr); assert.equal(registration(await readFile(f.toml, 'utf8')), undefined); assert((await readFile(f.toml, 'utf8')).includes(original));
   const journal = path.join(path.dirname(f.state), 'transaction.json'); assert(!(await readFile(journal, 'utf8')).includes('private-value-not-for-journal'));
   await rm(f.state, { recursive: true }); const recovered = f.call('clean', '--host', 'codex'); assert.equal(recovered.code, 0, recovered.stdout); await assert.rejects(stat(journal), { code: 'ENOENT' });

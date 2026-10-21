@@ -4,7 +4,7 @@
 
 ## 本地文件与 URL 引用的完整示例
 
-先按[安装](/getting-started/installation)准备 Node.js >=22.12.0 的项目。下面三个文件放在同一目录；也可以按[运行示例](/examples/index)复制后运行 `node examples/documents/read.mjs`，无需模型或网络请求。
+先按[安装](/getting-started/installation)准备 Node.js 20.19+（20.x）或 >=22.12.0 的项目，Node20使用v2.1.0起的本库版本。下面三个文件放在同一目录；也可以按[运行示例](/examples/index)复制后运行 `node examples/documents/read.mjs`，无需模型或网络请求。
 
 ```text
 documents/

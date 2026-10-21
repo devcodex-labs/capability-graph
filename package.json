@@ -1,6 +1,6 @@
 {
   "name": "@devcodex/capability-graph",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -36,7 +36,7 @@
     "capability-graph": "./dist/cli/main.js"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "types": "./dist/index.d.ts",
   "exports": {
@@ -64,6 +64,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node scripts/test.mjs",
+    "test:openai:compat": "node scripts/test-openai-compat.mjs",
     "smoke:package": "node scripts/package-smoke.mjs",
     "release:check": "node scripts/check-release.mjs",
     "release:registry": "node scripts/release-registry.mjs",
@@ -82,12 +83,12 @@
     "undici": "7.30.1"
   },
   "devDependencies": {
-    "@types/node": "24.0.0",
-    "openai": "7.39.0",
+    "@types/node": "20.19.0",
+    "openai": "6.49.0",
     "typescript": "5.9.2"
   },
   "peerDependencies": {
-    "openai": "^7.39.0"
+    "openai": "^6.49.0 || ^7.39.0"
   },
   "peerDependenciesMeta": {
     "openai": {

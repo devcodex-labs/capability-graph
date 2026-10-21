@@ -2,7 +2,7 @@
 
 Describe the capabilities of a framework, SDK, or project in static JSON. Let applications and AI hosts discover them, read usage guidance, check applicability, and resolve declared dependencies.
 
-**v2.0.1** · Node.js / TypeScript · MCP stdio / Streamable HTTP · Apache-2.0
+**v2.1.0** · Node.js / TypeScript · MCP stdio / Streamable HTTP · Apache-2.0
 
 A Provider is a named source of capability definitions. Its author declares capabilities and relationships; the application or model selects existing IDs; Graph validates access, supplied facts, and dependencies. The caller decides how to use the result. Graph does not execute capabilities, infer project facts, or provide an agent runtime, RAG, or embeddings.
 
@@ -24,7 +24,9 @@ For an existing Agent or MCP Server, use the [tool adapter](https://devcodex-lab
 
 ## Install
 
-Requires **Node.js >=22.12.0 and ESM**. Use `.mjs`, or set `"type":"module"` for JavaScript; compile TypeScript as ESM/NodeNext.
+Requires **Node.js 20.19+ (20.x) or >=22.12.0, and ESM**. Use `.mjs`, or set `"type":"module"` for JavaScript; compile TypeScript as ESM/NodeNext.
+
+> Node 20 and OpenAI SDK 6 support starts with v2.1.0. If you still use v2.0.1, run Node >=22.12.0 with SDK 7. Check your installed version with `npm ls @devcodex/capability-graph`.
 
 In a new application directory (Bash or PowerShell):
 
@@ -36,6 +38,15 @@ npm install @devcodex/capability-graph
 ```
 
 Static queries need no model SDK, account, or API key. Installation does not start a service or register anything in your AI host. Run the local CLI with `npx --no-install capability-graph`; [installation options](https://devcodex-labs.github.io/capability-graph/getting-started/installation.html) include a global CLI install.
+
+For application-owned OpenAI matching, install the optional SDK for your runtime:
+
+| Runtime | Install in the application directory |
+| --- | --- |
+| Node 20.19+ (20.x) | `npm install @devcodex/capability-graph openai@6.49.0` |
+| Node 22.12+ / 24 | `npm install @devcodex/capability-graph openai@7.39.0` (6.49.0 also supported) |
+
+The [OpenAI guide](https://devcodex-labs.github.io/capability-graph/models/openai.html) explains API credentials, model selection, gateway configuration, results, and errors. Ordinary MCP hosts use their own model and do not need this SDK.
 
 ## Your first graph
 
@@ -261,7 +272,7 @@ console.log(upstream.source.url); // https://example.com/guide
 | Connect another MCP client | [stdio and HTTP](https://devcodex-labs.github.io/capability-graph/integrations/mcp.html): client-owned stdio process or a separately running HTTP service. |
 | Use a private remote service | [HTTPS and Bearer client](https://devcodex-labs.github.io/capability-graph/integrations/remote.html): reachable TLS endpoint, compatible protocol, and authentication accepted by the host. |
 | Distribute a Skill / Plugin | [Plugin installation](https://devcodex-labs.github.io/capability-graph/integrations/skill-plugin.html): an explicit host installation and a running HTTP service for the Plugin. |
-| Match using OpenAI | [OpenAI](https://devcodex-labs.github.io/capability-graph/models/openai.html): optional `openai@7.39.0`, API credentials, and Responses with strict Structured Outputs. |
+| Match using OpenAI | [OpenAI](https://devcodex-labs.github.io/capability-graph/models/openai.html): `openai@6.49.0` on Node 20.19+; SDK 6.49.0 or 7.39.0 on Node 22.12+ / 24, API credentials, and Responses with strict Structured Outputs. |
 | Match using a separate Codex process | [Independent Codex CLI](https://devcodex-labs.github.io/capability-graph/models/codex.html): Linux, bubblewrap, pinned native CLI 0.163.0, trusted runtime and dedicated login directory. |
 | Reuse an existing model | [Custom executor](https://devcodex-labs.github.io/capability-graph/models/custom.html): adapt the application's model call to the public ModelExecutor contract. |
 

@@ -1,6 +1,6 @@
 # OpenAI 与兼容网关
 
-适用于应用主动 match，不是普通 Codex 宿主使用 MCP 的前置条件。另装 openai@7.39.0；配置有效 API Key 与有权限且支持 strict Structured Outputs 的模型。CLI 网页登录不能代替 API 凭据。
+适用于应用主动 match，不是普通 Codex 宿主使用 MCP 的前置条件。Node 20.19+（20.x）另装 openai@6.49.0；Node 22.12+ / 24 可用6.49.0或7.39.0。Node20路线从本库v2.1.0开始，先核对[安装版本条件](/getting-started/installation)，再配置有效 API Key 与有权限且支持 strict Structured Outputs 的模型。CLI 网页登录不能代替 API 凭据。
 
 | createOpenAIExecutor 字段 | 必填 / 默认 | 说明 |
 | --- | --- | --- |
@@ -12,7 +12,13 @@
 
 ## 安装与完整调用
 
-在你的应用项目中先按[快速开始](/getting-started/quick-start)保存provider.json；本例不需要知识文件。安装本库和可选SDK：
+在你的应用项目中先按[快速开始](/getting-started/quick-start)保存provider.json；本例不需要知识文件。Node 20.19+（20.x）安装v2.1.0起的本库版本和兼容SDK：
+
+```sh
+npm install @devcodex/capability-graph openai@6.49.0
+```
+
+Node 22.12+ / 24 可继续使用SDK 7；两种组合使用下面同一调用代码和参数：
 
 ```sh
 npm install @devcodex/capability-graph openai@7.39.0

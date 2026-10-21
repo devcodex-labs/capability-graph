@@ -191,7 +191,7 @@ stdio协商2025-06-18时，当前官方SDK2.3.1实测仍返回content:[]、struc
   "_meta": {
     "io.modelcontextprotocol/serverInfo": {
       "name": "capability-graph",
-      "version": "2.0.1"
+      "version": "2.1.0"
     }
   },
   "content": [],
@@ -279,7 +279,7 @@ stdio协商2025-06-18时，当前官方SDK2.3.1实测仍返回content:[]、struc
   "_meta": {
     "io.modelcontextprotocol/serverInfo": {
       "name": "capability-graph",
-      "version": "2.0.1"
+      "version": "2.1.0"
     }
   },
   "content": [

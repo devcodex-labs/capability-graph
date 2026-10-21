@@ -8,7 +8,7 @@
       "title": "verify.mjs",
       "source": "examples/codex-host/verify.mjs",
       "assertions": ["five static tool calls", "literal summary and full output", "isolated setup doctor clean"],
-      "prerequisites": "Node >=22.12.0; isolated HOME only; no real model or client configuration changes."
+      "prerequisites": "Node ^20.19.0 || >=22.12.0; isolated HOME only; no real model or client configuration changes."
     },
     {
       "id": "minimal-file",
@@ -158,7 +158,7 @@
       "category": "conditional",
       "page": "models/openai.md",
       "title": "openai.mjs",
-      "prerequisites": "Account, API key, permitted model, Responses strict; real paid requests require separate user authorization."
+      "prerequisites": "Node20.19+ (20.x) with openai@6.49.0, or Node22.12+/24 with openai@6.49.0 or 7.39.0; account, API key, permitted model and Responses strict; real paid requests require separate user authorization."
     },
     {
       "id": "codex",
@@ -180,7 +180,7 @@
       "category": "conditional",
       "page": "examples/vextjs.md",
       "source": "examples/vextjs/verify.mjs",
-      "prerequisites": "Separately installed vextjs@2.0.0; Node22.12 uses --experimental-strip-types."
+      "prerequisites": "Node >=22.12.0 and separately installed vextjs@2.0.0 for the TS route with --experimental-strip-types; Node20 runs only the separate graph example."
     },
     {
       "id": "plugin",

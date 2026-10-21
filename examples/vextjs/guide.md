@@ -4,12 +4,18 @@
 
 `greeting.create` 是本例组合流程，明确依赖 `route.post` 和 `validation.body`。普通 VextJS 路由可以没有 body 校验；这里的 requires 只描述这个 greeting 流程，不把可选功能说成框架普遍依赖。
 
-在你的 ESM 项目中安装依赖并复制示例，然后运行：
+先在你的 ESM 项目中运行普通图谱示例，Node20.19+（20.x）或22.12+即可；Node20使用本库v2.1.0起的版本：
 
 ```sh
-npm install @devcodex/capability-graph vextjs@2.0.0
+npm install @devcodex/capability-graph
 cp -R node_modules/@devcodex/capability-graph/examples ./examples
 node examples/vextjs/resolve.mjs
+```
+
+真实框架验证额外要求Node22.12+，再安装框架并运行；Node20只执行上面的图谱解析，不执行此命令：
+
+```sh
+npm install vextjs@2.0.0
 node --experimental-strip-types examples/vextjs/verify.mjs
 ```
 

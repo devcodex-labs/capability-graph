@@ -1,7 +1,10 @@
 {
   "name": "capability-graph-website",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "private": true,
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "node scripts/run.mjs dev",

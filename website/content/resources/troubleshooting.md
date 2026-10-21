@@ -6,7 +6,8 @@
 
 | 现象 | 诊断命令或检查位置 | 应观察什么 | 恢复 |
 | --- | --- | --- | --- |
-| 文档方法与安装不一致 | node --version；npm ls @devcodex/capability-graph | Node>=22.12，实际安装版本匹配手册 | 站点可能先于npm发布，核对版本后选择手册 |
+| 文档方法与安装不一致 | node --version；npm ls @devcodex/capability-graph | 运行范围为20.19+（20.x）或22.12+；实际版本匹配手册 | Node20使用本库v2.1.0起的版本；旧v2.0.1仍需22.12+，见[安装版本条件](/getting-started/installation) |
+| Node20安装模型SDK报EBADENGINE或peer冲突 | npm ls @devcodex/capability-graph openai | SDK7要求更高Node；旧2.0.1不接受SDK6 | 升级本库至v2.1.0起的版本并固定openai@6.49.0；保留旧包时使用Node22.12+/SDK7，不忽略engine错误 |
 | 找不到命令 | 本地项目执行 npx --no-install capability-graph；GUI 宿主核对 bin 绝对路径 | 已安装包和正确路径 | 跨项目需要 CLI 时再全局安装 |
 | 换目录后来源丢失 | SDK 的 open cwd；CLI 的配置文件目录 | 实际解析的声明路径 | 脚本使用 import.meta.url，配置路径按其目录填写 |
 | 文档读取失败 | capabilityId/documentId、文档根与 source | 本地存在且合法 UTF-8；URL 仅引用 | 修正声明/正文；URL 从详情取得，不用 readDocument 抓取 |

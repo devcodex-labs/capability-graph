@@ -52,7 +52,8 @@ test('Codex adapter rejects unsupported platforms or a missing CLI before starti
 });
 
 const completeResponse = {
-  id: 'resp_boundary', object: 'response', created_at: 1, access_programs: null,
+  // SDK 7 adds metadata absent from SDK 6's type; retain it without widening the response contract.
+  id: 'resp_boundary', object: 'response', created_at: 1, ...{ access_programs: null },
   output_text: JSON.stringify(wire), status: 'completed', error: null, incomplete_details: null,
   instructions: null, metadata: {}, model: 'controlled', parallel_tool_calls: false,
   temperature: 1, tool_choice: 'auto', tools: [], top_p: 1,

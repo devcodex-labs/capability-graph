@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: ['22.12.0', '24']
+        node: ['20.19.0', '22.12.0', '24']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      - run: npm ci --engine-strict --no-audit --no-fund
       - run: npm test
         env:
           CG_BUILD_DIR: ${{ runner.temp }}/capability-graph-build
@@ -43,3 +43,7 @@ jobs:
       - run: npm run smoke:package
         env:
           CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability graph 中文 artifacts
+      - run: npm run test:openai:compat
+        if: matrix.node != '20.19.0'
+        env:
+          CG_ARTIFACTS_DIR: ${{ runner.temp }}/capability graph SDK7 中文 artifacts

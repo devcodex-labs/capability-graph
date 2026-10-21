@@ -1,5 +1,7 @@
 # 运行示例
 
+普通图谱示例使用Node20.19+（20.x）或22.12+；Node20使用本库v2.1.0起的版本，见[安装条件](/getting-started/installation)。真实VextJS的TS路由示例另需Node22.12+，不要在Node20传入strip-types标志。
+
 示例随 npm 包的 examples/ 目录一起分发。在你的 ESM 项目中安装并复制：
 
 ```sh
@@ -19,7 +21,7 @@ cp -R node_modules/@devcodex/capability-graph/examples ./examples
 | 已有 MCP Server | MCP 客户端启动 node examples/mcp/server.mjs | 另装官方 server SDK；ping、资源、Prompt 保留，Graph 工具可调用 |
 | 自定义模型 | node examples/custom-executor.mjs | 应用已有 HTTPS 模型及环境变量；真实端点由调用方验证 |
 | VextJS 图谱 | node examples/vextjs/resolve.mjs | 仅静态声明解析，不启动 VextJS |
-| VextJS 真实框架 | node --experimental-strip-types examples/vextjs/verify.mjs | 另装 vextjs@2.0.0；Node22.12剥离类型，真实处理链/内存请求验证 |
+| VextJS 真实框架 | node --experimental-strip-types examples/vextjs/verify.mjs | Node22.12+，另装 vextjs@2.0.0；剥离类型后验证真实处理链/内存请求 |
 
 静态示例无需模型凭据。自定义模型示例会调用你配置的端点，运行前请确认模型权限、认证和费用；各示例页列出所需依赖。
 

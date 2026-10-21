@@ -2,7 +2,7 @@
 
 在你的应用里解析一个“带请求校验的 HTTP 接口”：它显式依赖请求 Schema。Graph 返回声明和依赖，应用负责真正注册路由。
 
-先按[安装说明](/getting-started/installation)安装 `@devcodex/capability-graph`。以下命令在你的 `graph-demo/` 项目根目录执行，Node.js ≥22.12.0；无需模型、凭据或知识文件。首次使用推荐文件式，声明可单独维护；已有程序对象时可选后面的内联式。
+先按[安装说明](/getting-started/installation)安装 `@devcodex/capability-graph`，Node20使用v2.1.0起的本库版本。以下命令在你的 `graph-demo/` 项目根目录执行，使用 Node.js 20.19+（20.x）或 ≥22.12.0；无需模型、凭据或知识文件。首次使用推荐文件式，声明可单独维护；已有程序对象时可选后面的内联式。
 
 ## 1. 创建两项能力的声明
 

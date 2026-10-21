@@ -1,5 +1,13 @@
 # Capability Graph
 
+## 2.1.0
+
+- 最低支持 Node.js 20.19.0，继续支持 Node 22.12+ 和 Node 24；SDK、CLI、Tool Adapter、MCP 与模型适配器沿用现有公开接口。
+- Node 20 的主动 OpenAI 匹配使用可选 openai@6.49.0；Node 22.12+/24 可使用6.49.0或7.39.0。静态查询与普通MCP宿主接入无需模型SDK。
+- 为两条OpenAI SDK路线补齐独立消费者、严格类型检查及Linux/Windows验证矩阵。普通VextJS图谱示例支持Node20，真实TS路由验证仍要求Node22.12+。
+- 维护诊断的启动总时限与首次工具发现对齐MCP SDK标准60秒预算，避免现代stdio的慢冷启动被旧10秒总窗口或8秒首次请求拒收。改进CLI/MCP回归的就绪等待与失败诊断，覆盖迟到确认、早退、冷启动及真实进程回收，保留宿主内容保护检查；业务请求、HTTP和模型超时不变。
+- 同步英文README、安装、模型、示例、兼容说明及站点能力索引。
+
 ## 2.0.1
 
 - OpenAI Responses 匹配只接受 `status: 'completed'` 且 `error: null` 的最终响应，正确区分失败、取消、非最终状态与畸形消息内容。兼容网关也须提供这两个字段。
