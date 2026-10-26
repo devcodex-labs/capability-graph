@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { open, realpath } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { types } from 'node:util';
 import { copyJSON, bytes, descriptors, digest, freezeJSON } from './json.js';
 import { fail, GraphError } from './errors.js';
@@ -59,7 +60,8 @@ export function parseOpen(options: OpenOptions): { sources: SourceConfig[]; allo
 
 /** A bounded handle read prevents stat/read races from bypassing the byte limit. */
 export async function readBounded(file: string, maximum: number): Promise<Buffer> {
-  const handle = await open(file, 'r');
+  // O_NONBLOCK keeps a named pipe from blocking open(); the fstat check below rejects it.
+  const handle = await open(file, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
   try {
     const before = await handle.stat({ bigint: true });
     if (!before.isFile()) throw new Error('Not a regular file');

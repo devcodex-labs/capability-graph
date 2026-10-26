@@ -4,7 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 const required = ['list_providers', 'list_catalog', 'get_capabilities', 'resolve', 'read_document'].map(v => 'capability_graph_' + v);
 export async function diagnose(command: string, args: string[]): Promise<number> {
   const transport = new StdioClientTransport({ command, args, stderr: 'pipe', env: Object.fromEntries(Object.entries(process.env).filter((v): v is [string, string] => v[1] !== undefined)) });
-  const client = new Client({ name: 'capability-graph-diagnostic', version: '2.1.0' }, { versionNegotiation: { mode: { pin: '2026-07-28' } } });
+  const client = new Client({ name: 'capability-graph-diagnostic', version: '2.1.1' }, { versionNegotiation: { mode: { pin: '2026-07-28' } } });
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Include cold Node/module loading using the SDK's standard request budget.
   const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('MCP startup or tool discovery timed out.')), DEFAULT_REQUEST_TIMEOUT_MSEC); });

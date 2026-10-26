@@ -2,7 +2,7 @@
 
 Describe the capabilities of a framework, SDK, or project in static JSON. Let applications and AI hosts discover them, read usage guidance, check applicability, and resolve declared dependencies.
 
-**v2.1.0** · Node.js / TypeScript · MCP stdio / Streamable HTTP · Apache-2.0
+**v2.1.1** · Node.js / TypeScript · MCP stdio / Streamable HTTP · Apache-2.0
 
 A Provider is a named source of capability definitions. Its author declares capabilities and relationships; the application or model selects existing IDs; Graph validates access, supplied facts, and dependencies. The caller decides how to use the result. Graph does not execute capabilities, infer project facts, or provide an agent runtime, RAG, or embeddings.
 

@@ -1,4 +1,5 @@
 import { lstat, readFile, mkdir, open, rename, unlink, rmdir } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -26,7 +27,7 @@ async function safe(file: string): Promise<void> {
 async function read(file: string): Promise<string | null> {
   await safe(file);
   try {
-    const handle = await open(file, 'r');
+    const handle = await open(file, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0)); // a named pipe must not block open()
     try { const stat = await handle.stat(); if (!stat.isFile() || stat.size > maximum) throw new ProtectionConflict('A maintenance file is not a bounded regular file.'); return await handle.readFile('utf8'); }
     finally { await handle.close(); }
   } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }

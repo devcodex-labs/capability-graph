@@ -77,7 +77,7 @@ try {
 
 成功stdout为完整MatchResult，结构和四种业务状态见[结果处理](/models/match)。GraphError输出code/phase/nextAction；认证、额度、网关协议不兼容等不得当作no_match。未配置的环境变量会在创建Graph前明确报错。
 
-SDK只发送本次input、Context、授权精简Catalog、Revision；Responses请求使用text.format的json_schema/strict、store:false并关闭自动重试，不自动读取知识正文。默认遵循系统CA及代理。
+SDK只发送本次input、Context、授权精简Catalog、Revision；Responses请求使用text.format的json_schema/strict、store:false并关闭自动重试，不自动读取知识正文。默认遵循系统CA及代理：依次取第一个非空的 `HTTPS_PROXY`、`https_proxy`、`HTTP_PROXY`、`http_proxy`（空值视为未设置），`NO_PROXY`/`no_proxy` 列出的主机（含子域、可带端口，`*` 表示全部）直连。配置代理后，代理隧道或直连目标的连接失败会立即返回 `CG_MODEL_UNAVAILABLE`，不做隐藏重连。传入自定义 `fetch` 时不使用这些变量。
 
 选择结果只接受顶层 `status:'completed'` 且 `error:null` 的最终响应；兼容网关也必须提供这两个字段。`failed` 返回 `CG_MODEL_UNAVAILABLE`，`cancelled` 返回 `CG_MODEL_CANCELLED`；排队、生成中、不完整、未知或缺失状态，以及完成响应中的异常错误字段，都返回 `CG_MODEL_OUTPUT_INVALID`。即使输出包含合法选择JSON，也不会把这些响应当作成功匹配；适配器不轮询后台任务。
 

@@ -1,5 +1,11 @@
 # Capability Graph
 
+## 2.1.1
+
+- OpenAI 适配器的代理处理与文档一致：遵循 `NO_PROXY`/`no_proxy`，空的代理变量视为未设置而不再屏蔽后续变量；代理断开 CONNECT 隧道或连接失败时立即返回 `CG_MODEL_UNAVAILABLE`，不再紧密重连。
+- 文档读取、Provider/配置文件读取与 CLI 维护在打开前不再被命名管道阻塞，非普通文件直接拒绝，避免请求挂起并耗尽 Node 文件线程池。
+- 新增代理与命名管道回归测试。
+
 ## 2.1.0
 
 - 最低支持 Node.js 20.19.0，继续支持 Node 22.12+ 和 Node 24；SDK、CLI、Tool Adapter、MCP 与模型适配器沿用现有公开接口。

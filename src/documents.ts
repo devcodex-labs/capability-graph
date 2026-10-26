@@ -22,7 +22,8 @@ export async function readDocument(snapshot: Snapshot, capabilityId: string, doc
     const root = provider.documentRootReal ?? await realpath(provider.documentRoot);
     const target = await realpath(path.join(root, ...reference.source.path.split(/[\\/]/)));
     if (!inside(root, target)) fail('CG_DOCUMENT_ACCESS_DENIED', 'document', 'Document escapes its trusted root', 'contact_admin');
-    const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    // O_NONBLOCK keeps a named pipe from blocking open(); fstat below still rejects every non-regular file.
+    const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
     try {
       const before = await handle.stat({ bigint: true });
       if (!before.isFile()) fail('CG_DOCUMENT_UNREADABLE', 'document', 'Document must be a regular file', 'fix_input');

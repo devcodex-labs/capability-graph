@@ -22,7 +22,7 @@ Tool Adapter 以 ok:false/error 返回；MCP 执行错误 isError:true，文本�
 | CG_DOCUMENT_NOT_FOUND | 未声明或文件不存在；检查能力/文档 ID 与相对路径 |
 | CG_DOCUMENT_ACCESS_DENIED | 路径越界/逃逸/正文未授权；修正可信来源 |
 | CG_DOCUMENT_REFERENCE_ONLY | URL 只作为引用；不要期望自动 HTTP 抓取 |
-| CG_DOCUMENT_TOO_LARGE / CG_DOCUMENT_UNREADABLE | 超限/编码/不稳定或不可读文件；修正文档或受信预算 |
+| CG_DOCUMENT_TOO_LARGE / CG_DOCUMENT_UNREADABLE | 超限/编码/不稳定或不可读文件（含命名管道等非普通文件，直接拒绝不等待）；修正文档或受信预算 |
 | CG_MODEL_NOT_CONFIGURED | 调用 match 却没有 executor；配置后调用，静态查询可继续 |
 | CG_MODEL_UNAVAILABLE | 缺可选 SDK、认证/网络/服务不可用；检查模型配置和访问 |
 | CG_MODEL_EXECUTOR_UNSAFE | Codex 平台/版本/隔离前提不满足；提供支持环境，不降级 |

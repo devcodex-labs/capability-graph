@@ -62,7 +62,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   }
   const token = auth.type === 'bearer' ? Buffer.from(auth.token, 'utf8') : undefined;
   const factory = () => {
-    const server = new Server({ name: 'capability-graph', version: '2.1.0' }, { capabilities: { tools: {} }, supportedProtocolVersions: options.transport === 'stdio' ? ['2026-07-28', '2025-06-18'] : ['2026-07-28'] });
+    const server = new Server({ name: 'capability-graph', version: '2.1.1' }, { capabilities: { tools: {} }, supportedProtocolVersions: options.transport === 'stdio' ? ['2026-07-28', '2025-06-18'] : ['2026-07-28'] });
     server.setRequestHandler('tools/list', async () => ({ tools: tools.definitions.map(t => ({ ...t, inputSchema: t.inputSchema as { type: 'object' }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: !t.name.endsWith('_match'), openWorldHint: t.name.endsWith('_match') } })) }));
     server.setRequestHandler('tools/call', async (request, ctx) => {
       const name = request.params.name;

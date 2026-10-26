@@ -1,6 +1,6 @@
 # 安装
 
-本手册对应 Capability Graph **v2.1.0**。使用 Node.js 20.19+（20.x）或 >=22.12.0，支持 JavaScript/TypeScript 和 ESM。运行条件见[版本与兼容](/resources/compatibility)。
+本手册对应 Capability Graph **v2.1.1**。使用 Node.js 20.19+（20.x）或 >=22.12.0，支持 JavaScript/TypeScript 和 ESM。运行条件见[版本与兼容](/resources/compatibility)。
 
 :::tip 版本条件
 Node 20 与 SDK 6 支持从 v2.1.0 开始。若仍使用 v2.0.1，请使用 Node >=22.12.0 和 SDK 7。在应用中执行 npm ls @devcodex/capability-graph 核对实际安装版本；站点随 main 更新。

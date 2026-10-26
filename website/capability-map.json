@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "productVersion": "2.1.0",
+  "productVersion": "2.1.1",
   "failureGuide": "/reference/errors",
   "tasks": [
     {"id":"declare-provider","name":"声明已有能力","guide":"/guide/providers","example":"examples/minimal/provider.json","source":"src/schema.ts","symbols":[],"whenToUse":"让真实功能可被发现","input":"ProviderDefinition","output":"静态能力声明","prerequisites":"稳定 ID；由作者确认功能与限制"},

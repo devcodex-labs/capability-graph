@@ -1,4 +1,4 @@
-import { fetch as proxyFetch, ProxyAgent } from 'undici';
+import { fetch as proxyFetch, EnvHttpProxyAgent, Pool } from 'undici';
 import { GraphError, fail } from '../errors.js';
 import { modelWireSchema, selectionFromWire, validateSelection } from '../model.js';
 import { selectionInput, selectionInstructions } from './prompt.js';
@@ -30,11 +30,16 @@ export function createOpenAIExecutor(options: OpenAIExecutorOptions): ModelExecu
       try { OpenAI = (await import('openai')).default; }
       catch { fail('CG_MODEL_UNAVAILABLE', 'match', 'Install the optional openai package to use this adapter', 'check_config'); }
       if (request.signal.aborted) fail('CG_MODEL_CANCELLED', 'match', 'Model request cancelled', 'retry');
-      const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? process.env.HTTP_PROXY ?? process.env.http_proxy;
-      let agent: ProxyAgent | undefined;
-      try { agent = !customFetch && proxy ? new ProxyAgent(proxy) : undefined; }
+      // Empty variables count as unset; NO_PROXY matching is delegated to undici with the resolved values only.
+      const env = (...names: string[]) => names.map(name => process.env[name]).find(value => value !== undefined && value.trim() !== '');
+      const proxy = env('HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy');
+      // undici keeps a request queued after a dropped proxy tunnel and reconnects at once; fail on the first connection error instead.
+      const connectionFailure = new AbortController();
+      const factory = (origin: string | URL, opts: object) => new Pool(origin, opts).on('connectionError', () => connectionFailure.abort(new GraphError('CG_MODEL_UNAVAILABLE', 'match', 'Model transport connection failed', 'check_config')));
+      let agent: EnvHttpProxyAgent | undefined;
+      try { agent = !customFetch && proxy ? new EnvHttpProxyAgent({ httpProxy: proxy, httpsProxy: proxy, noProxy: env('NO_PROXY', 'no_proxy') ?? '', factory }) : undefined; }
       catch { fail('CG_MODEL_UNAVAILABLE', 'match', 'Invalid proxy transport configuration', 'check_config'); }
-      const transport: typeof globalThis.fetch = customFetch ?? ((input, init) => proxyFetch(input.toString(), { ...init, ...(agent ? { dispatcher: agent } : {}) } as Parameters<typeof proxyFetch>[1]) as unknown as Promise<Response>);
+      const transport: typeof globalThis.fetch = customFetch ?? ((input, init) => proxyFetch(input.toString(), { ...init, ...(agent ? { dispatcher: agent, signal: init?.signal ? AbortSignal.any([init.signal, connectionFailure.signal]) : connectionFailure.signal } : {}) } as Parameters<typeof proxyFetch>[1]) as unknown as Promise<Response>);
       const boundedFetch: typeof globalThis.fetch = async (input, init) => {
         const response = await transport(input, init); const reader = response.body?.getReader();
         if (!reader) return response;
