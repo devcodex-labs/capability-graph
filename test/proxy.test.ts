@@ -32,7 +32,8 @@ async function attempt(env: Partial<Record<typeof keys[number], string>>, proxyR
 }
 
 test('OpenAI adapter bypasses the proxy for NO_PROXY hosts as documented', async () => {
-  const result = await attempt({ HTTPS_PROXY: 'PROXY', NO_PROXY: 'localhost' }, '502', 'localhost');
+  // Use the IPv4 literal the local server listens on: `localhost` may resolve to ::1 first (seen on Windows with Node 22.12).
+  const result = await attempt({ HTTPS_PROXY: 'PROXY', NO_PROXY: '127.0.0.1' }, '502', '127.0.0.1');
   assert.equal(result.proxy, 0);
   assert.ok(result.direct >= 1);
   assert.ok(result.failure instanceof GraphError);
